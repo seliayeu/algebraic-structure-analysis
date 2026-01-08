@@ -1,2 +1,1 @@
--5.817413e-04 poly-loop.mlir
-2.683258e-02 poly-canonicalize.mlir
+-4.050732e-04 identity-prop.mlir
