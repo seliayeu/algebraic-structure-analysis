@@ -5,6 +5,7 @@ add_mlir_library(AlgebraicStructureRewrite
     MLIRAlgebraicStructureRewrite
     
     LINK_LIBS PUBLIC
+    AlgebraicStructureAnalysis
 )
 
 set(LLVM_TARGET_DEFINITIONS AlgebraicStructureRewrite.td)

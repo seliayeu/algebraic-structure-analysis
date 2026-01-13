@@ -1,5 +1,7 @@
 #include "lib/Transforms/AlgebraicStructureRewrite.h"
+#include "lib/Analysis/AlegbraicStructureAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Analysis/DataFlowFramework.h"
 
 namespace mlir::asa {
 
@@ -9,7 +11,12 @@ namespace mlir::asa {
 struct AlgebraicStructureRewrite : public impl::AlgebraicStructureRewriteBase<AlgebraicStructureRewrite> {
     using AlgebraicStructureRewriteBase::AlgebraicStructureRewriteBase;
     void runOnOperation() {
-        
+        auto* op{ getOperation() };       
+        DataFlowSolver solver{};
+        solver.load<AlgebraicStructureAnalysis>();
+        if (failed(solver.initializeAndRun(op)))
+            return signalPassFailure();
+        return;
     }
 };
 
