@@ -5,91 +5,120 @@
 #include "mlir/IR/Value.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Support/LLVM.h"
-#include "mlir/Analysis/DataFlowFramework.h"
+// #include "mlir/Analysis/DataFlowFramework.h"
+#include "mlir/Analysis/DataFlow/SparseAnalysis.h"
 
 namespace mlir::asa {
 
-class AlgebraicStructureAnalysisState : public AnalysisState {
+class AlgebraicStructureAnalysisLatticeValue {
 public:
-    using AnalysisState::AnalysisState;
-
-    enum class ASAValue : unsigned int {
+    enum class AlgebraicProperty : unsigned int {
+        Uninitialized,
         Identity,
         Diagonal,
         Symmetric,
         Unknown,
     };
 
-    static StringRef valueAsString(ASAValue value) {
-        switch (value) {
-            case ASAValue::Identity:
+    AlgebraicStructureAnalysisLatticeValue(AlgebraicProperty state) : state{ state } {}
+    AlgebraicStructureAnalysisLatticeValue() : state{ AlgebraicProperty::Uninitialized } {}
+
+    static AlgebraicStructureAnalysisLatticeValue join(const AlgebraicStructureAnalysisLatticeValue& lhs, const AlgebraicStructureAnalysisLatticeValue& rhs) {
+        if (lhs.state == AlgebraicProperty::Uninitialized)
+            return rhs;
+        if (rhs.state == AlgebraicProperty::Uninitialized)
+            return lhs;
+        if (lhs.state == AlgebraicProperty::Identity)
+            return rhs;
+        if (rhs.state == AlgebraicProperty::Identity)
+            return lhs;
+        if (lhs.state == AlgebraicProperty::Diagonal)
+            return rhs;
+        if (rhs.state == AlgebraicProperty::Diagonal)
+            return lhs;
+        if (lhs.state == AlgebraicProperty::Symmetric)
+            return rhs;
+        if (rhs.state == AlgebraicProperty::Symmetric)
+            return lhs;
+        return lhs; // Unknown
+    }
+
+    bool operator==(const AlgebraicStructureAnalysisLatticeValue& rhs) {
+        return state == rhs.state;
+    }
+
+    static StringRef propertyAsStringRef(AlgebraicProperty property) {
+        switch (property) {
+            case AlgebraicProperty::Uninitialized:
+                return "Uninitialized";
+            case AlgebraicProperty::Identity:
                 return "Identity";
-            case ASAValue::Diagonal:
+            case AlgebraicProperty::Diagonal:
                 return "Diagonal";
-            case ASAValue::Symmetric:
+            case AlgebraicProperty::Symmetric:
                 return "Symmetric";
-            case ASAValue::Unknown:
+            case AlgebraicProperty::Unknown:
                 return "Unknown";
         }
         return "Unknown";
     }
 
-    static const ASAValue stringAsValue(StringRef value) {
-        static const DenseMap<StringRef, ASAValue> dict {
-            { "Identity", ASAValue::Identity },
-            { "Diagonal", ASAValue::Diagonal },
-            { "Symmetric", ASAValue::Symmetric },
-            { "Unknown", ASAValue::Unknown },
+    static const AlgebraicProperty stringRefAsValue(StringRef value) {
+        static const DenseMap<StringRef, AlgebraicProperty> dict {
+            { "Uninitialized", AlgebraicProperty::Uninitialized },
+            { "Identity", AlgebraicProperty::Identity },
+            { "Diagonal", AlgebraicProperty::Diagonal },
+            { "Symmetric", AlgebraicProperty::Symmetric },
+            { "Unknown", AlgebraicProperty::Unknown },
         };
-        return dict.contains(value) ? dict.at(value) : ASAValue::Unknown;
+        return dict.contains(value) ? dict.at(value) : AlgebraicProperty::Unknown;
     }
 
-    static ASAValue binMatmul(ASAValue lhs, ASAValue rhs) {
-        if (lhs == ASAValue::Identity && lhs == rhs)
-            return ASAValue::Identity;
-        if (lhs == ASAValue::Diagonal && lhs == rhs)
-            return ASAValue::Diagonal;
-        return ASAValue::Unknown;
+    static AlgebraicProperty binaryMatmul(AlgebraicProperty lhs, AlgebraicProperty rhs) {
+        if (lhs == AlgebraicProperty::Identity && lhs == rhs)
+            return AlgebraicProperty::Identity;
+        if (lhs == AlgebraicProperty::Diagonal && lhs == rhs)
+            return AlgebraicProperty::Diagonal;
+        return AlgebraicProperty::Unknown;
     }
 
-    static ASAValue binAdd(ASAValue lhs, ASAValue rhs) {
-        if (lhs == ASAValue::Identity && lhs == rhs)
-            return ASAValue::Diagonal;
-        if (lhs == ASAValue::Diagonal && lhs == rhs)
-            return ASAValue::Diagonal;
-        if (lhs == ASAValue::Symmetric && lhs == rhs)
-            return ASAValue::Symmetric;
-        return ASAValue::Unknown;
+    static AlgebraicProperty binaryAdd(AlgebraicProperty lhs, AlgebraicProperty rhs) {
+        if (lhs == AlgebraicProperty::Identity && lhs == rhs)
+            return AlgebraicProperty::Diagonal;
+        if (lhs == AlgebraicProperty::Diagonal && lhs == rhs)
+            return AlgebraicProperty::Diagonal;
+        if (lhs == AlgebraicProperty::Symmetric && lhs == rhs)
+            return AlgebraicProperty::Symmetric;
+        return AlgebraicProperty::Unknown;
     }
 
-    static ASAValue binElementwise(ASAValue lhs, ASAValue rhs) {
-        if (lhs == ASAValue::Identity && lhs == rhs)
-            return ASAValue::Diagonal;
-        if (lhs == ASAValue::Diagonal && lhs == rhs)
-            return ASAValue::Diagonal;
-        if (lhs == ASAValue::Symmetric && lhs == rhs)
-            return ASAValue::Symmetric;
-        return ASAValue::Unknown;
+    static AlgebraicProperty binaryElementwise(AlgebraicProperty lhs, AlgebraicProperty rhs) {
+        if (lhs == AlgebraicProperty::Identity && lhs == rhs)
+            return AlgebraicProperty::Diagonal;
+        if (lhs == AlgebraicProperty::Diagonal && lhs == rhs)
+            return AlgebraicProperty::Diagonal;
+        if (lhs == AlgebraicProperty::Symmetric && lhs == rhs)
+            return AlgebraicProperty::Symmetric;
+        return AlgebraicProperty::Unknown;
     }
 
-    void print(raw_ostream &os) const override { os << "(" << valueAsString(value) << ")"; };
-    ASAValue getValue() const { return value; }
-    ChangeResult setValue(ASAValue newValue) { 
-        auto result{ value == newValue ? ChangeResult::NoChange : ChangeResult::Change };
-        value = newValue; 
-        return result;
-    }
+    AlgebraicProperty getState() const { return state; };
+
+    void print(raw_ostream& os) const { os << propertyAsStringRef(state); }
+
 private:
-    ASAValue value{ ASAValue::Unknown };
+    AlgebraicProperty state{ AlgebraicProperty::Uninitialized };
 };
 
-class AlgebraicStructureAnalysis : public DataFlowAnalysis {
+class AlgebraicStructureAnalysis : public dataflow::SparseForwardDataFlowAnalysis<dataflow::Lattice<AlgebraicStructureAnalysisLatticeValue>> {
 public:
-    explicit AlgebraicStructureAnalysis(DataFlowSolver &solver);
-    LogicalResult initialize(Operation* top) override;
-    LogicalResult initializeBlock(Operation* block);
-    LogicalResult initializeOperation(Operation* op);
-    LogicalResult visit(ProgramPoint* point) override;
+    using AlgebraicStructureAnalysisLattice = dataflow::Lattice<AlgebraicStructureAnalysisLatticeValue>;
+    using AlgebraicProperty = AlgebraicStructureAnalysisLatticeValue::AlgebraicProperty;
+
+    using SparseForwardDataFlowAnalysis::SparseForwardDataFlowAnalysis;
+    LogicalResult visitOperation(Operation *op, ArrayRef<const AlgebraicStructureAnalysisLattice*> operands, ArrayRef<AlgebraicStructureAnalysisLattice*> results) override;
+private:
+    void setToEntryState(AlgebraicStructureAnalysisLattice *lattice) override;
 };
 
 }

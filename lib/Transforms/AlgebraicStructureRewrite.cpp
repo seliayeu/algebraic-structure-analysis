@@ -2,6 +2,7 @@
 #include "lib/Analysis/AlegbraicStructureAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Analysis/DataFlowFramework.h"
+#include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
 
 namespace mlir::asa {
 
@@ -13,6 +14,7 @@ struct AlgebraicStructureRewrite : public impl::AlgebraicStructureRewriteBase<Al
     void runOnOperation() {
         auto* op{ getOperation() };       
         DataFlowSolver solver{};
+        solver.load<dataflow::DeadCodeAnalysis>();
         solver.load<AlgebraicStructureAnalysis>();
         if (failed(solver.initializeAndRun(op)))
             return signalPassFailure();

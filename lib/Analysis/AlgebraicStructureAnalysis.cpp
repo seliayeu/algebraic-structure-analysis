@@ -11,92 +11,85 @@
 
 namespace mlir::asa {
 
-LogicalResult AlgebraicStructureAnalysis::initialize(Operation* top) {
-    for (Region &region : top->getRegions()) {
-        if (region.empty())
-            continue;
-        for (Block &block : region.getBlocks()) {
-            if (block.empty())
-                continue;
-            for (Operation &op : block.getOperations()) {
-                if (failed(initializeOperation(&op)))
-                    return failure();
-            }
-        }
-    }
+// LogicalResult AlgebraicStructureAnalysis::initialize(Operation* top) {
+//     for (Region &region : top->getRegions()) {
+//         if (region.empty())
+//             continue;
+//         for (Block &block : region.getBlocks()) {
+//             if (block.empty())
+//                 continue;
+//             for (Operation &op : block.getOperations()) {
+//                 if (failed(initializeOperation(&op)))
+//                     return failure();
+//             }
+//         }
+//     }
+//
+//     return success();
+// }
 
-    return success();
-}
+// LogicalResult AlgebraicStructureAnalysis::initializeOperation(Operation* op) {
+//     if (auto metadata{ op->getAttrOfType<DictionaryAttr>("metadata") }) {
+//         auto strAttr{ metadata.getAs<StringAttr>("analysisState") };
+//         auto strValue{ strAttr.getValue() };
+//         auto initStateValue{ AlgebraicStructureAnalysisState::ASAValue::Unknown };
+//         if (strValue.data() != nullptr)
+//             initStateValue = AlgebraicStructureAnalysisState::stringAsValue(strValue);
+//         (void)getOrCreate<AlgebraicStructureAnalysisState>(getProgramPointAfter(op))->setValue(initStateValue);
+//
+//     } else {
+//         (void)getOrCreate<AlgebraicStructureAnalysisState>(getProgramPointAfter(op))->setValue(AlgebraicStructureAnalysisState::ASAValue::Unknown);
+//     }
+//
+//     if (op->getNumRegions() && failed(initialize(op)))
+//         return failure();
+//
+//     if (failed(visit(getProgramPointAfter(op))))
+//         return failure();
+//
+//     return success();
+// }
 
-LogicalResult AlgebraicStructureAnalysis::initializeOperation(Operation* op) {
+LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op,
+                                       ArrayRef<const AlgebraicStructureAnalysisLattice*> operands,
+                                       ArrayRef<AlgebraicStructureAnalysisLattice*> results) {
+    if (results.size() > 1)
+        return success();
+
     if (auto metadata{ op->getAttrOfType<DictionaryAttr>("metadata") }) {
         auto strAttr{ metadata.getAs<StringAttr>("analysisState") };
         auto strValue{ strAttr.getValue() };
-        auto initStateValue{ AlgebraicStructureAnalysisState::ASAValue::Unknown };
+        auto initStateValue{ AlgebraicProperty::Unknown };
         if (strValue.data() != nullptr)
-            initStateValue = AlgebraicStructureAnalysisState::stringAsValue(strValue);
-        (void)getOrCreate<AlgebraicStructureAnalysisState>(getProgramPointAfter(op))->setValue(initStateValue);
-
-    } else {
-        (void)getOrCreate<AlgebraicStructureAnalysisState>(getProgramPointAfter(op))->setValue(AlgebraicStructureAnalysisState::ASAValue::Unknown);
-    }
-
-    if (op->getNumRegions() && failed(initialize(op)))
-        return failure();
-
-    if (failed(visit(getProgramPointAfter(op))))
-        return failure();
-
-    return success();
-}
-
-LogicalResult AlgebraicStructureAnalysis::visit(ProgramPoint* point) {
-    auto op{ point->getPrevOp() };
-    
-    llvm::errs() << "=======Visiting==========";
-    op->dump();
-    llvm::errs() << "\n";
-
-    if (auto matmulOp{ dyn_cast<linalg::MatmulOp>(op) }) {
-        // if (matmulOp.getIndexingMaps()) // don't support non-standard indexing
-        //     return success();
-        auto matmulInputs{ matmulOp.getDpsInputs() };
-        auto lhs{ matmulInputs[0] };
-        auto lhsDefiningOp{ lhs.getDefiningOp() };
-        auto rhs{ matmulInputs[1] };
-        auto rhsDefiningOp{ rhs.getDefiningOp() };
-
-        if (!lhsDefiningOp || !rhsDefiningOp)
-            return success();
-
-        auto lhsState{ getOrCreate<AlgebraicStructureAnalysisState>(getProgramPointAfter(lhsDefiningOp)) };
-        auto rhsState{ getOrCreate<AlgebraicStructureAnalysisState>(getProgramPointAfter(rhsDefiningOp)) };
-        auto newValue{ AlgebraicStructureAnalysisState::binMatmul(lhsState->getValue(), rhsState->getValue()) };
-        auto state{ getOrCreate<AlgebraicStructureAnalysisState>(getProgramPointAfter(op)) };
-        propagateIfChanged(state, state->setValue(newValue));
+            initStateValue = AlgebraicStructureAnalysisLatticeValue::stringRefAsValue(strValue);
+        propagateIfChanged(results[0], results[0]->join(initStateValue));
+    } else if (auto matmulOp{ dyn_cast<linalg::MatmulOp>(op) }) {
+        const AlgebraicStructureAnalysisLattice* lhsState{ operands[0] };
+        const AlgebraicStructureAnalysisLattice* rhsState{ operands[1] };
+        auto newValue{ AlgebraicStructureAnalysisLatticeValue::binaryMatmul(lhsState->getValue().getState(), rhsState->getValue().getState()) };
+        propagateIfChanged(results[0], results[0]->join(newValue));
     } else if (auto addOp{ dyn_cast<linalg::AddOp>(op) }) {
-        auto addInputs{ addOp.getInputs() };
-        auto lhs{ addInputs[0] };
-        auto lhsDefiningOp{ lhs.getDefiningOp() };
-        auto rhs{ addInputs[1] };
-        auto rhsDefiningOp{ rhs.getDefiningOp() };
-
-        if (!lhsDefiningOp || !rhsDefiningOp)
+        const AlgebraicStructureAnalysisLattice* lhsState{ operands[0] };
+        const AlgebraicStructureAnalysisLattice* rhsState{ operands[1] };
+        auto newValue{ AlgebraicStructureAnalysisLatticeValue::binaryAdd(lhsState->getValue().getState(), rhsState->getValue().getState()) };
+        propagateIfChanged(results[0], results[0]->join(newValue));
+    } else if (auto elementwiseOp{ dyn_cast<linalg::ElementwiseOp>(op) }) {
+        if (operands.size() > 1)
             return success();
-
-        auto lhsState{ getOrCreate<AlgebraicStructureAnalysisState>(getProgramPointAfter(lhsDefiningOp)) };
-        auto rhsState{ getOrCreate<AlgebraicStructureAnalysisState>(getProgramPointAfter(rhsDefiningOp)) };
-        auto newValue{ AlgebraicStructureAnalysisState::binAdd(lhsState->getValue(), rhsState->getValue()) };
-        auto state{ getOrCreate<AlgebraicStructureAnalysisState>(getProgramPointAfter(op)) };
-        propagateIfChanged(state, state->setValue(newValue));
+        const AlgebraicStructureAnalysisLattice* state{ operands[0] };
+        propagateIfChanged(results[0], results[0]->join(state->getValue()));
+    } else {
+        propagateIfChanged(results[0], results[0]->join(AlgebraicProperty::Unknown));
     }
     
     return success();
 }
 
-
-AlgebraicStructureAnalysis::AlgebraicStructureAnalysis(DataFlowSolver &solver) : DataFlowAnalysis(solver) {
-    registerAnchorKind<ProgramPoint>();
+void AlgebraicStructureAnalysis::setToEntryState(AlgebraicStructureAnalysisLattice *lattice) { 
+    auto value{ lattice->getAnchor() };
+    llvm::errs() << "=======settoentrystate!!==========\n";
+    value.print(llvm::errs());
+    llvm::errs() << "\n";
 }
 
 }
