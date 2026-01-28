@@ -20,7 +20,7 @@ LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op,
     if (auto metadata{ op->getAttrOfType<DictionaryAttr>("metadata") }) {
         auto strAttr{ metadata.getAs<StringAttr>("analysisState") };
         auto strValue{ strAttr.getValue() };
-        auto initStateValue{ AlgebraicProperty::Unknown };
+        auto initStateValue{ AlgebraicProperty::General};
         if (strValue.data() != nullptr)
             initStateValue = AlgebraicStructureAnalysisLatticeValue::stringRefAsValue(strValue);
         llvm::errs() << AlgebraicStructureAnalysisLatticeValue::propertyAsStringRef(initStateValue) << " from metadata StringRef " << strValue << " \n";
@@ -44,7 +44,7 @@ LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op,
         const AlgebraicStructureAnalysisLattice* state{ operands[0] };
         propagateIfChanged(results[0], results[0]->join(state->getValue()));
     } else {
-        propagateIfChanged(results[0], results[0]->join(AlgebraicProperty::Unknown));
+        propagateIfChanged(results[0], results[0]->join(AlgebraicProperty::General));
     }
     
     return success();
