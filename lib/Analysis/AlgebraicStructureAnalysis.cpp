@@ -11,45 +11,6 @@
 
 namespace mlir::asa {
 
-// LogicalResult AlgebraicStructureAnalysis::initialize(Operation* top) {
-//     for (Region &region : top->getRegions()) {
-//         if (region.empty())
-//             continue;
-//         for (Block &block : region.getBlocks()) {
-//             if (block.empty())
-//                 continue;
-//             for (Operation &op : block.getOperations()) {
-//                 if (failed(initializeOperation(&op)))
-//                     return failure();
-//             }
-//         }
-//     }
-//
-//     return success();
-// }
-
-// LogicalResult AlgebraicStructureAnalysis::initializeOperation(Operation* op) {
-//     if (auto metadata{ op->getAttrOfType<DictionaryAttr>("metadata") }) {
-//         auto strAttr{ metadata.getAs<StringAttr>("analysisState") };
-//         auto strValue{ strAttr.getValue() };
-//         auto initStateValue{ AlgebraicStructureAnalysisState::ASAValue::Unknown };
-//         if (strValue.data() != nullptr)
-//             initStateValue = AlgebraicStructureAnalysisState::stringAsValue(strValue);
-//         (void)getOrCreate<AlgebraicStructureAnalysisState>(getProgramPointAfter(op))->setValue(initStateValue);
-//
-//     } else {
-//         (void)getOrCreate<AlgebraicStructureAnalysisState>(getProgramPointAfter(op))->setValue(AlgebraicStructureAnalysisState::ASAValue::Unknown);
-//     }
-//
-//     if (op->getNumRegions() && failed(initialize(op)))
-//         return failure();
-//
-//     if (failed(visit(getProgramPointAfter(op))))
-//         return failure();
-//
-//     return success();
-// }
-
 LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op,
                                        ArrayRef<const AlgebraicStructureAnalysisLattice*> operands,
                                        ArrayRef<AlgebraicStructureAnalysisLattice*> results) {
@@ -62,11 +23,15 @@ LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op,
         auto initStateValue{ AlgebraicProperty::Unknown };
         if (strValue.data() != nullptr)
             initStateValue = AlgebraicStructureAnalysisLatticeValue::stringRefAsValue(strValue);
+        llvm::errs() << AlgebraicStructureAnalysisLatticeValue::propertyAsStringRef(initStateValue) << " from metadata StringRef " << strValue << " \n";
         propagateIfChanged(results[0], results[0]->join(initStateValue));
     } else if (auto matmulOp{ dyn_cast<linalg::MatmulOp>(op) }) {
         const AlgebraicStructureAnalysisLattice* lhsState{ operands[0] };
         const AlgebraicStructureAnalysisLattice* rhsState{ operands[1] };
         auto newValue{ AlgebraicStructureAnalysisLatticeValue::binaryMatmul(lhsState->getValue().getState(), rhsState->getValue().getState()) };
+        llvm::errs() << AlgebraicStructureAnalysisLatticeValue::propertyAsStringRef(lhsState->getValue().getState()) << " from lhs\n";
+        llvm::errs() << AlgebraicStructureAnalysisLatticeValue::propertyAsStringRef(rhsState->getValue().getState()) << " from rhs\n";
+        llvm::errs() << AlgebraicStructureAnalysisLatticeValue::propertyAsStringRef(newValue) << " from res\n";
         propagateIfChanged(results[0], results[0]->join(newValue));
     } else if (auto addOp{ dyn_cast<linalg::AddOp>(op) }) {
         const AlgebraicStructureAnalysisLattice* lhsState{ operands[0] };
@@ -86,10 +51,10 @@ LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op,
 }
 
 void AlgebraicStructureAnalysis::setToEntryState(AlgebraicStructureAnalysisLattice *lattice) { 
-    auto value{ lattice->getAnchor() };
-    llvm::errs() << "=======settoentrystate!!==========\n";
-    value.print(llvm::errs());
-    llvm::errs() << "\n";
+    // auto value{ lattice->getAnchor() };
+    // llvm::errs() << "=======settoentrystate!!==========\n";
+    // value.print(llvm::errs());
+    // llvm::errs() << "\n";
 }
 
 }

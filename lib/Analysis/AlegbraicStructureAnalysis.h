@@ -17,7 +17,9 @@ public:
         Identity,
         Diagonal,
         Symmetric,
-        Unknown,
+        UpperTriangular,
+        LowerTriangular,
+        General,
     };
 
     AlgebraicStructureAnalysisLatticeValue(AlgebraicProperty state) : state{ state } {}
@@ -28,6 +30,23 @@ public:
             return rhs;
         if (rhs.state == AlgebraicProperty::Uninitialized)
             return lhs;
+        if (lhs.state == AlgebraicProperty::General)
+            return rhs;
+        if (rhs.state == AlgebraicProperty::General)
+            return lhs;
+        if (lhs.state == AlgebraicProperty::Symmetric || lhs.state == AlgebraicProperty::UpperTriangular || lhs.state == AlgebraicProperty::LowerTriangular)
+            return AlgebraicProperty::Diagonal; // rhs is either sym, upper, lower, or diagonal. either way, output is diagonal
+        if (rhs.state == AlgebraicProperty::Symmetric || rhs.state == AlgebraicProperty::UpperTriangular || rhs.state == AlgebraicProperty::LowerTriangular)
+            return AlgebraicProperty::Diagonal; // rhs is either sym, upper, lower, or diagonal. either way, output is diagonal
+        if (lhs.state == AlgebraicProperty::Diagonal)
+            return rhs;
+        if (rhs.state == AlgebraicProperty::Diagonal)
+            return lhs;
+        return lhs; // identity
+    }
+
+    static AlgebraicStructureAnalysisLatticeValue meet(const AlgebraicStructureAnalysisLatticeValue& lhs, const AlgebraicStructureAnalysisLatticeValue& rhs) {
+        assert(lhs.state != AlgebraicProperty::Uninitialized && rhs.state != AlgebraicProperty::Uninitialized && "All states should be initialized before using meet");
         if (lhs.state == AlgebraicProperty::Identity)
             return rhs;
         if (rhs.state == AlgebraicProperty::Identity)
@@ -36,14 +55,14 @@ public:
             return rhs;
         if (rhs.state == AlgebraicProperty::Diagonal)
             return lhs;
-        if (lhs.state == AlgebraicProperty::Symmetric)
-            return rhs;
-        if (rhs.state == AlgebraicProperty::Symmetric)
-            return lhs;
-        return lhs; // Unknown
+        if (lhs.state == AlgebraicProperty::Symmetric || lhs.state == AlgebraicProperty::UpperTriangular || lhs.state == AlgebraicProperty::LowerTriangular)
+            return AlgebraicProperty::General; // rhs is either sym, upper, lower, or diagonal. either way, output is diagonal
+        if (rhs.state == AlgebraicProperty::Symmetric || rhs.state == AlgebraicProperty::UpperTriangular || rhs.state == AlgebraicProperty::LowerTriangular)
+            return AlgebraicProperty::General; // rhs is either sym, upper, lower, or diagonal. either way, output is diagonal
+        return lhs; // identity
     }
 
-    bool operator==(const AlgebraicStructureAnalysisLatticeValue& rhs) {
+    bool operator==(const AlgebraicStructureAnalysisLatticeValue& rhs) const {
         return state == rhs.state;
     }
 
@@ -57,10 +76,14 @@ public:
                 return "Diagonal";
             case AlgebraicProperty::Symmetric:
                 return "Symmetric";
-            case AlgebraicProperty::Unknown:
-                return "Unknown";
+            case AlgebraicProperty::UpperTriangular:
+                return "UpperTriangular";
+            case AlgebraicProperty::LowerTriangular:
+                return "LowerTriangular";
+            case AlgebraicProperty::General:
+                return "General";
         }
-        return "Unknown";
+        return "General";
     }
 
     static const AlgebraicProperty stringRefAsValue(StringRef value) {
@@ -69,9 +92,11 @@ public:
             { "Identity", AlgebraicProperty::Identity },
             { "Diagonal", AlgebraicProperty::Diagonal },
             { "Symmetric", AlgebraicProperty::Symmetric },
-            { "Unknown", AlgebraicProperty::Unknown },
+            { "UpperTriangular", AlgebraicProperty::UpperTriangular },
+            { "LowerTriangular", AlgebraicProperty::LowerTriangular },
+            { "General", AlgebraicProperty::General },
         };
-        return dict.contains(value) ? dict.at(value) : AlgebraicProperty::Unknown;
+        return dict.contains(value) ? dict.at(value) : AlgebraicProperty::General;
     }
 
     static AlgebraicProperty binaryMatmul(AlgebraicProperty lhs, AlgebraicProperty rhs) {
@@ -79,7 +104,11 @@ public:
             return AlgebraicProperty::Identity;
         if (lhs == AlgebraicProperty::Diagonal && lhs == rhs)
             return AlgebraicProperty::Diagonal;
-        return AlgebraicProperty::Unknown;
+        if (lhs == AlgebraicProperty::LowerTriangular && lhs == rhs)
+            return AlgebraicProperty::LowerTriangular;
+        if (lhs == AlgebraicProperty::UpperTriangular && lhs == rhs)
+            return AlgebraicProperty::UpperTriangular;
+        return AlgebraicProperty::General;
     }
 
     static AlgebraicProperty binaryAdd(AlgebraicProperty lhs, AlgebraicProperty rhs) {
@@ -89,17 +118,39 @@ public:
             return AlgebraicProperty::Diagonal;
         if (lhs == AlgebraicProperty::Symmetric && lhs == rhs)
             return AlgebraicProperty::Symmetric;
-        return AlgebraicProperty::Unknown;
+        if (lhs == AlgebraicProperty::LowerTriangular && lhs == rhs)
+            return AlgebraicProperty::LowerTriangular;
+        if (lhs == AlgebraicProperty::UpperTriangular && lhs == rhs)
+            return AlgebraicProperty::UpperTriangular;
+        return AlgebraicProperty::General;
     }
 
-    static AlgebraicProperty binaryElementwise(AlgebraicProperty lhs, AlgebraicProperty rhs) {
+    static AlgebraicProperty binaryElementwiseGeneral(AlgebraicProperty lhs, AlgebraicProperty rhs) {
         if (lhs == AlgebraicProperty::Identity && lhs == rhs)
             return AlgebraicProperty::Diagonal;
         if (lhs == AlgebraicProperty::Diagonal && lhs == rhs)
             return AlgebraicProperty::Diagonal;
         if (lhs == AlgebraicProperty::Symmetric && lhs == rhs)
             return AlgebraicProperty::Symmetric;
-        return AlgebraicProperty::Unknown;
+        return AlgebraicProperty::General;
+    }
+
+    static AlgebraicProperty binaryElementwiseProduct(AlgebraicProperty lhs, AlgebraicProperty rhs) {
+        return meet(lhs, rhs).state;
+    }
+
+    static AlgebraicProperty unaryElementwise(AlgebraicProperty property) {
+        if (property == AlgebraicProperty::Identity)
+            return AlgebraicProperty::Diagonal;
+        return property;
+    }
+
+    static AlgebraicProperty transpose(AlgebraicProperty property) {
+        if (property == AlgebraicProperty::UpperTriangular)
+            return AlgebraicProperty::LowerTriangular;
+        if (property == AlgebraicProperty::LowerTriangular)
+            return AlgebraicProperty::UpperTriangular;
+        return property;
     }
 
     AlgebraicProperty getState() const { return state; };
@@ -121,5 +172,17 @@ private:
     void setToEntryState(AlgebraicStructureAnalysisLattice *lattice) override;
 };
 
+// class AlgebraicBackwardStructureAnalysis : public dataflow::SparseBackwardDataFlowAnalysis<dataflow::Lattice<AlgebraicStructureAnalysisLatticeValue>> {
+// public:
+//     using AlgebraicStructureAnalysisLattice = dataflow::Lattice<AlgebraicStructureAnalysisLatticeValue>;
+//     using AlgebraicProperty = AlgebraicStructureAnalysisLatticeValue::AlgebraicProperty;
+//
+//     using SparseBackwardDataFlowAnalysis::SparseBackwardDataFlowAnalysis;
+//     LogicalResult visitOperation(Operation *op, ArrayRef<AlgebraicStructureAnalysisLattice*> operands, ArrayRef<const AlgebraicStructureAnalysisLattice*> results) override;
+// private:
+//     void setToEntryState(AlgebraicStructureAnalysisLattice *lattice) override;
+// };
+
 }
+
 #endif
