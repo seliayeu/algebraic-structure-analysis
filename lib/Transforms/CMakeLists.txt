@@ -1,13 +1,14 @@
-add_mlir_library(AlgebraicStructureRewrite
+add_mlir_library(AlgebraicStructurePasses
     AlgebraicStructureRewrite.cpp
+    AlgebraicStructureDebug.cpp
 
     DEPENDS
-    MLIRAlgebraicStructureRewrite
+    MLIRAlgebraicStructurePasses
     
     LINK_LIBS PUBLIC
     AlgebraicStructureAnalysis
 )
 
-set(LLVM_TARGET_DEFINITIONS AlgebraicStructureRewrite.td)
-mlir_tablegen(AlgebraicStructureRewrite.h.inc -gen-pass-decls -name Linalg)
-add_public_tablegen_target(MLIRAlgebraicStructureRewrite)
+set(LLVM_TARGET_DEFINITIONS Passes.td)
+mlir_tablegen(Passes.h.inc -gen-pass-decls -name Linalg)
+add_public_tablegen_target(MLIRAlgebraicStructurePasses)

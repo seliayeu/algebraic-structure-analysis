@@ -25,11 +25,7 @@ public:
     AlgebraicStructureAnalysisLatticeValue(AlgebraicProperty state) : state{ state } {}
     AlgebraicStructureAnalysisLatticeValue() : state{ AlgebraicProperty::Uninitialized } {}
 
-    static AlgebraicStructureAnalysisLatticeValue join(const AlgebraicStructureAnalysisLatticeValue& lhs, const AlgebraicStructureAnalysisLatticeValue& rhs) {
-        if (lhs.state == AlgebraicProperty::Uninitialized)
-            return rhs;
-        if (rhs.state == AlgebraicProperty::Uninitialized)
-            return lhs;
+    static AlgebraicStructureAnalysisLatticeValue meet(const AlgebraicStructureAnalysisLatticeValue& lhs, const AlgebraicStructureAnalysisLatticeValue& rhs) {
         if (lhs.state == AlgebraicProperty::General)
             return rhs;
         if (rhs.state == AlgebraicProperty::General)
@@ -42,11 +38,18 @@ public:
             return rhs;
         if (rhs.state == AlgebraicProperty::Diagonal)
             return lhs;
+        if (lhs.state == AlgebraicProperty::Identity)
+            return rhs;
+        if (rhs.state == AlgebraicProperty::Identity)
+            return lhs;
         return lhs; // identity
     }
 
-    static AlgebraicStructureAnalysisLatticeValue meet(const AlgebraicStructureAnalysisLatticeValue& lhs, const AlgebraicStructureAnalysisLatticeValue& rhs) {
-        assert(lhs.state != AlgebraicProperty::Uninitialized && rhs.state != AlgebraicProperty::Uninitialized && "All states should be initialized before using meet");
+    static AlgebraicStructureAnalysisLatticeValue join(const AlgebraicStructureAnalysisLatticeValue& lhs, const AlgebraicStructureAnalysisLatticeValue& rhs) {
+        if (lhs.state == AlgebraicProperty::Uninitialized)
+            return rhs;
+        if (rhs.state == AlgebraicProperty::Uninitialized)
+            return lhs;
         if (lhs.state == AlgebraicProperty::Identity)
             return rhs;
         if (rhs.state == AlgebraicProperty::Identity)
@@ -55,11 +58,9 @@ public:
             return rhs;
         if (rhs.state == AlgebraicProperty::Diagonal)
             return lhs;
-        if (lhs.state == AlgebraicProperty::Symmetric || lhs.state == AlgebraicProperty::UpperTriangular || lhs.state == AlgebraicProperty::LowerTriangular)
-            return AlgebraicProperty::General; // rhs is either sym, upper, lower, or diagonal. either way, output is diagonal
-        if (rhs.state == AlgebraicProperty::Symmetric || rhs.state == AlgebraicProperty::UpperTriangular || rhs.state == AlgebraicProperty::LowerTriangular)
-            return AlgebraicProperty::General; // rhs is either sym, upper, lower, or diagonal. either way, output is diagonal
-        return lhs; // identity
+        if (lhs.state == rhs.state)
+            return lhs;
+        return AlgebraicProperty::General; // rhs is either sym, upper, lower, or diagonal. either way, output is diagonal
     }
 
     bool operator==(const AlgebraicStructureAnalysisLatticeValue& rhs) const {
@@ -157,8 +158,10 @@ public:
 
     void print(raw_ostream& os) const { os << propertyAsStringRef(state); }
 
+    StringRef toString() const { return propertyAsStringRef(state); };
+
 private:
-    AlgebraicProperty state{ AlgebraicProperty::Uninitialized };
+    AlgebraicProperty state{ AlgebraicProperty::General };
 };
 
 class AlgebraicStructureAnalysis : public dataflow::SparseForwardDataFlowAnalysis<dataflow::Lattice<AlgebraicStructureAnalysisLatticeValue>> {
@@ -171,18 +174,6 @@ public:
 private:
     void setToEntryState(AlgebraicStructureAnalysisLattice *lattice) override;
 };
-
-// class AlgebraicBackwardStructureAnalysis : public dataflow::SparseBackwardDataFlowAnalysis<dataflow::Lattice<AlgebraicStructureAnalysisLatticeValue>> {
-// public:
-//     using AlgebraicStructureAnalysisLattice = dataflow::Lattice<AlgebraicStructureAnalysisLatticeValue>;
-//     using AlgebraicProperty = AlgebraicStructureAnalysisLatticeValue::AlgebraicProperty;
-//
-//     using SparseBackwardDataFlowAnalysis::SparseBackwardDataFlowAnalysis;
-//     LogicalResult visitOperation(Operation *op, ArrayRef<AlgebraicStructureAnalysisLattice*> operands, ArrayRef<const AlgebraicStructureAnalysisLattice*> results) override;
-// private:
-//     void setToEntryState(AlgebraicStructureAnalysisLattice *lattice) override;
-// };
-
 }
 
 #endif

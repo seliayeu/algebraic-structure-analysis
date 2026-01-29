@@ -77,6 +77,64 @@ private:
     DataFlowSolver* solver;
 };
 
+struct MatmulRewrite : public OpRewritePattern<linalg::MatmulOp> {
+    MatmulRewrite(MLIRContext* context, DataFlowSolver* solver) : OpRewritePattern<linalg::MatmulOp>(context), solver{ solver } {};
+
+    LogicalResult rewriteDiagonalTimesDiagonal(linalg::MatmulOp matmulOp, PatternRewriter& rewriter) const {
+        auto lhs{ matmulOp.getInputs()[0] };
+        auto rhs{ matmulOp.getInputs()[1] };
+
+        auto type{ dyn_cast<TensorType>(lhs.getType()) };
+        auto shape{ type.getShape() };
+
+        assert(shape.size() == 2 && shape[0] == shape[1]);
+
+        auto n{ shape[0] };
+
+        auto lowerBound{ arith::ConstantIndexOp::create(rewriter, matmulOp.getLoc(), 0) };
+        auto upperBound{ arith::ConstantIndexOp::create(rewriter, matmulOp.getLoc(), n) };
+        auto step{ arith::ConstantIndexOp::create(rewriter, matmulOp.getLoc(), 1) };
+
+        auto emptyTensorOp{ tensor::EmptyOp::create(rewriter, matmulOp.getLoc(), shape, type.getElementType()) };
+        auto outerForOp{ scf::ForOp::create(rewriter, matmulOp.getLoc(), lowerBound, upperBound, step, { emptyTensorOp }, 
+            [&](OpBuilder& b, Location loc, Value iv, ValueRange iterArgsOuter) {
+                auto currentMatrix{ iterArgsOuter[0] };
+                auto lhsExtractOp{ tensor::ExtractOp::create(rewriter, matmulOp.getLoc(), {iv, iv}) };
+                auto rhsExtractOp{ tensor::ExtractOp::create(rewriter, matmulOp.getLoc(), {iv, iv}) };
+                auto addOp{ arith::AddFOp::create(rewriter, matmulOp.getLoc(), lhsExtractOp, rhsExtractOp) };
+                auto insertOp{ tensor::InsertOp::create(rewriter, matmulOp.getLoc(), type, addOp, currentMatrix, {iv, iv}) };
+                scf::YieldOp::create(rewriter, addOp.getLoc(), { insertOp });
+            } 
+        )};
+        rewriter.replaceOp(matmulOp, outerForOp);
+
+        return success();       
+    }
+
+    LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp, PatternRewriter& rewriter) const override {
+        auto operands{ matmulOp.getInputs() };
+        auto lhs{ operands[0] };
+        auto rhs{ operands[1] };
+
+        auto lhsState{  solver->lookupState<dataflow::Lattice<AlgebraicStructureAnalysisLatticeValue>, Value>(lhs) };
+        auto rhsState{  solver->lookupState<dataflow::Lattice<AlgebraicStructureAnalysisLatticeValue>, Value>(rhs) };
+       
+        if (!lhsState || !rhsState)
+            return success();
+
+        auto lhsProperty{ lhsState->getValue().getState() };
+        auto rhsProperty{ rhsState->getValue().getState() };
+
+        if (lhsProperty == AlgebraicStructureAnalysisLatticeValue::AlgebraicProperty::Diagonal &&
+                rhsProperty == AlgebraicStructureAnalysisLatticeValue::AlgebraicProperty::Diagonal)
+            return rewriteDiagonalTimesDiagonal(matmulOp, rewriter);
+
+        return success();
+    }
+private:
+    DataFlowSolver* solver;
+};
+
 struct AlgebraicStructureRewritePass : public impl::AlgebraicStructureRewriteBase<AlgebraicStructureRewritePass> {
     using AlgebraicStructureRewriteBase::AlgebraicStructureRewriteBase;
     void runOnOperation() {

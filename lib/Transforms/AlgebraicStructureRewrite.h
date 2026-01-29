@@ -4,7 +4,6 @@
 
 namespace mlir::asa {
 #define GEN_PASS_DECL_ALGEBRAICSTRUCTUREREWRITE
-#define GEN_PASS_REGISTRATION
-#include "lib/Transforms/AlgebraicStructureRewrite.h.inc"
+#include "lib/Transforms/Passes.h.inc"
 }
 #endif
