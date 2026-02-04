@@ -8,6 +8,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
+#include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
 #include "mlir/Analysis/DataFlow/SparseAnalysis.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -20,9 +21,13 @@ struct AlgebraicStructureDebugPass : public impl::AlgebraicStructureDebugBase<Al
     using AlgebraicStructureDebugBase::AlgebraicStructureDebugBase;
     void runOnOperation() {
         auto* op{ getOperation() };       
+
+        auto* context{ op->getContext() };
         DataFlowSolver solver{};
         solver.load<dataflow::DeadCodeAnalysis>();
+        solver.load<dataflow::SparseConstantPropagation>();
         solver.load<AlgebraicStructureAnalysis>();
+
         if (failed(solver.initializeAndRun(op)))
             return signalPassFailure();
     
@@ -31,7 +36,8 @@ struct AlgebraicStructureDebugPass : public impl::AlgebraicStructureDebugBase<Al
                 const auto *lattice{ solver.lookupState<AlgebraicStructureAnalysis::AlgebraicStructureAnalysisLattice>(result) };
                 if (lattice) {
                     auto stateStr{ lattice->getValue().toString() }; 
-                    inst->setAttr("analysis_state", StringAttr::get(inst->getContext(), stateStr));
+                    NamedAttribute namedAttr("analysisState", StringAttr::get(inst->getContext(), stateStr));
+                    inst->setAttr("metadata", DictionaryAttr::get(inst->getContext(), { namedAttr }));
                 }
             }
         });

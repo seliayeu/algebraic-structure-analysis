@@ -7,6 +7,8 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Analysis/DataFlow/SparseAnalysis.h"
 #include "llvm/Support/DebugLog.h"
 #include <iostream>
 
@@ -24,8 +26,6 @@ LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op,
         auto initStateValue{ AlgebraicProperty::General};
         if (strValue.data() != nullptr)
             initStateValue = AlgebraicStructureAnalysisLatticeValue::stringRefAsValue(strValue);
-        llvm::errs() << AlgebraicStructureAnalysisLatticeValue::propertyAsStringRef(initStateValue) << " from metadata StringRef " << strValue << " \n";
-        llvm::errs() << AlgebraicStructureAnalysisLatticeValue::propertyAsStringRef(results[0]->getValue().getState()) << " originally " << strValue << " \n";
         propagateIfChanged(results[0], results[0]->join(initStateValue));
     } else if (auto matmulOp{ dyn_cast<linalg::MatmulOp>(op) }) {
         auto matmulOperands{ matmulOp->getOperands() };
@@ -56,9 +56,6 @@ LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op,
         const AlgebraicStructureAnalysisLattice* lhsState{ operands[0] };
         const AlgebraicStructureAnalysisLattice* rhsState{ operands[1] };
         auto newValue{ AlgebraicStructureAnalysisLatticeValue::binaryMatmul(lhsState->getValue().getState(), rhsState->getValue().getState()) };
-        llvm::errs() << AlgebraicStructureAnalysisLatticeValue::propertyAsStringRef(lhsState->getValue().getState()) << " from lhs\n";
-        llvm::errs() << AlgebraicStructureAnalysisLatticeValue::propertyAsStringRef(rhsState->getValue().getState()) << " from rhs\n";
-        llvm::errs() << AlgebraicStructureAnalysisLatticeValue::propertyAsStringRef(newValue) << " from res\n";
         propagateIfChanged(results[0], results[0]->join(newValue));
     } else if (auto addOp{ dyn_cast<linalg::AddOp>(op) }) {
         auto addOperands{ addOp.getOperands() };
@@ -71,9 +68,6 @@ LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op,
         const AlgebraicStructureAnalysisLattice* lhsState{ operands[0] };
         const AlgebraicStructureAnalysisLattice* rhsState{ operands[1] };
         auto newValue{ AlgebraicStructureAnalysisLatticeValue::binaryAdd(lhsState->getValue().getState(), rhsState->getValue().getState()) };
-        llvm::errs() << AlgebraicStructureAnalysisLatticeValue::propertyAsStringRef(lhsState->getValue().getState()) << " from lhs\n";
-        llvm::errs() << AlgebraicStructureAnalysisLatticeValue::propertyAsStringRef(rhsState->getValue().getState()) << " from rhs\n";
-        llvm::errs() << AlgebraicStructureAnalysisLatticeValue::propertyAsStringRef(newValue) << " from res\n";
         propagateIfChanged(results[0], results[0]->join(newValue));
     } else if (auto elementwiseOp{ dyn_cast<linalg::ElementwiseOp>(op)}) {
         for (auto& map : elementwiseOp.getIndexingMapsArray())
@@ -88,6 +82,12 @@ LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op,
                 AlgebraicStructureAnalysisLatticeValue::binaryElementwiseGeneral(operands[0]->getValue().getState(), operands[1]->getValue().getState()) };
             propagateIfChanged(results[0], results[0]->join(newValue));
         }
+    } else if (auto mulOp{ dyn_cast<linalg::MulOp>(op)}) {
+        for (auto& map : mulOp.getIndexingMapsArray())
+            if (!map.isIdentity()) 
+                return success();
+        auto newValue{ AlgebraicStructureAnalysisLatticeValue::binaryElementwiseProduct(operands[0]->getValue().getState(), operands[1]->getValue().getState()) };
+        propagateIfChanged(results[0], results[0]->join(newValue));
     } else if (auto transposeOp{ dyn_cast<linalg::TransposeOp>(op)}) {
         auto permutation{ transposeOp.getPermutation() };
         if (permutation.size() != 2 || !(permutation[0] == 1 && permutation[1] == 0) )
@@ -124,8 +124,7 @@ void AlgebraicStructureAnalysis::setToEntryState(AlgebraicStructureAnalysisLatti
     auto initStateValue{ AlgebraicProperty::General};
     if (strValue.data() != nullptr)
         initStateValue = AlgebraicStructureAnalysisLatticeValue::stringRefAsValue(strValue);
-    llvm::errs() << AlgebraicStructureAnalysisLatticeValue::propertyAsStringRef(initStateValue) << " from metadata StringRef " << strValue << " \n";
     propagateIfChanged(lattice, lattice->join(initStateValue));
 }
-
 }
+
