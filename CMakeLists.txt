@@ -5,6 +5,7 @@ project(algebraic-structure-analysis LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(LLVM_USE_LINKER "lld")
 
 find_package(MLIR REQUIRED CONFIG)
 

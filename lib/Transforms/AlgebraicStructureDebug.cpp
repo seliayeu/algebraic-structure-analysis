@@ -1,16 +1,8 @@
 #include <cassert>
 #include "lib/Transforms/AlgebraicStructureDebug.h"
-#include "lib/Analysis/AlegbraicStructureAnalysis.h"
+#include "lib/Analysis/AlgebraicStructureAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Analysis/DataFlowFramework.h"
-#include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
-#include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
-#include "mlir/Analysis/DataFlow/SparseAnalysis.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace mlir::asa {
 
@@ -20,26 +12,23 @@ namespace mlir::asa {
 struct AlgebraicStructureDebugPass : public impl::AlgebraicStructureDebugBase<AlgebraicStructureDebugPass> {
     using AlgebraicStructureDebugBase::AlgebraicStructureDebugBase;
     void runOnOperation() {
-        auto* op{ getOperation() };       
+        auto funcOp{ getOperation() };       
+        auto* context{ funcOp->getContext() };
+        AlgebraicStructureAnalysis ASA;
 
-        auto* context{ op->getContext() };
-        DataFlowSolver solver{};
-        solver.load<dataflow::DeadCodeAnalysis>();
-        solver.load<dataflow::SparseConstantPropagation>();
-        solver.load<AlgebraicStructureAnalysis>();
+        for (auto& block : funcOp.getBody())
+            (void) ASA.run(&block);
 
-        if (failed(solver.initializeAndRun(op)))
-            return signalPassFailure();
-    
-        op->walk([&](Operation *inst) {
-            for (Value result : inst->getResults()) {
-                const auto *lattice{ solver.lookupState<AlgebraicStructureAnalysis::AlgebraicStructureAnalysisLattice>(result) };
-                if (lattice) {
-                    auto stateStr{ lattice->getValue().toString() }; 
-                    NamedAttribute namedAttr("analysisState", StringAttr::get(inst->getContext(), stateStr));
-                    inst->setAttr("metadata", DictionaryAttr::get(inst->getContext(), { namedAttr }));
-                }
-            }
+        Builder builder(context);
+
+        funcOp->walk([&](Operation* inst) {
+            auto results{ inst->getResults() };
+            if (results.size() != 1 || !ASA.hasProperty(results[0]))
+                return;
+            auto stringAttr{ builder.getStringAttr(propertyAsStringRef(ASA.getProperty(results[0]))) };
+            auto propertyAttr{ builder.getNamedAttr("algebraicProperty", stringAttr) };
+            auto dictAttr{ builder.getDictionaryAttr({ propertyAttr }) };
+            inst->setAttr("metadata", dictAttr);
         });
 
         return;

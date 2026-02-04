@@ -2,35 +2,52 @@
 #include "mlir/IR/Value.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Support/LLVM.h"
-#include "mlir/Analysis/DataFlowFramework.h"
-#include "lib/Analysis/AlegbraicStructureAnalysis.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Analysis/DataFlow/SparseAnalysis.h"
-#include "llvm/Support/DebugLog.h"
-#include <iostream>
+#include "lib/Analysis/AlgebraicStructureAnalysis.h"
 
 namespace mlir::asa {
 
-LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op,
-                                       ArrayRef<const AlgebraicStructureAnalysisLattice*> operands,
-                                       ArrayRef<AlgebraicStructureAnalysisLattice*> results) {
-    if (results.size() > 1)
-        return success();
+LogicalResult AlgebraicStructureAnalysis::run(Block* block) {
+    if (block->isEntryBlock()) {
+        auto* parentOp{ block->getParentOp() };
+        if (auto funcOp{ dyn_cast<func::FuncOp>(parentOp) })
+            for (auto& arg : block->getArguments())
+                if (auto dict{ funcOp.getArgAttrDict(arg.getArgNumber()) })
+                    propertyMap[dyn_cast<Value>(arg)] = readPropertyFromDictAttr(dict);
+    }
 
-    if (auto metadata{ op->getAttrOfType<DictionaryAttr>("metadata") }) {
-        auto strAttr{ metadata.getAs<StringAttr>("analysisState") };
-        auto strValue{ strAttr.getValue() };
-        auto initStateValue{ AlgebraicProperty::General};
-        if (strValue.data() != nullptr)
-            initStateValue = AlgebraicStructureAnalysisLatticeValue::stringRefAsValue(strValue);
-        propagateIfChanged(results[0], results[0]->join(initStateValue));
-    } else if (auto matmulOp{ dyn_cast<linalg::MatmulOp>(op) }) {
-        auto matmulOperands{ matmulOp->getOperands() };
-        auto lhsType{ dyn_cast<TensorType>(matmulOperands[0].getType()) };
-        auto rhsType{ dyn_cast<TensorType>(matmulOperands[1].getType()) };
+    for (auto& op : block->getOperations()) {
+        if (failed(visitOperation(&op)))
+            return failure();
+    }
+
+    return success();
+}
+
+LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op) {
+    if (op->getNumResults() != 1)
+        return success();
+    auto dialect{ op->getDialect() };
+    if (!dialect || (dialect->getNamespace() != "linalg"
+        && dialect->getNamespace() != "arith"
+        && dialect->getNamespace() != "tensor")) {
+        return success();
+    }
+
+    auto dict{ op->getAttrDictionary() };
+    if (!dict) 
+        dict = DictionaryAttr();
+    
+    auto result{ op->getResult(0) };
+    propertyMap[result] = readPropertyFromDictAttr(dict);
+
+    if (auto matmulOp{ dyn_cast<linalg::MatmulOp>(op) }) {
+        auto operands{ matmulOp->getOperands() };
+        auto lhs{ operands[0] };
+        auto rhs{ operands[1] };
+        auto lhsType{ dyn_cast<TensorType>(lhs.getType()) };
+        auto rhsType{ dyn_cast<TensorType>(rhs.getType()) };
         auto lhsShape{ lhsType.getShape() };
         auto rhsShape{ rhsType.getShape() };
         if (!(lhsShape[0] == lhsShape[1]) || !(rhsShape[0] == rhsShape[1])) 
@@ -53,78 +70,56 @@ LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op,
             return success();
         }
 
-        const AlgebraicStructureAnalysisLattice* lhsState{ operands[0] };
-        const AlgebraicStructureAnalysisLattice* rhsState{ operands[1] };
-        auto newValue{ AlgebraicStructureAnalysisLatticeValue::binaryMatmul(lhsState->getValue().getState(), rhsState->getValue().getState()) };
-        propagateIfChanged(results[0], results[0]->join(newValue));
+        auto newValue{ binaryMatmul(propertyMap[lhs], propertyMap[rhs]) };
+        propertyMap[result] = 
+            join(propertyMap[result], newValue);
     } else if (auto addOp{ dyn_cast<linalg::AddOp>(op) }) {
-        auto addOperands{ addOp.getOperands() };
-        auto lhsType{ dyn_cast<TensorType>(addOperands[0].getType()) };
-        auto rhsType{ dyn_cast<TensorType>(addOperands[1].getType()) };
+        auto operands{ addOp.getOperands() };
+        auto lhs{ operands[0] };
+        auto rhs{ operands[1] };
+        auto lhsType{ dyn_cast<TensorType>(lhs.getType()) };
+        auto rhsType{ dyn_cast<TensorType>(rhs.getType()) };
         auto lhsShape{ lhsType.getShape() };
         auto rhsShape{ rhsType.getShape() };
         if (!(lhsShape[0] == lhsShape[1]) || !(rhsShape[0] == rhsShape[1])) 
             return success();
-        const AlgebraicStructureAnalysisLattice* lhsState{ operands[0] };
-        const AlgebraicStructureAnalysisLattice* rhsState{ operands[1] };
-        auto newValue{ AlgebraicStructureAnalysisLatticeValue::binaryAdd(lhsState->getValue().getState(), rhsState->getValue().getState()) };
-        propagateIfChanged(results[0], results[0]->join(newValue));
+        auto newValue{ binaryAdd(propertyMap[lhs], propertyMap[rhs]) };
+        propertyMap[result] = 
+            join(propertyMap[result], newValue);
     } else if (auto elementwiseOp{ dyn_cast<linalg::ElementwiseOp>(op)}) {
         for (auto& map : elementwiseOp.getIndexingMapsArray())
             if (!map.isIdentity()) 
                 return success();
-        if (operands.size() == 1) {
-            auto newValue{ AlgebraicStructureAnalysisLatticeValue::unaryElementwise(operands[0]->getValue().getState()) };
-            propagateIfChanged(results[0], results[0]->join(newValue));
-        } else if (operands.size() == 2) {
-            auto newValue{ elementwiseOp.getKind() == linalg::ElementwiseKind::mul ?
-                AlgebraicStructureAnalysisLatticeValue::binaryElementwiseProduct(operands[0]->getValue().getState(), operands[1]->getValue().getState()) :
-                AlgebraicStructureAnalysisLatticeValue::binaryElementwiseGeneral(operands[0]->getValue().getState(), operands[1]->getValue().getState()) };
-            propagateIfChanged(results[0], results[0]->join(newValue));
+        auto operands{ elementwiseOp.getOperands() };
+        auto newValue{ AlgebraicProperty::General };
+        if (operands.size() == 1)
+            newValue = unaryElementwise(propertyMap[operands[0]]);
+        else if (operands.size() == 2) {
+            newValue = binaryElementwiseGeneral(propertyMap[operands[0]],
+                propertyMap[operands[1]]);
+            propertyMap[result] = 
+                join(propertyMap[result], newValue);
         }
     } else if (auto mulOp{ dyn_cast<linalg::MulOp>(op)}) {
         for (auto& map : mulOp.getIndexingMapsArray())
             if (!map.isIdentity()) 
                 return success();
-        auto newValue{ AlgebraicStructureAnalysisLatticeValue::binaryElementwiseProduct(operands[0]->getValue().getState(), operands[1]->getValue().getState()) };
-        propagateIfChanged(results[0], results[0]->join(newValue));
+        auto operands{ mulOp.getOperands() };
+        auto newValue{ binaryElementwiseProduct(propertyMap[operands[0]],
+            propertyMap[operands[1]])};
+        propertyMap[result] = 
+            join(propertyMap[result], newValue);
     } else if (auto transposeOp{ dyn_cast<linalg::TransposeOp>(op)}) {
+        auto operands{ transposeOp.getOperands() };
         auto permutation{ transposeOp.getPermutation() };
         if (permutation.size() != 2 || !(permutation[0] == 1 && permutation[1] == 0) )
             return success();
-        auto newValue{ AlgebraicStructureAnalysisLatticeValue::transpose(operands[0]->getValue().getState()) };
-        propagateIfChanged(results[0], results[0]->join(newValue));
-    } else if (isa<RegionBranchOpInterface>(op) || isa<BranchOpInterface>(op)) {
-        return success();
-    } else if (!results.empty()) {
-        propagateIfChanged(results[0], results[0]->join(AlgebraicProperty::General));
-    }
-    
+        auto newValue{ transpose(propertyMap[operands[0]]) };
+        propertyMap[result] = 
+            join(propertyMap[result], newValue);
+    } 
+
     return success();
 }
 
-void AlgebraicStructureAnalysis::setToEntryState(AlgebraicStructureAnalysisLattice *lattice) { 
-    auto value{ lattice->getAnchor() };
-    auto blockArg{ dyn_cast<BlockArgument>(value) };
-    if (!blockArg) return;
-    auto* block{ blockArg.getOwner() };
-    if (!block->isEntryBlock()) return;
-
-    auto op{ block->getParentOp() };
-    auto funcOp{ dyn_cast<func::FuncOp>(op) };
-    if (!funcOp) return;
-    auto attrDict{ funcOp.getArgAttrDict(blockArg.getArgNumber()) };
-    if (!attrDict) {
-        propagateIfChanged(lattice, lattice->join(AlgebraicProperty::General));
-        return;
-    }
-
-    auto strAttr{ attrDict.getAs<StringAttr>("analysisState") };
-    auto strValue{ strAttr.getValue() };
-    auto initStateValue{ AlgebraicProperty::General};
-    if (strValue.data() != nullptr)
-        initStateValue = AlgebraicStructureAnalysisLatticeValue::stringRefAsValue(strValue);
-    propagateIfChanged(lattice, lattice->join(initStateValue));
 }
-}
-

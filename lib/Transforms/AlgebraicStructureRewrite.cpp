@@ -1,6 +1,6 @@
 #include <cassert>
 #include "lib/Transforms/AlgebraicStructureRewrite.h"
-#include "lib/Analysis/AlegbraicStructureAnalysis.h"
+#include "lib/Analysis/AlgebraicStructureAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -14,26 +14,25 @@
 namespace mlir::asa {
 
 #define GEN_PASS_DEF_ALGEBRAICSTRUCTUREREWRITE
-#include "lib/Transforms/AlgebraicStructureRewrite.h.inc"
+#include "lib/Transforms/Passes.h.inc"
 
 struct AddRewrite : public OpRewritePattern<linalg::AddOp> {
-    AddRewrite(MLIRContext* context, DataFlowSolver* solver) : OpRewritePattern<linalg::AddOp>(context), solver{ solver } {};
+    AddRewrite(MLIRContext* context, AlgebraicStructureAnalysis& ASA) : OpRewritePattern<linalg::AddOp>(context), ASA{ ASA } { };
 
     LogicalResult matchAndRewrite(linalg::AddOp addOp, PatternRewriter& rewriter) const override {
         auto operands{ addOp.getInputs() };
         auto lhs{ operands[0] };
         auto rhs{ operands[1] };
 
-        auto lhsState{  solver->lookupState<dataflow::Lattice<AlgebraicStructureAnalysisLatticeValue>, Value>(lhs) };
-        auto rhsState{  solver->lookupState<dataflow::Lattice<AlgebraicStructureAnalysisLatticeValue>, Value>(rhs) };
-       
-        if (!lhsState || !rhsState || !(lhsState->getValue() == rhsState->getValue()))
+        if (!ASA.hasProperty(lhs) || !ASA.hasProperty(rhs)
+            || !(ASA.getProperty(lhs) != ASA.getProperty(rhs))) {
             return success();
+        }
 
-        auto lhsProperty{ lhsState->getValue().getState() };
-        auto rhsProperty{ rhsState->getValue().getState() };
+        auto lhsProperty{ ASA.getProperty(lhs) };
+        auto rhsProperty{ ASA.getProperty(rhs) };
 
-        if (lhsProperty != AlgebraicStructureAnalysisLatticeValue::AlgebraicProperty::Symmetric)
+        if (rhsProperty != AlgebraicProperty::Symmetric)
             return success();
 
         // rewrite the output matrix symmetricly
@@ -70,15 +69,15 @@ struct AddRewrite : public OpRewritePattern<linalg::AddOp> {
         )};
 
         rewriter.replaceOp(addOp, outerForOp);
-        
+
         return success();
     }
 private:
-    DataFlowSolver* solver;
+    AlgebraicStructureAnalysis& ASA;
 };
 
 struct MatmulRewrite : public OpRewritePattern<linalg::MatmulOp> {
-    MatmulRewrite(MLIRContext* context, DataFlowSolver* solver) : OpRewritePattern<linalg::MatmulOp>(context), solver{ solver } {};
+    MatmulRewrite(MLIRContext* context, AlgebraicStructureAnalysis& ASA) : OpRewritePattern<linalg::MatmulOp>(context), ASA{ ASA } {};
 
     LogicalResult rewriteDiagonalTimesDiagonal(linalg::MatmulOp matmulOp, PatternRewriter& rewriter) const {
         auto lhs{ matmulOp.getInputs()[0] };
@@ -116,40 +115,33 @@ struct MatmulRewrite : public OpRewritePattern<linalg::MatmulOp> {
         auto lhs{ operands[0] };
         auto rhs{ operands[1] };
 
-        auto lhsState{  solver->lookupState<dataflow::Lattice<AlgebraicStructureAnalysisLatticeValue>, Value>(lhs) };
-        auto rhsState{  solver->lookupState<dataflow::Lattice<AlgebraicStructureAnalysisLatticeValue>, Value>(rhs) };
-       
-        if (!lhsState || !rhsState)
+        if (!ASA.hasProperty(lhs) || !ASA.hasProperty(rhs))
             return success();
 
-        auto lhsProperty{ lhsState->getValue().getState() };
-        auto rhsProperty{ rhsState->getValue().getState() };
+        auto lhsProperty{ ASA.getProperty(lhs) };
+        auto rhsProperty{ ASA.getProperty(rhs) };
 
-        if (lhsProperty == AlgebraicStructureAnalysisLatticeValue::AlgebraicProperty::Diagonal &&
-                rhsProperty == AlgebraicStructureAnalysisLatticeValue::AlgebraicProperty::Diagonal)
+        if (lhsProperty == AlgebraicProperty::Diagonal && rhsProperty == AlgebraicProperty::Diagonal)
             return rewriteDiagonalTimesDiagonal(matmulOp, rewriter);
 
         return success();
     }
 private:
-    DataFlowSolver* solver;
+    AlgebraicStructureAnalysis& ASA;
 };
 
 struct AlgebraicStructureRewritePass : public impl::AlgebraicStructureRewriteBase<AlgebraicStructureRewritePass> {
     using AlgebraicStructureRewriteBase::AlgebraicStructureRewriteBase;
     void runOnOperation() {
-        auto* op{ getOperation() };       
-        DataFlowSolver solver{};
-        solver.load<dataflow::DeadCodeAnalysis>();
-        solver.load<AlgebraicStructureAnalysis>();
-        if (failed(solver.initializeAndRun(op)))
-            return signalPassFailure();
+        AlgebraicStructureAnalysis ASA;
+        auto funcOp{ getOperation() };       
         mlir::RewritePatternSet patterns(&getContext());
-        patterns.add<AddRewrite>(&getContext(), &solver);
+        patterns.add<AddRewrite>(&getContext(), ASA);
         (void)applyPatternsGreedily(getOperation(), std::move(patterns));
 
         return;
     }
 };
+
 
 }
