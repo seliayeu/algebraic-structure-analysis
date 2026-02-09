@@ -25,7 +25,7 @@ struct AlgebraicStructureDebugPass : public impl::AlgebraicStructureDebugBase<Al
             auto results{ inst->getResults() };
             if (results.size() != 1 || !ASA.hasProperty(results[0]))
                 return;
-            auto stringAttr{ builder.getStringAttr(propertyAsStringRef(ASA.getProperty(results[0]))) };
+            auto stringAttr{ builder.getStringAttr(propertyToString(ASA.getProperty(results[0]))) };
             auto propertyAttr{ builder.getNamedAttr("algebraicProperty", stringAttr) };
             auto dictAttr{ builder.getDictionaryAttr({ propertyAttr }) };
             inst->setAttr("metadata", dictAttr);

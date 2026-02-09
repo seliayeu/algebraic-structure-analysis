@@ -4,6 +4,8 @@
 #include "mlir/IR/Value.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Support/LLVM.h"
+#include <string>
+#include <array>
 
 namespace mlir::asa {
 
@@ -14,6 +16,11 @@ enum class AlgebraicProperty : unsigned int {
     UpperTriangular,
     LowerTriangular,
     General,
+};
+
+struct SubMatrixProperty {
+    AlgebraicProperty property;
+    std::array<size_t, 2> dimension;
 };
 
 static AlgebraicProperty meet(const AlgebraicProperty lhs, const AlgebraicProperty rhs) {
@@ -51,7 +58,7 @@ static AlgebraicProperty join(const AlgebraicProperty& lhs, const AlgebraicPrope
     return lhs; // identity
 }
 
-static StringRef propertyAsStringRef(AlgebraicProperty property) {
+static std::string propertyToString(AlgebraicProperty property) {
     switch (property) {
         case AlgebraicProperty::Identity:
             return "Identity";
@@ -69,7 +76,7 @@ static StringRef propertyAsStringRef(AlgebraicProperty property) {
     return "General";
 }
 
-static const AlgebraicProperty stringRefAsValue(StringRef value) {
+static const AlgebraicProperty stringToValue(const std::string& value) {
     static const DenseMap<StringRef, AlgebraicProperty> dict {
         { "Identity", AlgebraicProperty::Identity },
         { "Diagonal", AlgebraicProperty::Diagonal },
@@ -163,7 +170,7 @@ private:
             return AlgebraicProperty::General;
         auto analysisProperty{ dyn_cast<StringAttr>(analysisPropertyAttr).getValue() };
 
-        return stringRefAsValue(analysisProperty);
+        return stringToValue(std::string(analysisProperty));
     }
 };
 }
