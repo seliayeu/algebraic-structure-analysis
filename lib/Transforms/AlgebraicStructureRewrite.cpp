@@ -32,7 +32,7 @@ struct AddRewrite : public OpRewritePattern<linalg::AddOp> {
         auto lhsProperty{ ASA.getProperty(lhs) };
         auto rhsProperty{ ASA.getProperty(rhs) };
 
-        if (rhsProperty != AlgebraicProperty::Symmetric)
+        if (rhsProperty.property != AlgebraicProperty::Symmetric)
             return success();
 
         // rewrite the output matrix symmetricly
@@ -121,7 +121,7 @@ struct MatmulRewrite : public OpRewritePattern<linalg::MatmulOp> {
         auto lhsProperty{ ASA.getProperty(lhs) };
         auto rhsProperty{ ASA.getProperty(rhs) };
 
-        if (lhsProperty == AlgebraicProperty::Diagonal && rhsProperty == AlgebraicProperty::Diagonal)
+        if (lhsProperty.property == AlgebraicProperty::Diagonal && rhsProperty.property == AlgebraicProperty::Diagonal)
             return rewriteDiagonalTimesDiagonal(matmulOp, rewriter);
 
         return success();

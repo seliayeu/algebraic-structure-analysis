@@ -5,6 +5,8 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/Support/LLVM.h"
 #include <string>
+#include <iostream>
+#include <limits>
 #include <array>
 
 namespace mlir::asa {
@@ -20,7 +22,13 @@ enum class AlgebraicProperty : unsigned int {
 
 struct SubMatrixProperty {
     AlgebraicProperty property;
-    std::array<size_t, 2> dimension;
+    std::array<long long, 2> dimensions{ -1, -1 };
+    bool operator==(const SubMatrixProperty& other) const {
+        return (property == other.property) && (dimensions == other.dimensions);
+    }
+    bool operator!=(const SubMatrixProperty& other) const {
+        return !operator==(other);
+    }
 };
 
 static AlgebraicProperty meet(const AlgebraicProperty lhs, const AlgebraicProperty rhs) {
@@ -34,7 +42,7 @@ static AlgebraicProperty meet(const AlgebraicProperty lhs, const AlgebraicProper
         return lhs;
     if (lhs == rhs)
         return lhs;
-    return AlgebraicProperty::General; // rhs is either sym, upper, lower, or diagonal. either way, output is diagonal
+    return AlgebraicProperty::General;
 }
 
 static AlgebraicProperty join(const AlgebraicProperty& lhs, const AlgebraicProperty& rhs) {
@@ -100,7 +108,7 @@ static AlgebraicProperty binaryMatmul(AlgebraicProperty lhs, AlgebraicProperty r
     return AlgebraicProperty::General;
 }
 
-static AlgebraicProperty binaryAdd(AlgebraicProperty lhs, AlgebraicProperty rhs) {
+static AlgebraicProperty binaryElementwiseGeneral(AlgebraicProperty lhs, AlgebraicProperty rhs) {
     if (lhs == AlgebraicProperty::Identity && lhs == rhs)
         return AlgebraicProperty::Diagonal;
     if (lhs == AlgebraicProperty::Diagonal && lhs == rhs)
@@ -114,18 +122,8 @@ static AlgebraicProperty binaryAdd(AlgebraicProperty lhs, AlgebraicProperty rhs)
     return AlgebraicProperty::General;
 }
 
-static AlgebraicProperty binaryElementwiseGeneral(AlgebraicProperty lhs, AlgebraicProperty rhs) {
-    if (lhs == AlgebraicProperty::Identity && lhs == rhs)
-        return AlgebraicProperty::Diagonal;
-    if (lhs == AlgebraicProperty::Diagonal && lhs == rhs)
-        return AlgebraicProperty::Diagonal;
-    if (lhs == AlgebraicProperty::Symmetric && lhs == rhs)
-        return AlgebraicProperty::Symmetric;
-    return AlgebraicProperty::General;
-}
-
 static AlgebraicProperty binaryElementwiseProduct(AlgebraicProperty lhs, AlgebraicProperty rhs) {
-    return meet(lhs, rhs);
+    return join(lhs, rhs);
 }
 
 static AlgebraicProperty unaryElementwise(AlgebraicProperty property) {
@@ -143,12 +141,10 @@ static AlgebraicProperty transpose(AlgebraicProperty property) {
 }
 
 class AlgebraicStructureAnalysis {
-    llvm::DenseMap<mlir::Value, AlgebraicProperty> propertyMap;
+    llvm::DenseMap<mlir::Value, SubMatrixProperty> propertyMap;
 public:
     LogicalResult run(Block* block);
-    AlgebraicProperty getProperty(mlir::Value value) {
-        if (!propertyMap.contains(value))
-            return AlgebraicProperty::General;
+    SubMatrixProperty getProperty(mlir::Value value) {
         return propertyMap[value];
     }
 
@@ -158,19 +154,30 @@ public:
 
 private:
     LogicalResult visitOperation(Operation* op);
-    AlgebraicProperty readPropertyFromDictAttr(DictionaryAttr dictAttr) {
+    SubMatrixProperty readPropertyFromDictAttr(DictionaryAttr dictAttr) {
         auto metadataAttr{ dictAttr.get("metadata") };
         if (!metadataAttr)
-            return AlgebraicProperty::General;
+            return { AlgebraicProperty::General };
         auto innerDictAttr{ dyn_cast<DictionaryAttr>(metadataAttr) };
         if (!innerDictAttr)
-            return AlgebraicProperty::General;
+            return { AlgebraicProperty::General };
         auto analysisPropertyAttr{ innerDictAttr.get("analysisState") };
         if (!analysisPropertyAttr)
-            return AlgebraicProperty::General;
+            return { AlgebraicProperty::General };
         auto analysisProperty{ dyn_cast<StringAttr>(analysisPropertyAttr).getValue() };
 
-        return stringToValue(std::string(analysisProperty));
+        auto propertyDimsAttr{ innerDictAttr.get("propertyDims") };
+        if (!propertyDimsAttr)
+            return { AlgebraicProperty::General };
+        auto propertyDimsArrayAttr{ dyn_cast<ArrayAttr>(propertyDimsAttr) };
+        if (!propertyDimsArrayAttr || propertyDimsArrayAttr.size() != 2) {
+            return { AlgebraicProperty::General };
+        }
+        SubMatrixProperty res{ stringToValue(std::string(analysisProperty)) }; 
+        res.dimensions[0] = cast<IntegerAttr>(propertyDimsArrayAttr[0]).getInt();
+        res.dimensions[1] = cast<IntegerAttr>(propertyDimsArrayAttr[1]).getInt();
+
+        return res;
     }
 };
 }

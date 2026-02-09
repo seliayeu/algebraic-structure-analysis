@@ -12,8 +12,8 @@
 module {
     func.func private @printMemrefF32(memref<*xf32>)
     func.func @main() {
-        %0 = arith.constant { metadata = { analysisState = "Diagonal" } } dense<[[2.0,0.0,0.0],[0.0,3.0,0.0],[0.0,0.0,7.0]]> : tensor<3x3xf32>
-        %1 = arith.constant { metadata = { analysisState = "Diagonal" } } dense<[[5.0,0.0,0.0],[0.0,4.0,0.0],[0.0,0.0,3.0]]> : tensor<3x3xf32>
+        %0 = arith.constant { metadata = { analysisState = "Diagonal", propertyDims = [0, 1] } } dense<[[2.0,0.0,0.0],[0.0,3.0,0.0],[0.0,0.0,7.0]]> : tensor<3x3xf32>
+        %1 = arith.constant { metadata = { analysisState = "Diagonal", propertyDims = [0, 1] } } dense<[[5.0,0.0,0.0],[0.0,4.0,0.0],[0.0,0.0,3.0]]> : tensor<3x3xf32>
         %3 = tensor.empty () : tensor<3x3xf32>
         %2 = linalg.matmul
             ins(%0, %1: tensor<3x3xf32>, tensor<3x3xf32>)

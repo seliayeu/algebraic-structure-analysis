@@ -70,9 +70,9 @@ LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op) {
             return success();
         }
 
-        auto newValue{ binaryMatmul(propertyMap[lhs], propertyMap[rhs]) };
-        propertyMap[result] = 
-            join(propertyMap[result], newValue);
+        auto newProperty{ binaryMatmul(propertyMap[lhs].property, propertyMap[rhs].property) };
+        newProperty = join(propertyMap[result].property, newProperty);
+        propertyMap[result] = SubMatrixProperty{ newProperty, { 0, 1 } };
     } else if (auto addOp{ dyn_cast<linalg::AddOp>(op) }) {
         auto operands{ addOp.getOperands() };
         auto lhs{ operands[0] };
@@ -83,40 +83,61 @@ LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op) {
         auto rhsShape{ rhsType.getShape() };
         if (!(lhsShape[0] == lhsShape[1]) || !(rhsShape[0] == rhsShape[1])) 
             return success();
-        auto newValue{ binaryAdd(propertyMap[lhs], propertyMap[rhs]) };
-        propertyMap[result] = 
-            join(propertyMap[result], newValue);
+        
+        if (propertyMap[lhs].dimensions != propertyMap[rhs].dimensions)
+            return success();
+        AlgebraicProperty newProperty;
+        newProperty = binaryElementwiseGeneral(propertyMap[lhs].property, propertyMap[rhs].property);
+        propertyMap[result] = {
+            join(propertyMap[result].property, newProperty),
+            propertyMap[operands[0]].dimensions
+        };
     } else if (auto elementwiseOp{ dyn_cast<linalg::ElementwiseOp>(op)}) {
         for (auto& map : elementwiseOp.getIndexingMapsArray())
             if (!map.isIdentity()) 
                 return success();
         auto operands{ elementwiseOp.getOperands() };
-        auto newValue{ AlgebraicProperty::General };
-        if (operands.size() == 1)
-            newValue = unaryElementwise(propertyMap[operands[0]]);
-        else if (operands.size() == 2) {
-            newValue = binaryElementwiseGeneral(propertyMap[operands[0]],
-                propertyMap[operands[1]]);
-            propertyMap[result] = 
-                join(propertyMap[result], newValue);
+        if (operands.size() == 1) {
+            auto newProperty{ unaryElementwise(propertyMap[operands[0]].property) };
+            propertyMap[result].property = join(propertyMap[result].property, newProperty);
+        } else if (operands.size() == 2) {
+            if (propertyMap[operands[0]].dimensions != propertyMap[operands[1]].dimensions)
+                return success();
+            auto newProperty{ binaryElementwiseGeneral(propertyMap[operands[0]].property,
+                propertyMap[operands[1]].property) };
+            newProperty = join(propertyMap[result].property, newProperty);
+            propertyMap[result] = {
+                join(propertyMap[result].property, newProperty),
+                propertyMap[operands[0]].dimensions
+            };
         }
     } else if (auto mulOp{ dyn_cast<linalg::MulOp>(op)}) {
         for (auto& map : mulOp.getIndexingMapsArray())
             if (!map.isIdentity()) 
                 return success();
         auto operands{ mulOp.getOperands() };
-        auto newValue{ binaryElementwiseProduct(propertyMap[operands[0]],
-            propertyMap[operands[1]])};
-        propertyMap[result] = 
-            join(propertyMap[result], newValue);
+        if (propertyMap[operands[0]].dimensions != propertyMap[operands[1]].dimensions)
+            return success();
+        auto newProperty{ binaryElementwiseProduct(propertyMap[operands[0]].property,
+            propertyMap[operands[1]].property)};
+        propertyMap[result] = {
+            join(propertyMap[result].property, newProperty),
+            propertyMap[operands[0]].dimensions
+        };
     } else if (auto transposeOp{ dyn_cast<linalg::TransposeOp>(op)}) {
         auto operands{ transposeOp.getOperands() };
         auto permutation{ transposeOp.getPermutation() };
-        if (permutation.size() != 2 || !(permutation[0] == 1 && permutation[1] == 0) )
+        if (permutation.size() != 2)
             return success();
-        auto newValue{ transpose(propertyMap[operands[0]]) };
-        propertyMap[result] = 
-            join(propertyMap[result], newValue);
+        if (permutation[0] != propertyMap[operands[0]].dimensions[1]
+                && permutation[1] != propertyMap[operands[0]].dimensions[0])
+            return success();
+
+        auto newProperty{ transpose(propertyMap[operands[0]].property) };
+        propertyMap[result] = {
+            join(propertyMap[result].property, newProperty),
+            { propertyMap[operands[0]].dimensions[1], propertyMap[operands[0]].dimensions[0] }
+        };
     } 
 
     return success();
