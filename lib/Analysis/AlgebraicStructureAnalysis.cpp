@@ -249,4 +249,98 @@ LogicalResult AlgebraicStructureAnalysis::visitElementwise(linalg::ElementwiseOp
     return success();
 }
 
+LogicalResult AlgebraicStructureAnalysis::visitGeneric(linalg::GenericOp* op) {
+    auto inputs{ op->getInputs() };
+    auto outputs{ op->getOutputs() };
+
+    auto lhs{ inputs[0] };
+    auto rhs{ inputs[1] };
+    auto result{ outputs[0] };
+
+    auto& lhsProp{ propertyMap[lhs] };
+    auto& rhsProp{ propertyMap[rhs] };
+
+    // verify indexing maps
+    auto indexingMaps{ op->getIndexingMapsArray() };
+    auto lhsMap{ indexingMaps[0] };
+    auto rhsMap{ indexingMaps[1] };
+    auto resultMap{ indexingMaps[2] };
+
+    if (!lhsMap.isProjectedPermutation() ||  !rhsMap.isProjectedPermutation() 
+            || !resultMap.isProjectedPermutation())
+        return success();
+
+    auto mExpr{ lhsMap.getResult(lhsProp.dimensions[0]) };
+    auto kExpr{ lhsMap.getResult(lhsProp.dimensions[1]) };
+    auto nExpr{ rhsMap.getResult(rhsProp.dimensions[1]) };
+
+    if (kExpr != rhsMap.getResult(rhsProp.dimensions[0]))
+        return success();
+
+    std::optional<int> mResultIdx;
+    std::optional<int> nResultIdx;
+
+    for (unsigned i = 0; i < resultMap.getNumResults(); ++i) {
+        auto resExpr{ resultMap.getResult(i) };
+        if (resExpr == mExpr) mResultIdx = static_cast<int>(i);
+        if (resExpr == nExpr) nResultIdx = static_cast<int>(i);
+    }
+
+    if (!mResultIdx.has_value() || !nResultIdx.has_value())
+        return success();
+
+    // verify iterators
+    auto iterTypes{ op->getIteratorTypesArray() };
+    auto kDimPos{ cast<AffineDimExpr>(kExpr).getPosition() };
+
+    if (iterTypes[kDimPos] != utils::IteratorType::reduction)
+        return success();
+
+    auto mDimPos{ cast<AffineDimExpr>(mExpr).getPosition() };
+    auto nDimPos{ cast<AffineDimExpr>(nExpr).getPosition() };
+
+    if (iterTypes[mDimPos] != utils::IteratorType::parallel 
+            ||  iterTypes[nDimPos] != utils::IteratorType::parallel)
+        return success();
+
+    auto body{ op->getBody() };
+    if (body->getOperations().size() != 3 || body->getNumArguments() != 3)
+        return success();
+
+    auto accumulator{ body->getArgument(2) };
+
+    auto yieldOp{ cast<linalg::YieldOp>(body->getTerminator()) };
+    auto yieldOperands{ yieldOp->getOperands() };
+    if (yieldOperands.size() != 1)
+        return success();
+    auto addOp{ yieldOperands[0].getDefiningOp() };
+    if (!addOp || !isa<arith::AddIOp, arith::AddFOp>(addOp))
+        return success();
+    Operation* mulOp;
+    if (addOp->getOperand(0) == accumulator) {
+        mulOp = addOp->getOperand(1).getDefiningOp();
+    } else if (addOp->getOperand(1) == accumulator) {
+        mulOp = addOp->getOperand(0).getDefiningOp();
+    } else {
+        return success();
+    }
+
+    if (!mulOp || !isa<arith::MulIOp, arith::MulFOp>(mulOp))
+        return success();
+
+    if (!((mulOp->getOperand(0) == body->getArgument(1) && mulOp->getOperand(1) == body->getArgument(0)) 
+            || (mulOp->getOperand(1) == body->getArgument(0) && mulOp->getOperand(0) == body->getArgument(1))))
+        return success();
+
+    auto newProperty{ binaryMatmul(lhsProp.property, rhsProp.property) };
+    newProperty = join(propertyMap[result].property, newProperty);
+
+    propertyMap[result] = SubMatrixProperty{ 
+        newProperty, 
+        { mResultIdx.value(), nResultIdx.value() } 
+    };
+
+    return success();
+}
+
 }
