@@ -30,7 +30,6 @@ static AlgebraicProperty meet(const AlgebraicProperty lhs, const AlgebraicProper
 }
 
 static AlgebraicProperty join(const AlgebraicProperty& lhs, const AlgebraicProperty& rhs) {
-    // pessimistic join
     if (lhs == AlgebraicProperty::General)
         return rhs;
     if (rhs == AlgebraicProperty::General)
@@ -47,7 +46,7 @@ static AlgebraicProperty join(const AlgebraicProperty& lhs, const AlgebraicPrope
         return rhs;
     if (rhs == AlgebraicProperty::Identity)
         return lhs;
-    return lhs; // identity
+    return lhs;
 }
 
 static std::string propertyToString(AlgebraicProperty property) {

@@ -84,9 +84,9 @@ LogicalResult AlgebraicStructureAnalysis::visitOperation(Operation *op) {
 }
 
 
-LogicalResult AlgebraicStructureAnalysis::visitMatmul(linalg::MatmulOp* matmulOp) {
-    auto operands{ matmulOp->getOperands() };
-    auto result{ matmulOp->getResult(0) };
+LogicalResult AlgebraicStructureAnalysis::visitMatmul(linalg::MatmulOp* op) {
+    auto operands{ op->getOperands() };
+    auto result{ op->getResult(0) };
     auto lhs{ operands[0] };
     auto rhs{ operands[1] };
     auto lhsType{ dyn_cast<TensorType>(lhs.getType()) };
@@ -97,11 +97,11 @@ LogicalResult AlgebraicStructureAnalysis::visitMatmul(linalg::MatmulOp* matmulOp
     if (!(lhsShape[0] == lhsShape[1]) || !(rhsShape[0] == rhsShape[1])) 
         return success();
 
-    auto indexingMapArr{ matmulOp->getIndexingMapsArray() };
+    auto indexingMapArr{ op->getIndexingMapsArray() };
     if (indexingMapArr.size() != 3)
         return success();
 
-    auto* ctx{ matmulOp->getContext() };
+    auto* ctx{ op->getContext() };
     AffineExpr m, n, k;
     bindDims(ctx, m, n, k);
     auto expectedMapLhs{ AffineMap::get(3, 0, {m, k}, ctx) };
@@ -121,9 +121,53 @@ LogicalResult AlgebraicStructureAnalysis::visitMatmul(linalg::MatmulOp* matmulOp
     return success();
 }
 
-LogicalResult AlgebraicStructureAnalysis::visitAdd(linalg::AddOp* addOp) {
-    auto operands{ addOp->getOperands() };
-    auto result{ addOp->getResult(0) };
+LogicalResult AlgebraicStructureAnalysis::visitBatchMatmul(linalg::BatchMatmulOp* op) {
+    auto operands{ op->getOperands() };
+    auto result{ op->getResult(0) };
+    auto lhs{ operands[0] };
+    auto rhs{ operands[1] };
+    auto lhsType{ dyn_cast<TensorType>(lhs.getType()) };
+    auto rhsType{ dyn_cast<TensorType>(rhs.getType()) };
+
+    auto lhsShape{ lhsType.getShape() };
+    auto rhsShape{ rhsType.getShape() };
+
+    if (!(lhsShape[1] == lhsShape[2]) || !(rhsShape[1] == rhsShape[2])) 
+        return success();
+
+    auto indexingMapArr{ op->getIndexingMapsArray() };
+    if (indexingMapArr.size() != 3)
+        return success();
+
+    auto* ctx{ op->getContext() };
+    AffineExpr b, m, n, k;
+    bindDims(ctx, b, m, n, k);
+    
+    auto expectedMapLhs{ AffineMap::get(4, 0, {b, m, k}, ctx) };
+    auto expectedMapRhs{ AffineMap::get(4, 0, {b, k, n}, ctx) };
+    auto expectedMapRes{ AffineMap::get(4, 0, {b, m, n}, ctx) };
+
+    if (indexingMapArr[0] != expectedMapLhs || 
+        indexingMapArr[1] != expectedMapRhs || 
+        indexingMapArr[2] != expectedMapRes) {
+        return success();
+    }
+
+    if (!(propertyMap[lhs].dimensions[0] == 1 && propertyMap[lhs].dimensions[1] == 2)
+            || !(propertyMap[rhs].dimensions[0] == 1 && propertyMap[rhs].dimensions[1] == 2))
+        return success();
+
+    auto newProperty{ binaryMatmul(propertyMap[lhs].property, propertyMap[rhs].property) };
+    newProperty = join(propertyMap[result].property, newProperty);
+    
+    propertyMap[result] = SubMatrixProperty{ newProperty, { 1, 2 } };
+
+    return success();
+}
+
+LogicalResult AlgebraicStructureAnalysis::visitAdd(linalg::AddOp* op) {
+    auto operands{ op->getOperands() };
+    auto result{ op->getResult(0) };
     auto lhs{ operands[0] };
     auto rhs{ operands[1] };
     auto lhsType{ dyn_cast<TensorType>(lhs.getType()) };
@@ -144,12 +188,12 @@ LogicalResult AlgebraicStructureAnalysis::visitAdd(linalg::AddOp* addOp) {
     return success();
 }
 
-LogicalResult AlgebraicStructureAnalysis::visitMul(linalg::MulOp* mulOp) {
-    for (auto& map : mulOp->getIndexingMapsArray())
+LogicalResult AlgebraicStructureAnalysis::visitMul(linalg::MulOp* op) {
+    for (auto& map : op->getIndexingMapsArray())
         if (!map.isIdentity()) 
             return success();
-    auto operands{ mulOp->getOperands() };
-    auto result{ mulOp->getResult(0) };
+    auto operands{ op->getOperands() };
+    auto result{ op->getResult(0) };
     if (propertyMap[operands[0]].dimensions != propertyMap[operands[1]].dimensions)
         return success();
     auto newProperty{ binaryElementwiseProduct(propertyMap[operands[0]].property,
@@ -161,11 +205,11 @@ LogicalResult AlgebraicStructureAnalysis::visitMul(linalg::MulOp* mulOp) {
     return success();
 }
 
-LogicalResult AlgebraicStructureAnalysis::visitTranspose(linalg::TransposeOp* transposeOp) {
-    auto operands{ transposeOp->getOperands() };
-    auto resultRange{ transposeOp->getResult() };
+LogicalResult AlgebraicStructureAnalysis::visitTranspose(linalg::TransposeOp* op) {
+    auto operands{ op->getOperands() };
+    auto resultRange{ op->getResult() };
     auto result{ resultRange[0] };
-    auto permutation{ transposeOp->getPermutation() };
+    auto permutation{ op->getPermutation() };
     if (permutation.size() != 2)
         return success();
     if (permutation[0] != propertyMap[operands[0]].dimensions[1]
@@ -180,13 +224,13 @@ LogicalResult AlgebraicStructureAnalysis::visitTranspose(linalg::TransposeOp* tr
     return success();
 }
 
-LogicalResult AlgebraicStructureAnalysis::visitElementwise(linalg::ElementwiseOp* elementwiseOp) {
-    for (auto& map : elementwiseOp->getIndexingMapsArray())
+LogicalResult AlgebraicStructureAnalysis::visitElementwise(linalg::ElementwiseOp* op) {
+    for (auto& map : op->getIndexingMapsArray())
         if (!map.isIdentity()) 
             return success();
 
-    auto operands{ elementwiseOp->getOperands() };
-    auto result{ elementwiseOp->getResult(0) };
+    auto operands{ op->getOperands() };
+    auto result{ op->getResult(0) };
 
     if (operands.size() == 1) {
         auto newProperty{ unaryElementwise(propertyMap[operands[0]].property) };

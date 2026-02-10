@@ -37,10 +37,12 @@ public:
 private:
     LogicalResult visitOperation(Operation* op);
     LogicalResult visitMatmul(linalg::MatmulOp* );
+    LogicalResult visitBatchMatmul(linalg::BatchMatmulOp* );
     LogicalResult visitAdd(linalg::AddOp* addOp);
     LogicalResult visitElementwise(linalg::ElementwiseOp* elementwiseOp);
     LogicalResult visitMul(linalg::MulOp* mulOp);
     LogicalResult visitTranspose(linalg::TransposeOp* transposeOp);
+    LogicalResult visitGeneric(linalg::GenericOp* transposeOp);
     SubMatrixProperty readPropertyFromDictAttr(DictionaryAttr dictAttr);
 };
 }
