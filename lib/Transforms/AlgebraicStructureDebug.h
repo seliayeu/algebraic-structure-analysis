@@ -5,5 +5,5 @@
 namespace mlir::asa {
 #define GEN_PASS_DECL_ALGEBRAICSTRUCTUREDEBUG
 #include "lib/Transforms/Passes.h.inc"
-}
+}  // namespace mlir::asa
 #endif
