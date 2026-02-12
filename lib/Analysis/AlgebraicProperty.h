@@ -59,12 +59,12 @@ static std::string propertyToString(AlgebraicProperty property) {
 
 static const AlgebraicProperty stringToValue(const std::string& value) {
     static const llvm::DenseMap<llvm::StringRef, AlgebraicProperty> dict{
-        {"Identity", AlgebraicProperty::Identity},
-        {"Diagonal", AlgebraicProperty::Diagonal},
-        {"Symmetric", AlgebraicProperty::Symmetric},
-        {"UpperTriangular", AlgebraicProperty::UpperTriangular},
-        {"LowerTriangular", AlgebraicProperty::LowerTriangular},
-        {"General", AlgebraicProperty::General},
+        { "Identity", AlgebraicProperty::Identity },
+        { "Diagonal", AlgebraicProperty::Diagonal },
+        { "Symmetric", AlgebraicProperty::Symmetric },
+        { "UpperTriangular", AlgebraicProperty::UpperTriangular },
+        { "LowerTriangular", AlgebraicProperty::LowerTriangular },
+        { "General", AlgebraicProperty::General },
     };
     return dict.contains(value) ? dict.at(value) : AlgebraicProperty::General;
 }

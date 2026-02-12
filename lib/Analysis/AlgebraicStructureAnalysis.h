@@ -13,7 +13,7 @@ namespace mlir::asa {
 
 struct SubMatrixProperty {
     AlgebraicProperty property;
-    std::array<long long, 2> dimensions{-1, -1};
+    std::array<long long, 2> dimensions{ -1, -1 };
     bool operator==(const SubMatrixProperty& other) const {
         return (property == other.property) && (dimensions == other.dimensions);
     }
