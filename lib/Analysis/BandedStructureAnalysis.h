@@ -2,8 +2,9 @@
 #define LIB_ANALYSIS_BANDEDSTRUCTUREANALYSIS_H
 
 #include <array>
-#include <cstddef>
 #include <limits>
+#include <set>
+#include <vector>
 
 #include "lib/Analysis/BandedProperty.h"
 #include "llvm/ADT/DenseMap.h"
@@ -27,16 +28,17 @@ struct BandedSubMatrix {
 };
 
 class BandedStructureAnalysis {
-    llvm::DenseMap<mlir::Value, BandedSubMatrix> propertyMap;
+    llvm::DenseMap<Value, BandedSubMatrix> propertyMap;
+    std::vector<Operation*> bwList;  // list of ops to perform bw prop on
 
    public:
     LogicalResult run(Block* block);
 
-    BandedSubMatrix getProperty(mlir::Value value) {
+    BandedSubMatrix getProperty(Value value) {
         return propertyMap[value];
     }
 
-    bool hasProperty(mlir::Value value) {
+    bool hasProperty(Value value) {
         return propertyMap.contains(value);
     }
 
@@ -49,6 +51,9 @@ class BandedStructureAnalysis {
     LogicalResult visitMul(linalg::MulOp* mulOp);
     LogicalResult visitTranspose(linalg::TransposeOp* transposeOp);
     LogicalResult visitGeneric(linalg::GenericOp* transposeOp);
+
+    LogicalResult runBackward();
+    bool propagateBackward(Value value);
 
     BandedSubMatrix readPropertyFromDictAttr(DictionaryAttr dictAttr);
 };

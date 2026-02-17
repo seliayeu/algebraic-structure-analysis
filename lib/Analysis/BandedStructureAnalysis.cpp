@@ -13,6 +13,7 @@
 namespace mlir::bpa {
 
 LogicalResult BandedStructureAnalysis::run(Block* block) {
+    // read block argument attr dictionaries
     if (block->isEntryBlock()) {
         auto* parentOp{ block->getParentOp() };
         if (auto funcOp{ dyn_cast<func::FuncOp>(parentOp) })
@@ -21,11 +22,57 @@ LogicalResult BandedStructureAnalysis::run(Block* block) {
                     propertyMap[dyn_cast<Value>(arg)] = readPropertyFromDictAttr(dict);
     }
 
-    for (auto& op : block->getOperations()) {
+    for (auto& op : block->getOperations())
         if (failed(visitOperation(&op))) return failure();
+
+    // backward
+    return runBackward();
+}
+
+LogicalResult BandedStructureAnalysis::runBackward() {
+    while (!bwList.empty()) {
+        auto* op{ bwList.back() };
+        bwList.pop_back();
+        auto linalgOp{ dyn_cast<linalg::LinalgOp>(op) };
+
+        for (auto& v : linalgOp.getDpsInputs()) {
+            auto* definingOp{ v.getDefiningOp() };
+            if (!propagateBackward(v) || !isa<linalg::LinalgOp>(definingOp) ||
+                isa<linalg::MatmulOp>(definingOp))
+                continue;
+            bwList.push_back(definingOp);
+        }
     }
 
     return success();
+}
+
+bool BandedStructureAnalysis::propagateBackward(Value value) {
+    auto& mat{ propertyMap[value] };
+    BandedProperty property{ 0, 0 };
+
+    for (auto* op : value.getUsers()) {
+        if (op->getResults().size() != 1) {
+            property = mat.Property;
+            break;
+        }
+
+        auto resultValue{ op->getResult(0) };
+        auto resMat{ propertyMap[resultValue] };
+        if (isa<linalg::TransposeOp>(op) &&
+            resMat.Property.LowerBandwidth != mat.Property.LowerBandwidth) {
+            property = meet(property, BandedProperty{ resMat.Property.LowerBandwidth,
+                                                      resMat.Property.UpperBandwidth });
+        } else {
+            property = meet(property, resMat.Property);
+        }
+    }
+
+    // return false when no update was made
+    if (mat.Property == property) return false;
+    mat.Property = join(mat.Property, property);
+
+    return true;
 }
 
 BandedSubMatrix BandedStructureAnalysis::readPropertyFromDictAttr(DictionaryAttr dictAttr) {
@@ -84,6 +131,7 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
     } else if (auto elementwiseOp{ dyn_cast<linalg::ElementwiseOp>(op) }) {
         return visitElementwise(&elementwiseOp);
     } else if (auto mulOp{ dyn_cast<linalg::MulOp>(op) }) {
+        bwList.push_back(op);
         return visitMul(&mulOp);
     } else if (auto transposeOp{ dyn_cast<linalg::TransposeOp>(op) }) {
         return visitTranspose(&transposeOp);
