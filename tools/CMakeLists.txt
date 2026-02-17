@@ -7,7 +7,7 @@ set (LIBS
     MLIROptLib
     MLIRRegisterAllDialects
     MLIRRegisterAllPasses
-    AlgebraicStructurePasses
+    BandedStructurePasses
 )
 
 add_llvm_executable(alg-opt alg-opt.cpp)

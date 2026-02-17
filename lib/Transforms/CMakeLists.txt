@@ -1,14 +1,13 @@
-add_mlir_library(AlgebraicStructurePasses
-    AlgebraicStructureRewrite.cpp
-    AlgebraicStructureDebug.cpp
+add_mlir_library(BandedStructurePasses
+    BandedStructureDebug.cpp
 
     DEPENDS
-    MLIRAlgebraicStructurePasses
+    MLIRBandedStructurePasses
     
     LINK_LIBS PUBLIC
-    AlgebraicStructureAnalysis
+    BandedStructureAnalysis
 )
 
 set(LLVM_TARGET_DEFINITIONS Passes.td)
 mlir_tablegen(Passes.h.inc -gen-pass-decls -name Linalg)
-add_public_tablegen_target(MLIRAlgebraicStructurePasses)
+add_public_tablegen_target(MLIRBandedStructurePasses)
