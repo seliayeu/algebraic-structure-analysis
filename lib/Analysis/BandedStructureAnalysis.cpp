@@ -162,8 +162,8 @@ LogicalResult BandedStructureAnalysis::visitMatmul(linalg::MatmulOp* op) {
     const auto& rhsMat{ propertyMap[rhs] };
 
     BandedProperty newProperty{ binaryMatmul(lhsMat.Property, rhsMat.Property) };
-    newProperty.UpperBandwidth = std::min(newProperty.UpperBandwidth, lhsShape[0] - 1);
-    newProperty.LowerBandwidth = std::min(newProperty.LowerBandwidth, lhsShape[0] - 1);
+    newProperty.UpperBandwidth = std::min<uint64_t>(newProperty.UpperBandwidth, lhsShape[0] - 1);
+    newProperty.LowerBandwidth = std::min<uint64_t>(newProperty.LowerBandwidth, lhsShape[0] - 1);
 
     BandedSubMatrix& resMat{ propertyMap[result] };
     resMat.Property = join(resMat.Property, newProperty);
@@ -200,8 +200,8 @@ LogicalResult BandedStructureAnalysis::visitBatchMatmul(linalg::BatchMatmulOp* o
     if (lhsMat.Dims != expectedDims || rhsMat.Dims != expectedDims) return success();
 
     BandedProperty newProperty{ binaryMatmul(lhsMat.Property, rhsMat.Property) };
-    newProperty.UpperBandwidth = std::min(newProperty.UpperBandwidth, lhsShape[1] - 1);
-    newProperty.LowerBandwidth = std::min(newProperty.LowerBandwidth, lhsShape[1] - 1);
+    newProperty.UpperBandwidth = std::min<uint64_t>(newProperty.UpperBandwidth, lhsShape[1] - 1);
+    newProperty.LowerBandwidth = std::min<uint64_t>(newProperty.LowerBandwidth, lhsShape[1] - 1);
 
     propertyMap[result] = BandedSubMatrix{ newProperty, { 1, 2 } };
 
@@ -417,8 +417,8 @@ LogicalResult BandedStructureAnalysis::visitGeneric(linalg::GenericOp* op) {
     if (!isMulArgsValid) return success();
 
     BandedProperty newProperty{ binaryMatmul(lhsMat.Property, rhsMat.Property) };
-    newProperty.UpperBandwidth = std::min(newProperty.UpperBandwidth, mSize - 1);
-    newProperty.LowerBandwidth = std::min(newProperty.LowerBandwidth, mSize - 1);
+    newProperty.UpperBandwidth = std::min<uint64_t>(newProperty.UpperBandwidth, mSize - 1);
+    newProperty.LowerBandwidth = std::min<uint64_t>(newProperty.LowerBandwidth, mSize - 1);
 
     propertyMap[result] = BandedSubMatrix{ newProperty, { *mResultIdx, *nResultIdx } };
 

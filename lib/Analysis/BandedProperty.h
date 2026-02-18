@@ -2,15 +2,16 @@
 #define LIB_ANALYSIS_BANDEDPROPERTY_H
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 
 namespace mlir::bpa {
 
 struct BandedProperty {
-    long UpperBandwidth;
-    long LowerBandwidth;
+    uint64_t UpperBandwidth;
+    uint64_t LowerBandwidth;
 
-    explicit BandedProperty(long upperBandwidth, long lowerBandwidth)
+    explicit BandedProperty(uint64_t upperBandwidth, uint64_t lowerBandwidth)
         : UpperBandwidth{ upperBandwidth }, LowerBandwidth{ lowerBandwidth } {
     }
 
