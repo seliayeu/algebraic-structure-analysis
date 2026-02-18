@@ -42,6 +42,8 @@ class BandedStructureAnalysis {
         return propertyMap.contains(value);
     }
 
+    static BandedSubMatrix readPropertyFromDictAttr(DictionaryAttr dictAttr);
+
    private:
     LogicalResult visitOperation(Operation* op);
     LogicalResult visitMatmul(linalg::MatmulOp* op);
@@ -54,8 +56,6 @@ class BandedStructureAnalysis {
 
     LogicalResult runBackward();
     bool propagateBackward(Value value);
-
-    BandedSubMatrix readPropertyFromDictAttr(DictionaryAttr dictAttr);
 };
 
 }  // namespace mlir::bpa

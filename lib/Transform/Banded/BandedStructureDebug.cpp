@@ -1,4 +1,4 @@
-#include "lib/Transforms/BandedStructureDebug.h"
+#include "Transform/Banded/BandedStructureDebug.h"
 
 #include <cassert>
 
