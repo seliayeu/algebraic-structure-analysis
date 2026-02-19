@@ -4,12 +4,12 @@
 
 namespace mlir::bpa {
 
-class BandLoweringPass : public PassWrapper<BandLoweringPass, OperationPass<func::FuncOp>> {
+class BandedLoweringPass : public PassWrapper<BandedLoweringPass, OperationPass<func::FuncOp>> {
    public:
-    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(BandLoweringPass)
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(BandedLoweringPass)
 
     StringRef getArgument() const final {
-        return "band-lowering";
+        return "banded-lowering";
     }
 
     StringRef getDescription() const override {
@@ -20,5 +20,5 @@ class BandLoweringPass : public PassWrapper<BandLoweringPass, OperationPass<func
     void runOnOperation() override;
 };
 
-void registerBandLoweringPass();
+void registerBandedLoweringPass();
 }  // namespace mlir::bpa
