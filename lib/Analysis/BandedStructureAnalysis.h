@@ -3,7 +3,6 @@
 
 #include <array>
 #include <limits>
-#include <set>
 #include <vector>
 
 #include "lib/Analysis/BandedProperty.h"
@@ -16,7 +15,8 @@
 namespace mlir::bpa {
 
 struct BandedSubMatrix {
-    BandedProperty Property{ std::numeric_limits<long>::max(), std::numeric_limits<long>::max() };
+    BandedProperty Property{ std::numeric_limits<uint64_t>::max(),
+                             std::numeric_limits<uint64_t>::max() };
     std::array<long long, 2> Dims{ 0, 1 };
 
     bool operator==(const BandedSubMatrix& other) const {
