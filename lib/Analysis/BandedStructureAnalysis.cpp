@@ -161,8 +161,8 @@ LogicalResult BandedStructureAnalysis::visitMatmul(linalg::MatmulOp* op) {
     const auto& rhsMat{ propertyMap[rhs] };
 
     BandedProperty newProperty{ binaryMatmul(lhsMat.Property, rhsMat.Property) };
-    newProperty.LowerBandwidth = std::min(newProperty.LowerBandwidth, lhsShape[0] - 1);  // m
-    newProperty.UpperBandwidth = std::min(newProperty.UpperBandwidth, rhsShape[1] - 1);  // n
+    newProperty.UpperBandwidth = std::min<uint64_t>(newProperty.UpperBandwidth, rhsShape[1] - 1);
+    newProperty.LowerBandwidth = std::min<uint64_t>(newProperty.LowerBandwidth, lhsShape[0] - 1);
 
     BandedSubMatrix& resMat{ propertyMap[result] };
     resMat.Property = join(resMat.Property, newProperty);
@@ -194,12 +194,12 @@ LogicalResult BandedStructureAnalysis::visitBatchMatmul(linalg::BatchMatmulOp* o
     const auto& lhsMat{ propertyMap[lhs] };
     const auto& rhsMat{ propertyMap[rhs] };
 
-    std::array<long long, 2> expectedDims{ 1, 2 };
+    std::array<uint64_t, 2> expectedDims{ 1, 2 };
     if (lhsMat.Dims != expectedDims || rhsMat.Dims != expectedDims) return success();
 
     BandedProperty newProperty{ binaryMatmul(lhsMat.Property, rhsMat.Property) };
-    newProperty.LowerBandwidth = std::min(newProperty.LowerBandwidth, lhsShape[1] - 1);  // m
-    newProperty.UpperBandwidth = std::min(newProperty.UpperBandwidth, rhsShape[2] - 1);  // n
+    newProperty.UpperBandwidth = std::min<uint64_t>(newProperty.UpperBandwidth, rhsShape[2] - 1);
+    newProperty.LowerBandwidth = std::min<uint64_t>(newProperty.LowerBandwidth, lhsShape[1] - 1);
 
     propertyMap[result] = BandedSubMatrix{ newProperty, { 1, 2 } };
 
@@ -263,9 +263,9 @@ LogicalResult BandedStructureAnalysis::visitTranspose(linalg::TransposeOp* op) {
     const auto& mat{ propertyMap[input] };
 
     auto dim0Iter{ std::find(permutation.begin(), permutation.end(), mat.Dims[0]) };
-    auto dim0{ std::distance(permutation.begin(), dim0Iter) };
+    auto dim0{ static_cast<uint64_t>(std::distance(permutation.begin(), dim0Iter)) };
     auto dim1Iter{ std::find(permutation.begin(), permutation.end(), mat.Dims[1]) };
-    auto dim1{ std::distance(permutation.begin(), dim1Iter) };
+    auto dim1{ static_cast<uint64_t>(std::distance(permutation.begin(), dim1Iter)) };
 
     assert(dim0Iter != permutation.end() && dim1Iter != permutation.end());
 
@@ -311,8 +311,6 @@ LogicalResult BandedStructureAnalysis::visitElementwise(linalg::ElementwiseOp* o
 
     if (operands.size() == 3) {
         auto newProperty{ binaryElementwiseGeneral(lhsMat.Property, rhsMat.Property) };
-        llvm::errs() << "Upper: " << newProperty.UpperBandwidth
-                     << ", Lower: " << newProperty.LowerBandwidth << "\n";
         resMat = { join(propertyMap[result].Property, newProperty), lhsMat.Dims };
     }
 
@@ -413,10 +411,12 @@ LogicalResult BandedStructureAnalysis::visitGeneric(linalg::GenericOp* op) {
     if (!isMulArgsValid) return success();
 
     BandedProperty newProperty{ binaryMatmul(lhsMat.Property, rhsMat.Property) };
-    newProperty.LowerBandwidth = std::min(newProperty.LowerBandwidth, mSize - 1);
-    newProperty.UpperBandwidth = std::min(newProperty.UpperBandwidth, nSize - 1);
+    newProperty.LowerBandwidth = std::min<uint64_t>(newProperty.LowerBandwidth, mSize - 1);
+    newProperty.UpperBandwidth = std::min<uint64_t>(newProperty.UpperBandwidth, nSize - 1);
 
-    propertyMap[result] = BandedSubMatrix{ newProperty, { *mResultIdx, *nResultIdx } };
+    propertyMap[result] = BandedSubMatrix{
+        newProperty, { static_cast<uint64_t>(*mResultIdx), static_cast<uint64_t>(*nResultIdx) }
+    };
 
     return success();
 }

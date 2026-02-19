@@ -7,6 +7,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(LLVM_USE_LINKER "lld")
 
+set(LLVM_DIR "/Users/kaio/projects/llvm-project/build/lib/cmake/llvm")
+set(MLIR_DIR "/Users/kaio/projects/llvm-project/build/lib/cmake/mlir")
+list(APPEND CMAKE_PREFIX_PATH "${LLVM_DIR}" "${MLIR_DIR}")
+
 find_package(MLIR REQUIRED CONFIG)
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
@@ -23,6 +27,8 @@ include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_BINARY_DIR})
+include_directories(${PROJECT_SOURCE_DIR}/include)
 
 add_subdirectory(tools)
 add_subdirectory(lib)
+add_subdirectory(tests)

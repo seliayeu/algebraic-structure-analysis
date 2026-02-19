@@ -1,6 +1,4 @@
-#include "lib/Transforms/BandedStructureDebug.h"
-
-#include <cassert>
+#include "Transform/Banded/BandedStructureDebug.h"
 
 #include "lib/Analysis/BandedStructureAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"

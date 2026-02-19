@@ -3,7 +3,6 @@
 
 #include <array>
 #include <limits>
-#include <set>
 #include <vector>
 
 #include "lib/Analysis/BandedProperty.h"
@@ -16,8 +15,9 @@
 namespace mlir::bpa {
 
 struct BandedSubMatrix {
-    BandedProperty Property{ std::numeric_limits<long>::max(), std::numeric_limits<long>::max() };
-    std::array<long long, 2> Dims{ 0, 1 };
+    BandedProperty Property{ std::numeric_limits<int64_t>::max(),
+                             std::numeric_limits<int64_t>::max() };
+    std::array<uint64_t, 2> Dims{ 0, 1 };
 
     bool operator==(const BandedSubMatrix& other) const {
         return (Property == other.Property) && (Dims == other.Dims);
@@ -42,6 +42,8 @@ class BandedStructureAnalysis {
         return propertyMap.contains(value);
     }
 
+    static BandedSubMatrix readPropertyFromDictAttr(DictionaryAttr dictAttr);
+
    private:
     LogicalResult visitOperation(Operation* op);
     LogicalResult visitMatmul(linalg::MatmulOp* op);
@@ -54,8 +56,6 @@ class BandedStructureAnalysis {
 
     LogicalResult runBackward();
     bool propagateBackward(Value value);
-
-    BandedSubMatrix readPropertyFromDictAttr(DictionaryAttr dictAttr);
 };
 
 }  // namespace mlir::bpa

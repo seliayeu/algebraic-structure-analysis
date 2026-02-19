@@ -2,15 +2,16 @@
 #define LIB_ANALYSIS_BANDEDPROPERTY_H
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 
 namespace mlir::bpa {
 
 struct BandedProperty {
-    long UpperBandwidth;
-    long LowerBandwidth;
+    uint64_t UpperBandwidth;
+    uint64_t LowerBandwidth;
 
-    explicit BandedProperty(long upperBandwidth, long lowerBandwidth)
+    explicit BandedProperty(uint64_t upperBandwidth, uint64_t lowerBandwidth)
         : UpperBandwidth{ upperBandwidth }, LowerBandwidth{ lowerBandwidth } {
     }
 
@@ -30,10 +31,14 @@ static BandedProperty join(const BandedProperty& lhs, const BandedProperty& rhs)
 }
 
 static BandedProperty binaryMatmul(const BandedProperty& lhs, const BandedProperty& rhs) {
-    unsigned long upperBw{ static_cast<unsigned long>(lhs.UpperBandwidth) + rhs.UpperBandwidth };
-    upperBw = std::min(upperBw, static_cast<unsigned long>(std::numeric_limits<long>::max()));
-    unsigned long lowerBw{ static_cast<unsigned long>(lhs.LowerBandwidth) + rhs.LowerBandwidth };
-    lowerBw = std::min(lowerBw, static_cast<unsigned long>(std::numeric_limits<long>::max()));
+    uint64_t upperBw{ lhs.UpperBandwidth >
+                              (std::numeric_limits<int64_t>::max() - rhs.UpperBandwidth)
+                          ? std::numeric_limits<int64_t>::max()
+                          : rhs.UpperBandwidth + lhs.UpperBandwidth };
+    uint64_t lowerBw{ lhs.LowerBandwidth >
+                              (std::numeric_limits<int64_t>::max() - rhs.LowerBandwidth)
+                          ? std::numeric_limits<int64_t>::max()
+                          : rhs.LowerBandwidth + lhs.LowerBandwidth };
     return BandedProperty(upperBw, lowerBw);
 }
 
