@@ -45,13 +45,10 @@ struct DiagonalMatmulPattern : public OpRewritePattern<linalg::MatmulOp> {
             rewriter, loc, c0, dim, c1, ValueRange{ C },
             [&](OpBuilder& b, Location loc, Value i, ValueRange iterArgs) {
                 Value cOut = iterArgs[0];
-
                 // Extract A[i,i] and B[i,i]
                 Value aVal = tensor::ExtractOp::create(b, loc, A, ValueRange{ i, i });
                 Value bVal = tensor::ExtractOp::create(b, loc, B, ValueRange{ i, i });
-
                 Value mul = arith::MulFOp::create(b, loc, aVal, bVal);
-
                 Value updated = tensor::InsertOp::create(b, loc, mul, cOut, ValueRange{ i, i });
                 scf::YieldOp::create(b, loc, ValueRange{ updated });
             });
