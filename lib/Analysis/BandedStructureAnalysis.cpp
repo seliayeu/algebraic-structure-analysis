@@ -155,15 +155,14 @@ LogicalResult BandedStructureAnalysis::visitMatmul(linalg::MatmulOp* op) {
     auto lhsShape{ lhsType.getShape() };
     auto rhsShape{ rhsType.getShape() };
 
-    if (lhsShape[0] != lhsShape[1] || rhsShape[0] != rhsShape[1]) return success();
     if (!propertyMap.contains(lhs) || !propertyMap.contains(rhs)) return success();
 
     const auto& lhsMat{ propertyMap[lhs] };
     const auto& rhsMat{ propertyMap[rhs] };
 
     BandedProperty newProperty{ binaryMatmul(lhsMat.Property, rhsMat.Property) };
-    newProperty.UpperBandwidth = std::min(newProperty.UpperBandwidth, lhsShape[0] - 1);
-    newProperty.LowerBandwidth = std::min(newProperty.LowerBandwidth, lhsShape[0] - 1);
+    newProperty.LowerBandwidth = std::min(newProperty.LowerBandwidth, lhsShape[0] - 1);  // m
+    newProperty.UpperBandwidth = std::min(newProperty.UpperBandwidth, rhsShape[1] - 1);  // n
 
     BandedSubMatrix& resMat{ propertyMap[result] };
     resMat.Property = join(resMat.Property, newProperty);
@@ -190,7 +189,6 @@ LogicalResult BandedStructureAnalysis::visitBatchMatmul(linalg::BatchMatmulOp* o
     auto lhsShape{ lhsType.getShape() };
     auto rhsShape{ rhsType.getShape() };
 
-    if (!(lhsShape[1] == lhsShape[2]) || !(rhsShape[1] == rhsShape[2])) return success();
     if (!propertyMap.contains(lhs) || !propertyMap.contains(rhs)) return success();
 
     const auto& lhsMat{ propertyMap[lhs] };
@@ -200,8 +198,8 @@ LogicalResult BandedStructureAnalysis::visitBatchMatmul(linalg::BatchMatmulOp* o
     if (lhsMat.Dims != expectedDims || rhsMat.Dims != expectedDims) return success();
 
     BandedProperty newProperty{ binaryMatmul(lhsMat.Property, rhsMat.Property) };
-    newProperty.UpperBandwidth = std::min(newProperty.UpperBandwidth, lhsShape[1] - 1);
-    newProperty.LowerBandwidth = std::min(newProperty.LowerBandwidth, lhsShape[1] - 1);
+    newProperty.LowerBandwidth = std::min(newProperty.LowerBandwidth, lhsShape[1] - 1);  // m
+    newProperty.UpperBandwidth = std::min(newProperty.UpperBandwidth, rhsShape[2] - 1);  // n
 
     propertyMap[result] = BandedSubMatrix{ newProperty, { 1, 2 } };
 
@@ -385,8 +383,6 @@ LogicalResult BandedStructureAnalysis::visitGeneric(linalg::GenericOp* op) {
     auto kSize{ lhsType.getShape()[lhsMat.Dims[1]] };
     auto nSize{ rhsType.getShape()[rhsMat.Dims[1]] };
 
-    if (mSize != kSize || kSize != nSize) return success();
-
     Block* body{ op->getBody() };
     if (body->getNumArguments() != 3) return success();
 
@@ -417,8 +413,8 @@ LogicalResult BandedStructureAnalysis::visitGeneric(linalg::GenericOp* op) {
     if (!isMulArgsValid) return success();
 
     BandedProperty newProperty{ binaryMatmul(lhsMat.Property, rhsMat.Property) };
-    newProperty.UpperBandwidth = std::min(newProperty.UpperBandwidth, mSize - 1);
     newProperty.LowerBandwidth = std::min(newProperty.LowerBandwidth, mSize - 1);
+    newProperty.UpperBandwidth = std::min(newProperty.UpperBandwidth, nSize - 1);
 
     propertyMap[result] = BandedSubMatrix{ newProperty, { *mResultIdx, *nResultIdx } };
 
