@@ -1,10 +1,10 @@
 set(LLVM_TARGET_DEFINITIONS Passes.td)
-mlir_tablegen(Passes.h.inc -gen-pass-decls -name Linalg)
+mlir_tablegen(Passes.h.inc -gen-pass-decls -name Banded)
 add_public_tablegen_target(MLIRBandedStructurePasses)
 
 add_mlir_library(BandedStructurePasses
     BandedPropagation.cpp
-    BandedLoweringPass.cpp
+    BandedRewrite.cpp
 
     DEPENDS
     MLIRBandedStructurePasses

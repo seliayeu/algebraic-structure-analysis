@@ -1,6 +1,6 @@
 include "mlir/Pass/PassBase.td"
 
-def BandedStructureRewrite : Pass<"banded-structure-rewrite", "mlir::func::FuncOp"> {
+def BandedRewrite: Pass<"banded-rewrite", "mlir::func::FuncOp"> {
     let summary = "Replace operations on banded matrices with more efficient versions";
     let description = [{
         Run Banded Structure Analysis on a function to find operations that have operands deduced

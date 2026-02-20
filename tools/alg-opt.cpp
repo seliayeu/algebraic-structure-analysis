@@ -1,4 +1,3 @@
-#include "Transform/BandedLoweringPass.h"
 #include "Transform/Passes.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
@@ -10,8 +9,7 @@ int main(int argc, char** argv) {
     mlir::registerAllPasses();
     mlir::registerAllDialects(registry);
 
-    mlir::bpa::registerBandedAnalysis();
-    mlir::bpa::registerBandedLoweringPass();
+    mlir::bpa::registerBandedPasses();
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Algebraic Structure Rewrite Pass Driver", registry));

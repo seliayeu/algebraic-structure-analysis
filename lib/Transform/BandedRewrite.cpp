@@ -1,8 +1,9 @@
-#include "Transform/BandedLoweringPass.h"
+#include "Transform/BandedRewrite.h"
 
 #include "Analysis/BandedStructureAnalysis.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
@@ -16,6 +17,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::bpa {
+
+#define GEN_PASS_DEF_BANDEDREWRITE
+#include "lib/Transform/Passes.h.inc"
 
 struct DiagonalMatmulToGenericPattern : public OpRewritePattern<linalg::MatmulOp> {
     using OpRewritePattern::OpRewritePattern;
@@ -61,23 +65,22 @@ struct DiagonalMatmulToGenericPattern : public OpRewritePattern<linalg::MatmulOp
     }
 };
 
-void BandedLoweringPass::runOnOperation() {
-    func::FuncOp funcOp = getOperation();
-    MLIRContext* context = funcOp.getContext();
+struct BandedRewrite : public impl::BandedRewriteBase<BandedRewrite> {
+    using BandedRewriteBase::BandedRewriteBase;
 
-    RewritePatternSet patterns(context);
+    void runOnOperation() override {
+        func::FuncOp funcOp = getOperation();
+        MLIRContext* context = funcOp.getContext();
 
-    patterns.add<DiagonalMatmulToGenericPattern>(context);
+        RewritePatternSet patterns(context);
 
-    GreedyRewriteConfig config;
-    config.setMaxIterations(1);
-    config.setUseTopDownTraversal(true);
+        patterns.add<DiagonalMatmulToGenericPattern>(context);
 
-    (void)applyPatternsGreedily(funcOp, std::move(patterns), config);
-}
+        GreedyRewriteConfig config;
+        config.setMaxIterations(1);
+        config.setUseTopDownTraversal(true);
 
-void registerBandedLoweringPass() {
-    PassRegistration<BandedLoweringPass>();
-}
-
+        (void)applyPatternsGreedily(funcOp, std::move(patterns), config);
+    }
+};
 }  // namespace mlir::bpa
