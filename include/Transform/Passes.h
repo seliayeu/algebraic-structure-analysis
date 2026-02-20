@@ -1,6 +1,6 @@
 #ifndef LIB_TRANSFORMS_PASSES_H
 #define LIB_TRANSFORMS_PASSES_H
-#include "Transform/Banded/BandedStructureDebug.h"
+#include "Transform/BandedStructureDebug.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::bpa {

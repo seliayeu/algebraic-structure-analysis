@@ -4,6 +4,6 @@
 
 namespace mlir::bpa {
 #define GEN_PASS_DECL_BANDEDSTRUCTUREDEBUG
-#include "lib/Transforms/Passes.h.inc"
+#include "lib/Transform/Passes.h.inc"
 }  // namespace mlir::bpa
 #endif

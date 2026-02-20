@@ -1,4 +1,4 @@
-#include "Transform/Banded/BandedStructureDebug.h"
+#include "Transform/BandedStructureDebug.h"
 
 #include "lib/Analysis/BandedStructureAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -6,7 +6,7 @@
 namespace mlir::bpa {
 
 #define GEN_PASS_DEF_BANDEDSTRUCTUREDEBUG
-#include "lib/Transforms/Passes.h.inc"
+#include "lib/Transform/Passes.h.inc"
 
 struct BandedStructureDebugPass : public impl::BandedStructureDebugBase<BandedStructureDebugPass> {
     using BandedStructureDebugBase::BandedStructureDebugBase;

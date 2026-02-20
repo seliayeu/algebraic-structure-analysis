@@ -1,5 +1,5 @@
-#include "Transform/Banded/BandedLoweringPass.h"
-#include "Transform/Banded/Passes.h"
+#include "Transform/BandedLoweringPass.h"
+#include "Transform/Passes.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"

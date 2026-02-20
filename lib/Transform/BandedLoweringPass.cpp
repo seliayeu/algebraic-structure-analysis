@@ -1,11 +1,9 @@
-#include "Transform/Banded/BandedLoweringPass.h"
+#include "Transform/BandedLoweringPass.h"
 
 #include "lib/Analysis/BandedStructureAnalysis.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -69,7 +67,6 @@ void BandedLoweringPass::runOnOperation() {
 
     RewritePatternSet patterns(context);
 
-    // patterns.add<DiagonalMatmulPattern>(context);
     patterns.add<DiagonalMatmulToGenericPattern>(context);
 
     GreedyRewriteConfig config;
