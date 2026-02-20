@@ -1,4 +1,4 @@
-// RUN: %build/tools/alg-opt %s --banded-structure-debug | FileCheck %s
+// RUN: %build/tools/alg-opt %s --banded-analysis | FileCheck %s
 
 module {
   func.func @test_unary_elementwise() {

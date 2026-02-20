@@ -1,4 +1,4 @@
-// RUN: %build/tools/alg-opt %s --banded-structure-debug --banded-lowering | FileCheck %s
+// RUN: %build/tools/alg-opt %s --banded-analysis --banded-lowering | FileCheck %s
 
 // CHECK: #map = affine_map<(d0) -> (d0, d0)>
 // CHECK-LABEL: func.func @main

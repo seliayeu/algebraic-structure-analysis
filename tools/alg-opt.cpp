@@ -7,10 +7,11 @@
 int main(int argc, char** argv) {
     mlir::DialectRegistry registry;
 
-    mlir::bpa::registerBandedStructureDebug();
-    mlir::bpa::registerBandedLoweringPass();
     mlir::registerAllPasses();
     mlir::registerAllDialects(registry);
+
+    mlir::bpa::registerBandedAnalysis();
+    mlir::bpa::registerBandedLoweringPass();
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Algebraic Structure Rewrite Pass Driver", registry));
