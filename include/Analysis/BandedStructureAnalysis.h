@@ -5,7 +5,7 @@
 #include <limits>
 #include <vector>
 
-#include "lib/Analysis/BandedProperty.h"
+#include "Analysis/BandedProperty.h"
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Operation.h"

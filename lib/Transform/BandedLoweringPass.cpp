@@ -1,6 +1,6 @@
 #include "Transform/BandedLoweringPass.h"
 
-#include "lib/Analysis/BandedStructureAnalysis.h"
+#include "Analysis/BandedStructureAnalysis.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"

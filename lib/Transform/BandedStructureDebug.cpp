@@ -1,6 +1,6 @@
 #include "Transform/BandedStructureDebug.h"
 
-#include "lib/Analysis/BandedStructureAnalysis.h"
+#include "Analysis/BandedStructureAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace mlir::bpa {
