@@ -26,8 +26,30 @@ namespace mlir::bpa {
 #define GEN_PASS_DEF_BANDEDREWRITE
 #include "lib/Transform/Passes.h.inc"
 
-struct BandedMatmulToGenericPattern : public OpRewritePattern<linalg::MatmulOp> {
+// --------------
+// Matmul
+// --------------
+struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
     using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(linalg::MatmulOp op, PatternRewriter& rewriter) const override {
+        auto dict = op->getAttrDictionary();
+
+        if (!dict) dict = DictionaryAttr();
+
+        BandedSubMatrix opBandInfo = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
+
+        auto lower = opBandInfo.Property.LowerBandwidth;
+        auto upper = opBandInfo.Property.UpperBandwidth;
+        auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
+        uint64_t n = resultType.getDimSize(0);
+
+        if (lower == 0 && upper == 0)
+            return diagRewrite(op, rewriter);
+        else if (lower < n && upper < n)
+            return bandedSCFRewrite(op, rewriter);
+        return failure();
+    }
 
     LogicalResult diagRewrite(linalg::MatmulOp op, PatternRewriter& rewriter) const {
         auto loc = op.getLoc();
@@ -90,8 +112,6 @@ struct BandedMatmulToGenericPattern : public OpRewritePattern<linalg::MatmulOp> 
         Value upperA = arith::ConstantIndexOp::create(rewriter, loc, bandA.Property.UpperBandwidth);
         Value lowerB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.LowerBandwidth);
         Value upperB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.UpperBandwidth);
-
-        // llvm::outs() << dyn_cast<uint64_t>(lowerA) << " \n";
 
         // C is the projection of the Minkowski sum of A and B bands.
         //----------------------------------------------------------
@@ -163,45 +183,21 @@ struct BandedMatmulToGenericPattern : public OpRewritePattern<linalg::MatmulOp> 
         rewriter.replaceOp(op, iLoop.getResult(0));
         return success();
     }
+};
 
-    LogicalResult bandedRewrite(linalg::MatmulOp op, PatternRewriter& rewriter,
-                                BandedSubMatrix& opBandInfo) const {
-        auto loc = op.getLoc();
-        Value A = op.getInputs()[0];
-        Value B = op.getInputs()[1];
-        Value C = op.getOutputs()[0];
-        MLIRContext* context = rewriter.getContext();
-        // C is the projection of the Minkowski sum of A and B bands.
+// --------------
+// ElementwiseOp
+// --------------
+struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp> {
+    using OpRewritePattern::OpRewritePattern;
 
-        AffineExpr d0 = rewriter.getAffineDimExpr(0);
-        AffineExpr d1 = rewriter.getAffineDimExpr(1);
-        AffineExpr d2 = rewriter.getAffineDimExpr(2);
+    LogicalResult matchAndRewrite(linalg::ElementwiseOp op,
+                                  PatternRewriter& rewriter) const override {
+        if (op.getKind() != linalg::ElementwiseKind::mul &&
+            op.getKind() != linalg::ElementwiseKind::add &&
+            op.getKind() != linalg::ElementwiseKind::sub)
+            return failure();
 
-        AffineMap mapA = AffineMap::get(3, 0, { d0, d2 }, context);
-        AffineMap mapB = AffineMap::get(3, 0, { d2, d1 }, context);
-        AffineMap mapC = AffineMap::get(3, 0, { d0, d1 }, context);
-
-        SmallVector<AffineMap> indexingMaps = { mapA, mapB, mapC };
-
-        SmallVector<utils::IteratorType> iteratorTypes = { utils::IteratorType::parallel,
-                                                           utils::IteratorType::parallel,
-                                                           utils::IteratorType::reduction };
-
-        auto genericOp = linalg::GenericOp::create(
-            rewriter, loc, TypeRange{ op.getResult(0).getType() }, ValueRange{ A, B },
-            ValueRange{ C }, indexingMaps, iteratorTypes,
-            [&](OpBuilder& b, Location loc, ValueRange args) {
-                Value mul = arith::MulFOp::create(b, loc, args[0], args[1]);
-                Value add = arith::AddFOp::create(b, loc, args[2], mul);
-                linalg::YieldOp::create(b, loc, ValueRange{ add });
-            });
-
-        genericOp->setAttr("metadata", op->getAttr("metadata"));
-        rewriter.replaceOp(op, genericOp.getResult(0));
-        return success();
-    }
-
-    LogicalResult matchAndRewrite(linalg::MatmulOp op, PatternRewriter& rewriter) const override {
         auto dict = op->getAttrDictionary();
 
         if (!dict) dict = DictionaryAttr();
@@ -212,19 +208,13 @@ struct BandedMatmulToGenericPattern : public OpRewritePattern<linalg::MatmulOp> 
         auto upper = opBandInfo.Property.UpperBandwidth;
         auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
         uint64_t n = resultType.getDimSize(0);
-
         if (lower == 0 && upper == 0)
             return diagRewrite(op, rewriter);
-        else if (lower < n && upper < n)
-            return bandedSCFRewrite(op, rewriter);
-        // return bandedRewrite(op, rewriter, opBandInfo);
-        return failure();
+        else
+            return bandedRewrite(op, rewriter);
     }
-};
-struct BandedAdd : public OpRewritePattern<linalg::AddOp> {
-    using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult diagRewrite(linalg::AddOp op, PatternRewriter& rewriter) const {
+    LogicalResult diagRewrite(linalg::ElementwiseOp op, PatternRewriter& rewriter) const {
         auto loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
@@ -247,27 +237,100 @@ struct BandedAdd : public OpRewritePattern<linalg::AddOp> {
             rewriter, loc, TypeRange{ op.getResult(0).getType() }, ValueRange{ A, B },
             ValueRange{ C }, indexingMaps, iteratorTypes,
             [&](OpBuilder& b, Location loc, ValueRange args) {
-                Value mul = arith::AddFOp::create(b, loc, args[0], args[1]);
-                linalg::YieldOp::create(b, loc, ValueRange{ mul });
+                auto lhs = args[0];
+                auto rhs = args[1];
+                Value opResult = getInnerArithOp(op, b, loc, lhs, rhs);
+                linalg::YieldOp::create(b, loc, ValueRange{ opResult });
             });
         genericOp->setAttr("metadata", op->getAttr("metadata"));
         rewriter.replaceOp(op, genericOp);
         return success();
     }
 
-    LogicalResult matchAndRewrite(linalg::AddOp op, PatternRewriter& rewriter) const override {
-        auto dict = op->getAttrDictionary();
+    LogicalResult bandedRewrite(linalg::ElementwiseOp op, PatternRewriter& rewriter) const {
+        Location loc = op.getLoc();
+        Value A = op.getInputs()[0];
+        Value B = op.getInputs()[1];
+        Value C = op.getOutputs()[0];
 
-        if (!dict) dict = DictionaryAttr();
+        Operation* defOpA = A.getDefiningOp();
+        Operation* defOpB = B.getDefiningOp();
 
-        BandedSubMatrix opBandInfo = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
+        auto dictA = defOpA->getAttrDictionary();
+        auto dictB = defOpB->getAttrDictionary();
 
-        auto lower = opBandInfo.Property.LowerBandwidth;
-        auto upper = opBandInfo.Property.UpperBandwidth;
+        if (!dictA || !dictB) return failure();
+
+        BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
+        BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
+
+        auto lowerA = bandA.Property.LowerBandwidth;
+        auto upperA = bandA.Property.UpperBandwidth;
+        auto upperB = bandB.Property.UpperBandwidth;
+        auto lowerB = bandB.Property.LowerBandwidth;
+
+        // takes only the intersection
+        uint64_t lower = std::min(bandA.Property.LowerBandwidth, bandB.Property.LowerBandwidth);
+        uint64_t upper = std::min(bandB.Property.UpperBandwidth, bandB.Property.UpperBandwidth);
+
         auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
-        uint64_t n = resultType.getDimSize(0);
-        if (lower == 0 && upper == 0) return diagRewrite(op, rewriter);
-        return failure();
+        const int64_t N = resultType.getDimSize(0);
+        const int64_t M = resultType.getDimSize(1);
+
+        Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
+        Value c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
+        Value dimN = arith::ConstantIndexOp::create(rewriter, loc, N);
+        Value lowerBW = arith::ConstantIndexOp::create(rewriter, loc, (int64_t)lower);
+        Value upperBW = arith::ConstantIndexOp::create(rewriter, loc, (int64_t)upper);
+
+        auto iLoop = scf::ForOp::create(
+            rewriter, loc, c0, dimN, c1, ValueRange{ C },
+            [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
+                Value cOut = iArgs[0];
+
+                // j start = max(0, i - lower)
+                Value iMinusLower = arith::SubIOp::create(ob, loc, i, lowerBW);
+                Value jStart = arith::MaxSIOp::create(ob, loc, c0, iMinusLower);
+
+                // j end = min(M, i + upper + 1)
+                Value iPlusUpper = arith::AddIOp::create(ob, loc, i, upperBW);
+                Value iPlusUpperP1 = arith::AddIOp::create(ob, loc, iPlusUpper, c1);
+                Value jEnd = arith::MinSIOp::create(
+                    ob, loc, arith::ConstantIndexOp::create(ob, loc, M), iPlusUpperP1);
+
+                auto jLoop = scf::ForOp::create(
+                    ob, loc, jStart, jEnd, c1, ValueRange{ cOut },
+                    [&](OpBuilder& ib, Location loc, Value j, ValueRange jArgs) {
+                        Value cInner = jArgs[0];
+
+                        Value aij = tensor::ExtractOp::create(ib, loc, A, ValueRange{ i, j });
+                        Value bij = tensor::ExtractOp::create(ib, loc, B, ValueRange{ i, j });
+                        Value mul = arith::MulFOp::create(ib, loc, aij, bij);
+                        Value opResult = getInnerArithOp(op, ib, loc, aij, bij);
+                        Value updated =
+                            tensor::InsertOp::create(ib, loc, opResult, cInner, ValueRange{ i, j });
+                        scf::YieldOp::create(ib, loc, ValueRange{ updated });
+                    });
+
+                scf::YieldOp::create(ob, loc, jLoop.getResults());
+            });
+
+        rewriter.replaceOp(op, iLoop.getResult(0));
+        return success();
+    }
+
+   private:
+    Value getInnerArithOp(linalg::ElementwiseOp op, OpBuilder& ob, Location& loc, Value& lhs,
+                          Value& rhs) const {
+        auto kind = op.getKind();
+        Value result;
+        if (kind == linalg::ElementwiseKind::mul)
+            result = arith::MulFOp::create(ob, loc, lhs, rhs);
+        else if (kind == linalg::ElementwiseKind::add)
+            result = arith::AddFOp::create(ob, loc, lhs, rhs);
+        else
+            result = arith::SubFOp::create(ob, loc, lhs, rhs);
+        return result;
     }
 };
 
@@ -280,7 +343,7 @@ struct BandedRewrite : public impl::BandedRewriteBase<BandedRewrite> {
 
         RewritePatternSet patterns(context);
 
-        patterns.add<BandedMatmulToGenericPattern, BandedAdd>(context);
+        patterns.add<MatMulPattern, GenericElementWisePattern>(context);
 
         GreedyRewriteConfig config;
         config.setMaxIterations(1);
