@@ -1,8 +1,8 @@
-#include "lib/Analysis/BandedStructureAnalysis.h"
+#include "Analysis/BandedStructureAnalysis.h"
 
 #include <algorithm>
 
-#include "lib/Analysis/BandedProperty.h"
+#include "Analysis/BandedProperty.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/MLIRContext.h"
