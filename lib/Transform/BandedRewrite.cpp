@@ -34,7 +34,6 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
 
     LogicalResult matchAndRewrite(linalg::MatmulOp op, PatternRewriter& rewriter) const override {
         auto dict = op->getAttrDictionary();
-
         if (!dict) dict = DictionaryAttr();
 
         BandedSubMatrix opBandInfo = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
@@ -315,6 +314,7 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
                 scf::YieldOp::create(ob, loc, jLoop.getResults());
             });
 
+        iLoop->setAttr("metadata", op->getAttr("metadata"));
         rewriter.replaceOp(op, iLoop.getResult(0));
         return success();
     }
@@ -334,6 +334,55 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
     }
 };
 
+// --------------
+// Transposition
+// --------------
+struct TransposePattern : public OpRewritePattern<linalg::TransposeOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(linalg::TransposeOp op,
+                                  PatternRewriter& rewriter) const override {
+        auto dict = op->getAttrDictionary();
+        if (!dict) dict = DictionaryAttr();
+        BandedSubMatrix opBandInfo = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
+
+        if (opBandInfo.Property.LowerBandwidth == 0 && opBandInfo.Property.UpperBandwidth == 0) {
+            rewriter.replaceOp(op, op.getInput());
+            return success();
+        }
+
+        auto inputUpper = opBandInfo.Property.LowerBandwidth;
+        auto inputLower = opBandInfo.Property.UpperBandwidth;
+
+        MLIRContext* context = rewriter.getContext();
+
+        AffineExpr d0 = rewriter.getAffineDimExpr(0);
+        AffineExpr d1 = rewriter.getAffineDimExpr(1);
+
+        AffineMap inputMap = AffineMap::get(2, 0, { d0, d1 }, context);
+        AffineMap outputMap = AffineMap::get(2, 0, { d1, d0 }, context);
+
+        SmallVector<AffineMap, 2> indexingMaps = { inputMap, outputMap };
+
+        llvm::SmallVector<utils::IteratorType, 1> iteratorTypes = { utils::IteratorType::parallel,
+                                                                    utils::IteratorType::parallel };
+
+        Location loc = op->getLoc();
+        auto input = op->getOperand(0);
+        auto output = op->getOperand(1);
+
+        auto genericOp = linalg::GenericOp::create(
+            rewriter, loc, TypeRange{ op.getResult().getType() }, ValueRange{ input },
+            ValueRange{ output }, indexingMaps, iteratorTypes,
+            [&](OpBuilder& b, Location loc, ValueRange args) {
+                linalg::YieldOp::create(b, loc, ValueRange{ args[0] });
+            });
+        genericOp->setAttr("metadata", op->getAttr("metadata"));
+        rewriter.replaceOp(op, genericOp);
+        return success();
+    }
+};
+
 struct BandedRewrite : public impl::BandedRewriteBase<BandedRewrite> {
     using BandedRewriteBase::BandedRewriteBase;
 
@@ -343,7 +392,7 @@ struct BandedRewrite : public impl::BandedRewriteBase<BandedRewrite> {
 
         RewritePatternSet patterns(context);
 
-        patterns.add<MatMulPattern, GenericElementWisePattern>(context);
+        patterns.add<MatMulPattern, GenericElementWisePattern, TransposePattern>(context);
 
         GreedyRewriteConfig config;
         config.setMaxIterations(1);
