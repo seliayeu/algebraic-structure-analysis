@@ -11,6 +11,7 @@ add_mlir_library(BandedStructurePasses
 
     LINK_LIBS PUBLIC
     BandedStructureAnalysis
+    BandedUtils
 )
 
 target_include_directories(BandedStructurePasses PUBLIC
