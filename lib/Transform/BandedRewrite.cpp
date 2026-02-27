@@ -45,6 +45,7 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
         auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
         const uint64_t N = resultType.getDimSize(1);
 
+        // TODO: check when to change the layout
         if (lower == 0 && upper == 0)
             return diagDenseRewriteToDIA(op, rewriter);
         else {
@@ -56,6 +57,10 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
         return failure();
     }
 
+    /// Rewrite a dense `linalg.matmul` into an explicit SCF loop nest that
+    /// computes only the entries within the intersection.
+    ///
+    /// The result is materialized in the DIA format.
     LogicalResult denseBandedRewriteToDIA(linalg::MatmulOp op, PatternRewriter& rewriter,
                                           const BandedSubMatrix& outputBand) const {
         Location loc = op.getLoc();
@@ -581,6 +586,7 @@ struct BandedRewrite : public impl::BandedRewriteBase<BandedRewrite> {
                 auto metadata = defOp->getAttrOfType<DictionaryAttr>("metadata");
                 if (!metadata) continue;
                 auto layout = metadata.getAs<StringAttr>("layout");
+                // WARNING: This only works for squared matrices right now!
                 if (layout && layout.getValue() == "dia") changed = true;
             }
 

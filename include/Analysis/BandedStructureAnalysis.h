@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "Analysis/BandedProperty.h"
+#include "Dialect/DIA/DIAOps.h"
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Operation.h"
@@ -14,22 +15,37 @@
 
 namespace mlir::bpa {
 
+enum class LayoutType { DIA };
+
 struct BandedSubMatrix {
     BandedProperty Property{ std::numeric_limits<int64_t>::max(),
                              std::numeric_limits<int64_t>::max() };
+
+    // TODO: chekc if Dims are being used
     std::array<uint64_t, 2> Dims{ 0, 1 };
 
+    bool IsDia{ false };
+
     bool operator==(const BandedSubMatrix& other) const {
-        return (Property == other.Property) && (Dims == other.Dims);
+        return (Property == other.Property) && (Dims == other.Dims) && (IsDia == other.IsDia);
     }
+
     bool operator!=(const BandedSubMatrix& other) const {
         return !operator==(other);
+    }
+
+   public:
+    static inline std::optional<LayoutType> layoutTypeFromString(std::string_view s) {
+        if (s == "DIA") return LayoutType::DIA;
+        return std::nullopt;
     }
 };
 
 class BandedStructureAnalysis {
     llvm::DenseMap<Value, BandedSubMatrix> propertyMap;
     std::vector<Operation*> bwList;  // list of ops to perform bw prop on
+
+    bool detectDIA{ false };
 
    public:
     LogicalResult run(Block* block);
@@ -45,6 +61,9 @@ class BandedStructureAnalysis {
     static BandedSubMatrix readPropertyFromDictAttr(DictionaryAttr dictAttr);
 
    private:
+    // DIA ops
+    LogicalResult visitMatmul(dia::MatmulOp* op);
+
     LogicalResult visitOperation(Operation* op);
     LogicalResult visitMatmul(linalg::MatmulOp* op);
     LogicalResult visitBatchMatmul(linalg::BatchMatmulOp* op);

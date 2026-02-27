@@ -2,6 +2,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LLVM.h"
+
 namespace mlir::bpa {
 
 DictionaryAttr getMetadataWithTensorLayout(Operation& op, PatternRewriter& rewriter,
