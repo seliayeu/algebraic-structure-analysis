@@ -1,3 +1,4 @@
+#include "Dialect/DIA/DIADialect.h"
 #include "Transform/Passes.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
@@ -6,6 +7,8 @@
 int main(int argc, char** argv) {
     mlir::DialectRegistry registry;
 
+    // in main or registry setup:
+    registry.insert<mlir::bpa::dia::DIADialect>();
     mlir::registerAllPasses();
     mlir::registerAllDialects(registry);
 

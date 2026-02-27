@@ -5,6 +5,7 @@ set (LIBS
     MLIRRegisterAllDialects
     MLIRRegisterAllPasses
     BandedStructurePasses
+    MLIRDIADialect
 )
 
 add_llvm_executable(alg-opt alg-opt.cpp)
