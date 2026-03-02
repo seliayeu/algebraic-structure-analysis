@@ -24,8 +24,6 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
         Builder builder(context);
 
         funcOp->walk([&](Operation* inst) {
-            if (isa<tensor::EmptyOp>(inst)) return;
-
             auto results{ inst->getResults() };
             if (results.size() != 1 || !BSA.hasProperty(results[0])) return;
 
@@ -34,7 +32,6 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
             auto dims{ analysisResult.Dims };
 
             auto resultType = dyn_cast<RankedTensorType>(results[0].getType());
-            if (!resultType || resultType.getRank() != 2) return;
 
             const uint64_t N = resultType.getDimSize(1);
 
