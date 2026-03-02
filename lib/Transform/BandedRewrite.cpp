@@ -3,8 +3,10 @@
 #include <cstdint>
 
 #include "Analysis/BandedStructureAnalysis.h"
+#include "Dialect/DIA/DIAOps.h"
 #include "Utils/TransformUtils.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -28,7 +30,193 @@ namespace mlir::bpa {
 #include "lib/Transform/Passes.h.inc"
 
 // ------------------------------------------------------------------------------------------------------------------------------
-// Matmul
+// dia.MatmulOp
+// ------------------------------------------------------------------------------------------------------------------------------
+
+struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult diaBandedRewrite(dia::MatmulOp op, PatternRewriter& rewriter,
+                                   const BandedSubMatrix& bandResult) const {
+        Location loc = op.getLoc();
+        Value A = op.getLhs();
+        Value B = op.getRhs();
+        Value C = op.getOutput();
+
+        Operation* defOpA = A.getDefiningOp();
+        Operation* defOpB = B.getDefiningOp();
+
+        auto dictA = defOpA->getAttrDictionary();
+        auto dictB = defOpB->getAttrDictionary();
+
+        if (!dictA || !dictB) return failure();
+
+        const BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
+        const BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
+
+        auto resultType = cast<RankedTensorType>(A.getType());
+        const uint64_t N = resultType.getDimSize(1);
+
+        const int64_t lA = bandA.Property.LowerBandwidth;
+        const int64_t uA = bandA.Property.UpperBandwidth;
+        const int64_t lB = bandB.Property.LowerBandwidth;
+        const int64_t uB = bandB.Property.UpperBandwidth;
+        const int64_t lC = bandResult.Property.LowerBandwidth;
+        const int64_t uC = bandResult.Property.UpperBandwidth;
+
+        auto elementType = cast<RankedTensorType>(A.getType()).getElementType();
+
+        Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
+        Value c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
+        Value dimN = arith::ConstantIndexOp::create(rewriter, loc, N);
+
+        Value lAVal = arith::ConstantIndexOp::create(rewriter, loc, lA);
+        Value uAVal = arith::ConstantIndexOp::create(rewriter, loc, uA);
+        Value lBVal = arith::ConstantIndexOp::create(rewriter, loc, lB);
+        Value uBVal = arith::ConstantIndexOp::create(rewriter, loc, uB);
+        Value lCVal = arith::ConstantIndexOp::create(rewriter, loc, lC);
+        Value uCVal = arith::ConstantIndexOp::create(rewriter, loc, uC);
+
+        // negative constants for lower bounds
+        Value negLA = arith::ConstantIndexOp::create(rewriter, loc, -lA);
+        Value negLB = arith::ConstantIndexOp::create(rewriter, loc, -lB);
+        Value negLC = arith::ConstantIndexOp::create(rewriter, loc, -lC);
+
+        Value zero = arith::ConstantOp::create(rewriter, loc, elementType,
+                                               rewriter.getZeroAttr(elementType));
+        Value zeroedC =
+            linalg::FillOp::create(rewriter, loc, ValueRange{ zero }, ValueRange{ C }).getResult(0);
+
+        // outer loop: for i in range(-lc, uc + 1)
+        Value iStart = negLC;
+        Value iEnd = arith::AddIOp::create(rewriter, loc, uCVal, c1);
+
+        // outer loop: for i_shifted in range(0, lC + uC + 1)
+        Value totalDiags = arith::ConstantIndexOp::create(rewriter, loc, lC + uC + 1);
+
+        auto csti64 = [&](int64_t val) {
+            return arith::ConstantIntOp::create(rewriter, loc, val, 64);
+        };
+        auto toIndex = [&](OpBuilder& b, Value v) {
+            return arith::IndexCastOp::create(b, loc, rewriter.getIndexType(), v);
+        };
+        auto toI64 = [&](OpBuilder& b, Value v) {
+            return arith::IndexCastOp::create(b, loc, rewriter.getIntegerType(64), v);
+        };
+
+        // constants as i64
+        Value lAi64 = csti64(lA);
+        Value uAi64 = csti64(uA);
+        Value lBi64 = csti64(lB);
+        Value uBi64 = csti64(uB);
+        Value lCi64 = csti64(lC);
+        Value Ni64 = csti64(N);
+        Value c0i64 = csti64(0);
+        Value c1i64 = csti64(1);
+
+        // outer loop still uses index (0 to lC+uC+1)
+        auto iLoop = scf::ForOp::create(
+            rewriter, loc, c0, totalDiags, c1, ValueRange{ zeroedC },
+            [&](OpBuilder& ob, Location loc, Value iShifted, ValueRange iArgs) {
+                Value cOuter = iArgs[0];
+
+                // i = iShifted - lC, computed in i64
+                Value iShiftedI64 = toI64(ob, iShifted);
+                Value i = arith::SubIOp::create(ob, loc, iShiftedI64, lCi64);
+
+                // cIdx = iShifted
+                Value cIdx = iShifted;
+
+                // j_start = max(-lA, i - uB) in i64
+                Value negLA = csti64(-lA);
+                Value iMinusUb = arith::SubIOp::create(ob, loc, i, uBi64);
+                Value jStartI64 = arith::MaxSIOp::create(ob, loc, negLA, iMinusUb);
+
+                // j_end = min(uA, i + lB) + 1 in i64
+                Value iPlusLb = arith::AddIOp::create(ob, loc, i, lBi64);
+                Value jEndI64 = arith::AddIOp::create(
+                    ob, loc, arith::MinSIOp::create(ob, loc, uAi64, iPlusLb), c1i64);
+
+                // shift j to index: j_shifted_start = j_start + lA
+                Value jStartShifted = toIndex(ob, arith::AddIOp::create(ob, loc, jStartI64, lAi64));
+                Value jEndShifted = toIndex(ob, arith::AddIOp::create(ob, loc, jEndI64, lAi64));
+
+                auto jLoop = scf::ForOp::create(
+                    ob, loc, jStartShifted, jEndShifted, c1, ValueRange{ cOuter },
+                    [&](OpBuilder& mb, Location loc, Value jShifted, ValueRange jArgs) {
+                        Value cMid = jArgs[0];
+
+                        // j = jShifted - lA in i64
+                        Value jShiftedI64 = toI64(mb, jShifted);
+                        Value j = arith::SubIOp::create(mb, loc, jShiftedI64, lAi64);
+
+                        // aIdx = jShifted (already shifted, no negatives)
+                        Value aIdx = jShifted;
+
+                        // k = i - j in i64, bIdx = k + lB
+                        Value k = arith::SubIOp::create(mb, loc, i, j);
+                        Value bIdx = toIndex(mb, arith::AddIOp::create(mb, loc, k, lBi64));
+
+                        // r_start = max(0, -j) in i64
+                        Value negJ = arith::SubIOp::create(mb, loc, c0i64, j);
+                        Value rStart = toIndex(mb, arith::MaxSIOp::create(mb, loc, c0i64, negJ));
+
+                        // r_end = min(N, N - j) in i64
+                        Value nMinusJ = arith::SubIOp::create(mb, loc, Ni64, j);
+                        Value rEnd = toIndex(mb, arith::MinSIOp::create(mb, loc, Ni64, nMinusJ));
+
+                        auto rLoop = scf::ForOp::create(
+                            mb, loc, rStart, rEnd, c1, ValueRange{ cMid },
+                            [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
+                                Value cInner = rArgs[0];
+
+                                Value cVal = tensor::ExtractOp::create(ib, loc, cInner,
+                                                                       ValueRange{ cIdx, r });
+                                Value aVal =
+                                    tensor::ExtractOp::create(ib, loc, A, ValueRange{ aIdx, r });
+
+                                // r + j in i64, then cast to index
+                                Value rI64 = toI64(ib, r);
+                                Value rPlusJ = toIndex(ib, arith::AddIOp::create(ib, loc, rI64, j));
+                                Value bVal = tensor::ExtractOp::create(ib, loc, B,
+                                                                       ValueRange{ bIdx, rPlusJ });
+
+                                Value mul = arith::MulFOp::create(ib, loc, aVal, bVal);
+                                Value acc = arith::AddFOp::create(ib, loc, cVal, mul);
+                                Value updated = tensor::InsertOp::create(ib, loc, acc, cInner,
+                                                                         ValueRange{ cIdx, r });
+
+                                scf::YieldOp::create(ib, loc, ValueRange{ updated });
+                            });
+
+                        scf::YieldOp::create(mb, loc, rLoop.getResults());
+                    });
+
+                scf::YieldOp::create(ob, loc, jLoop.getResults());
+            });
+        iLoop->setAttr("metadata", op->getAttr("metadata"));
+        rewriter.replaceOp(op, iLoop.getResult(0));
+        return success();
+    }
+
+    LogicalResult matchAndRewrite(dia::MatmulOp op, PatternRewriter& rewriter) const override {
+        auto dict = op->getAttrDictionary();
+        if (!dict) dict = DictionaryAttr();
+
+        const BandedSubMatrix opBandInfo = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
+
+        auto lower = opBandInfo.Property.LowerBandwidth;
+        auto upper = opBandInfo.Property.UpperBandwidth;
+
+        if (lower == 0 && upper == 0) return failure();
+        // banded
+        else
+            return diaBandedRewrite(op, rewriter, opBandInfo);
+    }
+};
+
+// ------------------------------------------------------------------------------------------------------------------------------
+// linalg.MatmulOp
 // ------------------------------------------------------------------------------------------------------------------------------
 
 struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
@@ -42,18 +230,12 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
 
         auto lower = opBandInfo.Property.LowerBandwidth;
         auto upper = opBandInfo.Property.UpperBandwidth;
-        auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
-        const uint64_t N = resultType.getDimSize(1);
 
-        // TODO: check when to change the layout
-        if (lower == 0 && upper == 0)
-            return diagDenseRewriteToDIA(op, rewriter);
-        else {
-            if (shouldCompress(opBandInfo, N))
-                return denseBandedRewriteToDIA(op, rewriter, opBandInfo);
-            else
-                return denseBandedRewrite(op, rewriter);
-        }
+        // diagonal
+        if (lower == 0 && upper == 0) return diagRewrite(op, rewriter);
+        // banded
+        else
+            return denseBandedRewrite(op, rewriter);
         return failure();
     }
 
@@ -61,7 +243,7 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
     /// computes only the entries within the intersection.
     ///
     /// The result is materialized in the DIA format.
-    LogicalResult denseBandedRewriteToDIA(linalg::MatmulOp op, PatternRewriter& rewriter,
+    LogicalResult denseBandedToDIARewrite(linalg::MatmulOp op, PatternRewriter& rewriter,
                                           const BandedSubMatrix& outputBand) const {
         Location loc = op.getLoc();
         Value A = op.getInputs()[0];
@@ -178,12 +360,12 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
 
                 scf::YieldOp::create(ob, loc, ValueRange{ jLoop.getResult(0) });
             });
-        iLoop->setAttr("metadata", getMetadataWithTensorLayout(*op, rewriter, "dia"));
+        iLoop->setAttr("metadata", op->getAttrOfType<DictionaryAttr>("metadata"));
         rewriter.replaceOp(op, iLoop.getResult(0));
         return success();
     }
 
-    LogicalResult diagDenseRewriteToDIA(linalg::MatmulOp op, PatternRewriter& rewriter) const {
+    LogicalResult diagDenseToDIARewrite(linalg::MatmulOp op, PatternRewriter& rewriter) const {
         auto loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
@@ -219,8 +401,7 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
                 linalg::YieldOp::create(b, loc, ValueRange{ mul });
             });
 
-        auto layout = std::string("dia");
-        genericOp->setAttr("metadata", getMetadataWithTensorLayout(*op, rewriter, layout));
+        genericOp->setAttr("metadata", op->getAttrOfType<DictionaryAttr>("metadata"));
         rewriter.replaceOp(op, genericOp);
 
         return success();
@@ -567,7 +748,8 @@ struct BandedRewrite : public impl::BandedRewriteBase<BandedRewrite> {
 
         RewritePatternSet patterns(context);
 
-        patterns.add<MatMulPattern, GenericElementWisePattern, TransposePattern>(context);
+        patterns.add<MatMulPattern, GenericElementWisePattern, TransposePattern, DIAMatMulPattern>(
+            context);
 
         GreedyRewriteConfig config;
         config.setMaxIterations(1);
@@ -585,9 +767,9 @@ struct BandedRewrite : public impl::BandedRewriteBase<BandedRewrite> {
                 if (!defOp) continue;
                 auto metadata = defOp->getAttrOfType<DictionaryAttr>("metadata");
                 if (!metadata) continue;
-                auto layout = metadata.getAs<StringAttr>("layout");
-                // WARNING: This only works for squared matrices right now!
-                if (layout && layout.getValue() == "dia") changed = true;
+                const BandedSubMatrix opBandInfo =
+                    BandedStructureAnalysis::readPropertyFromDictAttr(metadata);
+                if (opBandInfo.IsDia) changed = true;
             }
 
             if (!changed) return;
