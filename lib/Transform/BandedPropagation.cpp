@@ -1,6 +1,9 @@
 #include "Transform/BandedPropagation.h"
 
+#include <cstdint>
+
 #include "Analysis/BandedStructureAnalysis.h"
+#include "Utils/TransformUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace mlir::bpa {
@@ -28,6 +31,10 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
             auto property{ analysisResult.Property };
             auto dims{ analysisResult.Dims };
 
+            auto resultType = dyn_cast<RankedTensorType>(results[0].getType());
+
+            const uint64_t N = resultType.getDimSize(1);
+
             auto upperAttr{ builder.getNamedAttr(
                 "upperBw", builder.getI64IntegerAttr(property.UpperBandwidth)) };
 
@@ -39,8 +46,12 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
             auto dimsArrayAttr{ builder.getNamedAttr(
                 "propertyDims", builder.getArrayAttr({ dim0Attr, dim1Attr })) };
 
-            auto dictAttr{ builder.getDictionaryAttr({ upperAttr, lowerAttr, dimsArrayAttr }) };
+            llvm::SmallVector<mlir::NamedAttribute> attrs{ upperAttr, lowerAttr, dimsArrayAttr };
 
+            if (detectDIA && shouldCompress(analysisResult, N))
+                attrs.emplace_back(builder.getNamedAttr("dia", builder.getBoolAttr(true)));
+
+            auto dictAttr = builder.getDictionaryAttr(attrs);
             inst->setAttr("metadata", dictAttr);
         });
     }

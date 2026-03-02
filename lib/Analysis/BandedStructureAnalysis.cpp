@@ -3,8 +3,10 @@
 #include <algorithm>
 
 #include "Analysis/BandedProperty.h"
+#include "Dialect/DIA/DIAOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
@@ -105,6 +107,11 @@ BandedSubMatrix BandedStructureAnalysis::readPropertyFromDictAttr(DictionaryAttr
     res.Dims[0] = cast<IntegerAttr>(propertyDimsArrayAttr[0]).getInt();
     res.Dims[1] = cast<IntegerAttr>(propertyDimsArrayAttr[1]).getInt();
 
+    auto diaAttr = innerDictAttr.get("dia");
+    if (diaAttr) {
+        auto diaBoolAttr = dyn_cast<BoolAttr>(diaAttr);
+        res.IsDia = diaBoolAttr.getValue();
+    }
     return res;
 }
 
@@ -112,7 +119,7 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
     if (op->getNumResults() != 1) return success();
     auto dialect{ op->getDialect() };
     if (!dialect || (dialect->getNamespace() != "linalg" && dialect->getNamespace() != "arith" &&
-                     dialect->getNamespace() != "tensor")) {
+                     dialect->getNamespace() != "tensor" && dialect->getNamespace() != "dia")) {
         return success();
     }
 
@@ -137,7 +144,42 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
         return visitTranspose(&transposeOp);
     } else if (auto genericOp{ dyn_cast<linalg::GenericOp>(op) }) {
         return visitGeneric(&genericOp);
+    } else if (auto diaMatmulOp{ dyn_cast<dia::MatmulOp>(op) }) {
+        return visitMatmul(&diaMatmulOp);
     }
+
+    return success();
+}
+
+LogicalResult BandedStructureAnalysis::visitMatmul(dia::MatmulOp* op) {
+    auto lhs = op->getLhs();
+    auto rhs = op->getRhs();
+    auto result = op->getResult();
+
+    auto lhsType = dyn_cast<RankedTensorType>(lhs.getType());
+    auto rhsType = dyn_cast<RankedTensorType>(rhs.getType());
+
+    if (!lhsType || !rhsType) return success();
+    if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape()) return success();
+
+    if (!propertyMap.contains(lhs) || !propertyMap.contains(rhs)) return success();
+
+    auto lhsShape{ lhsType.getShape() };
+    auto rhsShape{ rhsType.getShape() };
+
+    const auto& lhsMat = propertyMap[lhs];
+    const auto& rhsMat = propertyMap[rhs];
+
+    BandedProperty newProperty{ binaryMatmul(lhsMat.Property, rhsMat.Property) };
+
+    // WARNING: only works for squared matrices. True shape is (shape[1] x shape[1])
+    newProperty.UpperBandwidth = std::min<uint64_t>(newProperty.UpperBandwidth, rhsShape[1] - 1);
+    newProperty.LowerBandwidth = std::min<uint64_t>(newProperty.LowerBandwidth, lhsShape[1] - 1);
+
+    BandedSubMatrix& resMat = propertyMap[result];
+    resMat.Property = join(resMat.Property, newProperty);
+    resMat.Dims[0] = lhsMat.Dims[0];
+    resMat.Dims[1] = rhsMat.Dims[1];
 
     return success();
 }

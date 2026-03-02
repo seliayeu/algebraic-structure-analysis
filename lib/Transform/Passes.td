@@ -14,4 +14,11 @@ def BandedAnalysis : Pass<"banded-analysis", "mlir::func::FuncOp"> {
         Run Banded Structure Analysis on a function to deduce matrix properties and then add those
         matrix properties to their attribute dictionaries.
     }];
+    let options = [
+      Option<"detectDIA",
+            "detect-dia",
+            "bool",
+            /*default=*/"false",
+            "Enable DIA compression">
+    ];
 }
