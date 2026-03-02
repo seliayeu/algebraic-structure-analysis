@@ -6,7 +6,7 @@
 #include "Dialect/DIA/DIAOps.h"
 #include "Utils/TransformUtils.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -36,8 +36,8 @@ namespace mlir::bpa {
 struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult diaBandedRewrite(dia::MatmulOp op, PatternRewriter& rewriter,
-                                   const BandedSubMatrix& bandResult) const {
+    LogicalResult diaToDiaBandedMatmulRewriteToSCF(dia::MatmulOp op, PatternRewriter& rewriter,
+                                                   const BandedSubMatrix& bandResult) const {
         Location loc = op.getLoc();
         Value A = op.getLhs();
         Value B = op.getRhs();
@@ -211,7 +211,7 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         if (lower == 0 && upper == 0) return failure();
         // banded
         else
-            return diaBandedRewrite(op, rewriter, opBandInfo);
+            return diaToDiaBandedMatmulRewriteToSCF(op, rewriter, opBandInfo);
     }
 };
 
@@ -232,10 +232,10 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
         auto upper = opBandInfo.Property.UpperBandwidth;
 
         // diagonal
-        if (lower == 0 && upper == 0) return diagRewrite(op, rewriter);
+        if (lower == 0 && upper == 0) return denseToDenseDiagMatmulRewriteToLinalg(op, rewriter);
         // banded
         else
-            return denseBandedRewrite(op, rewriter);
+            return denseToDenseBandedMatmulRewriteToSCF(op, rewriter);
         return failure();
     }
 
@@ -243,8 +243,8 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
     /// computes only the entries within the intersection.
     ///
     /// The result is materialized in the DIA format.
-    LogicalResult denseBandedToDIARewrite(linalg::MatmulOp op, PatternRewriter& rewriter,
-                                          const BandedSubMatrix& outputBand) const {
+    LogicalResult denseToDiaBandedMatmulRewriteToSCF(linalg::MatmulOp op, PatternRewriter& rewriter,
+                                                     const BandedSubMatrix& outputBand) const {
         Location loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
@@ -365,7 +365,8 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
         return success();
     }
 
-    LogicalResult diagDenseToDIARewrite(linalg::MatmulOp op, PatternRewriter& rewriter) const {
+    LogicalResult denseToDiaDiagMatmulRewriteToLinalg(linalg::MatmulOp op,
+                                                      PatternRewriter& rewriter) const {
         auto loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
@@ -407,7 +408,8 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
         return success();
     }
 
-    LogicalResult diagRewrite(linalg::MatmulOp op, PatternRewriter& rewriter) const {
+    LogicalResult denseToDenseDiagMatmulRewriteToLinalg(linalg::MatmulOp op,
+                                                        PatternRewriter& rewriter) const {
         auto loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
@@ -438,7 +440,8 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
         return success();
     }
 
-    LogicalResult denseBandedRewrite(linalg::MatmulOp op, PatternRewriter& rewriter) const {
+    LogicalResult denseToDenseBandedMatmulRewriteToSCF(linalg::MatmulOp op,
+                                                       PatternRewriter& rewriter) const {
         Location loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
@@ -563,12 +566,13 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
         auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
         uint64_t n = resultType.getDimSize(0);
         if (lower == 0 && upper == 0)
-            return diagRewrite(op, rewriter);
+            return denseToDenseDiagElementWiseRewriteToLinalg(op, rewriter);
         else
-            return bandedRewrite(op, rewriter);
+            return denseToDenseBandedElementwiseRewriteToSCF(op, rewriter);
     }
 
-    LogicalResult diagRewrite(linalg::ElementwiseOp op, PatternRewriter& rewriter) const {
+    LogicalResult denseToDenseDiagElementWiseRewriteToLinalg(linalg::ElementwiseOp op,
+                                                             PatternRewriter& rewriter) const {
         auto loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
@@ -601,7 +605,8 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
         return success();
     }
 
-    LogicalResult bandedRewrite(linalg::ElementwiseOp op, PatternRewriter& rewriter) const {
+    LogicalResult denseToDenseBandedElementwiseRewriteToSCF(linalg::ElementwiseOp op,
+                                                            PatternRewriter& rewriter) const {
         Location loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
@@ -779,8 +784,5 @@ struct BandedRewrite : public impl::BandedRewriteBase<BandedRewrite> {
             funcOp.setType(newFuncType);
         });
     }
-    // TODO: you don't need an extra metadata flag for layout update.
-    // Create a helper function to match bands with tensor layouts.
-    // This will assume that all supported ops lower to the correct tensor layout.
 };
 }  // namespace mlir::bpa
