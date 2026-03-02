@@ -42,12 +42,15 @@ jobs:
 
     - name: Configure ASP
       run: |
+        LLVM_ROOT=$(pwd)/clang+llvm-${{ env.LLVM_VERSION }}-x86_64-linux-gnu-ubuntu-22.04
+
         cmake -S . -B build \
           -G Ninja \
-          -DLLVM_BUILD=${{ github.workspace }}/llvm-build
+          -DLLVM_DIR=$LLVM_ROOT/lib/cmake/llvm \
+          -DMLIR_DIR=$LLVM_ROOT/lib/cmake/mlir
 
     - name: Build ASP
       run: ninja -C build
 
     - name: Run Tests
-      run: ninja -C build check-spa
+      run: ninja -C build check-asp
