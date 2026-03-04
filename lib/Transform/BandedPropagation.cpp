@@ -32,6 +32,7 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
             auto dims{ analysisResult.Dims };
 
             auto resultType = dyn_cast<RankedTensorType>(results[0].getType());
+            if (!resultType) return;
 
             const uint64_t N = resultType.getDimSize(1);
 

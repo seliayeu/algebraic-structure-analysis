@@ -35,6 +35,39 @@ namespace mlir::bpa {
 struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
     using OpRewritePattern::OpRewritePattern;
 
+    // dia diag should always result in dia
+    LogicalResult diaToDiaDiagMatmulRewriteToLinalg(dia::MatmulOp op,
+                                                    PatternRewriter& rewriter) const {
+        Location loc = op.getLoc();
+        Value A = op.getLhs();
+        Value B = op.getRhs();
+        Value C = op.getOutput();
+
+        MLIRContext* context = rewriter.getContext();
+
+        AffineExpr d0 = rewriter.getAffineDimExpr(0);
+
+        SmallVector<AffineMap, 3> indexingMaps = {
+            AffineMap::getMultiDimIdentityMap(2, context),
+            AffineMap::getMultiDimIdentityMap(2, context),
+            AffineMap::getMultiDimIdentityMap(2, context),
+        };
+
+        llvm::SmallVector<utils::IteratorType, 1> iteratorTypes = { utils::IteratorType::parallel,
+                                                                    utils::IteratorType::parallel };
+
+        auto genericOp = linalg::GenericOp::create(
+            rewriter, loc, TypeRange{ op.getOutput().getType() }, ValueRange{ A, B },
+            ValueRange{ C }, indexingMaps, iteratorTypes,
+            [&](OpBuilder& b, Location loc, ValueRange args) {
+                Value mul = arith::MulFOp::create(b, loc, args[0], args[1]);
+                linalg::YieldOp::create(b, loc, ValueRange{ mul });
+            });
+        genericOp->setAttr("metadata", op->getAttr("metadata"));
+        rewriter.replaceOp(op, genericOp);
+        return success();
+    }
+
     LogicalResult diaToDiaBandedMatmulRewriteToSCF(dia::MatmulOp op, PatternRewriter& rewriter,
                                                    const BandedSubMatrix& bandResult) const {
         Location loc = op.getLoc();
@@ -207,8 +240,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         auto lower = opBandInfo.Property.LowerBandwidth;
         auto upper = opBandInfo.Property.UpperBandwidth;
 
-        if (lower == 0 && upper == 0) return failure();
-        // banded
+        if (lower == 0 && upper == 0)
+            return diaToDiaDiagMatmulRewriteToLinalg(op, rewriter);
         else
             return diaToDiaBandedMatmulRewriteToSCF(op, rewriter, opBandInfo);
     }

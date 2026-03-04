@@ -8,14 +8,13 @@
 #include "Analysis/BandedProperty.h"
 #include "Dialect/DIA/DIAOps.h"
 #include "llvm/ADT/DenseMap.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir::bpa {
-
-enum class LayoutType { DIA };
 
 struct BandedSubMatrix {
     BandedProperty Property{ std::numeric_limits<int64_t>::max(),
@@ -32,12 +31,6 @@ struct BandedSubMatrix {
 
     bool operator!=(const BandedSubMatrix& other) const {
         return !operator==(other);
-    }
-
-   public:
-    static inline std::optional<LayoutType> layoutTypeFromString(std::string_view s) {
-        if (s == "DIA") return LayoutType::DIA;
-        return std::nullopt;
     }
 };
 
@@ -61,10 +54,11 @@ class BandedStructureAnalysis {
     static BandedSubMatrix readPropertyFromDictAttr(DictionaryAttr dictAttr);
 
    private:
+    LogicalResult visitOperation(Operation* op);
+
     // DIA ops
     LogicalResult visitMatmul(dia::MatmulOp* op);
-
-    LogicalResult visitOperation(Operation* op);
+    // Linalg ops
     LogicalResult visitMatmul(linalg::MatmulOp* op);
     LogicalResult visitBatchMatmul(linalg::BatchMatmulOp* op);
     LogicalResult visitAdd(linalg::AddOp* addOp);
@@ -72,6 +66,9 @@ class BandedStructureAnalysis {
     LogicalResult visitMul(linalg::MulOp* mulOp);
     LogicalResult visitTranspose(linalg::TransposeOp* transposeOp);
     LogicalResult visitGeneric(linalg::GenericOp* transposeOp);
+
+    // Func Ops
+    LogicalResult visitFuncCall(func::CallOp* funcCallOp);
 
     LogicalResult runBackward();
     bool propagateBackward(Value value);

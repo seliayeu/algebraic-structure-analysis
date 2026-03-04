@@ -119,7 +119,8 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
     if (op->getNumResults() != 1) return success();
     auto dialect{ op->getDialect() };
     if (!dialect || (dialect->getNamespace() != "linalg" && dialect->getNamespace() != "arith" &&
-                     dialect->getNamespace() != "tensor" && dialect->getNamespace() != "dia")) {
+                     dialect->getNamespace() != "tensor" && dialect->getNamespace() != "dia") &&
+                        dialect->getNamespace() != "func") {
         return success();
     }
 
@@ -147,7 +148,6 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
     } else if (auto diaMatmulOp{ dyn_cast<dia::MatmulOp>(op) }) {
         return visitMatmul(&diaMatmulOp);
     }
-
     return success();
 }
 
