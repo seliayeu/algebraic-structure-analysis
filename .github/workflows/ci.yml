@@ -3,54 +3,30 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [**]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-22.04
-
-    env:
-      LLVM_COMMIT: 104e82b75defd23ade610a5a75cd95244638ec0b
+    container:
+      image: ghcr.io/andradekaio/mlir-base:104e82b
 
     steps:
-    - name: Checkout asp project
-      uses: actions/checkout@v4
+      # Checkout your repo
+      - uses: actions/checkout@v4
 
-    - name: Checkout LLVM
-      uses: actions/checkout@v4
-      with:
-        repository: llvm/llvm-project
-        ref: ${{ env.LLVM_COMMIT }}
-        path: llvm-project
+      # Configure your project using the LLVM/MLIR inside the container
+      - name: Configure ASP
+        run: |
+          cmake -S . -B build \
+            -G Ninja \
+            -DLLVM_DIR=$LLVM_DIR \
+            -DMLIR_DIR=$MLIR_DIR
 
-    - name: Cache LLVM build
-      uses: actions/cache@v4
-      with:
-        path: llvm-build
-        key: llvm-${{ runner.os }}-${{ env.LLVM_COMMIT }}
+      # Build
+      - name: Build ASP
+        run: ninja -C build
 
-    - name: Configure LLVM
-      run: |
-        cmake -S llvm-project/llvm -B llvm-build \
-          -G Ninja \
-          -DLLVM_ENABLE_PROJECTS="mlir" \
-          -DLLVM_TARGETS_TO_BUILD="host" \
-          -DCMAKE_BUILD_TYPE=Release
-
-    - name: Build LLVM
-      run: ninja -C llvm-build
-
-    - name: Configure ASP
-      run: |
-        LLVM_ROOT=$(pwd)/clang+llvm-${{ env.LLVM_VERSION }}-x86_64-linux-gnu-ubuntu-22.04
-
-        cmake -S . -B build \
-          -G Ninja \
-          -DLLVM_DIR=$LLVM_ROOT/lib/cmake/llvm \
-          -DMLIR_DIR=$LLVM_ROOT/lib/cmake/mlir
-
-    - name: Build ASP
-      run: ninja -C build
-
-    - name: Run Tests
-      run: ninja -C build check-asp
+      # Run tests
+      - name: Run Tests
+        run: ninja -C build check-asp
