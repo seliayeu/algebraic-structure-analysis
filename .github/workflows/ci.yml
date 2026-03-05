@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [**]
+    branches: [main]
 
 jobs:
   build-and-test:
@@ -27,4 +27,4 @@ jobs:
 
       # Run tests
       - name: Run Tests
-        run: ninja -C build check-asp
+        run: ninja -C build check-bpa
