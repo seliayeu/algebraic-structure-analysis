@@ -39,8 +39,8 @@ LogicalResult BandedStructureAnalysis::runBackward() {
 
         for (auto& v : linalgOp.getDpsInputs()) {
             auto* definingOp{ v.getDefiningOp() };
-            if (!propagateBackward(v) || !isa<linalg::LinalgOp>(definingOp) ||
-                isa<linalg::MatmulOp>(definingOp))
+            if (isa<linalg::MatmulOp>(definingOp) || !isa<linalg::LinalgOp>(definingOp) ||
+                !propagateBackward(v))
                 continue;
             bwList.push_back(definingOp);
         }
