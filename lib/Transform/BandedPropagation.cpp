@@ -27,7 +27,7 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
             auto results{ inst->getResults() };
             if (results.size() != 1 || !BSA.hasProperty(results[0])) return;
 
-            auto analysisResult{ BSA.getProperty(results[0]) };
+            const BandedSubMatrix analysisResult{ BSA.getProperty(results[0]) };
             auto property{ analysisResult.Property };
             auto dims{ analysisResult.Dims };
 
@@ -49,7 +49,7 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
 
             llvm::SmallVector<mlir::NamedAttribute> attrs{ upperAttr, lowerAttr, dimsArrayAttr };
 
-            if (detectDIA && shouldCompress(analysisResult, N))
+            if (shouldCompressResult(detectDIA, *inst, analysisResult, N))
                 attrs.emplace_back(builder.getNamedAttr("dia", builder.getBoolAttr(true)));
 
             auto dictAttr = builder.getDictionaryAttr(attrs);

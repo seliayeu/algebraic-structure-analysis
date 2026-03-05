@@ -35,6 +35,43 @@ namespace mlir::bpa {
 struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
     using OpRewritePattern::OpRewritePattern;
 
+    LogicalResult diaTimesDenseToDiaDiagMatmulRewriteToLinalg(dia::MatmulOp op,
+                                                              PatternRewriter& rewriter) const {
+        Location loc = op.getLoc();
+        Value A = op.getLhs();
+        Value B = op.getRhs();
+        Value C = op.getOutput();
+
+        MLIRContext* context = rewriter.getContext();
+
+        AffineExpr d0 = rewriter.getAffineDimExpr(0);
+        AffineExpr zero = rewriter.getAffineConstantExpr(0);
+
+        AffineMap diaInMap = AffineMap::get(1, 0, { zero, d0 }, context);
+        AffineMap denseMap = AffineMap::get(1, 0, { d0, d0 }, context);
+        AffineMap diaOutMap = AffineMap::get(1, 0, { zero, d0 }, context);
+
+        SmallVector<AffineMap, 3> indexingMaps = {
+            diaInMap,
+            denseMap,
+            diaOutMap,
+        };
+
+        llvm::SmallVector<utils::IteratorType, 1> iteratorTypes = { utils::IteratorType::parallel };
+
+        auto genericOp = linalg::GenericOp::create(
+            rewriter, loc, TypeRange{ op.getOutput().getType() }, ValueRange{ A, B },
+            ValueRange{ C }, indexingMaps, iteratorTypes,
+            [&](OpBuilder& b, Location loc, ValueRange args) {
+                Value mul = arith::MulFOp::create(b, loc, args[0], args[1]);
+                linalg::YieldOp::create(b, loc, ValueRange{ mul });
+            });
+        genericOp->setAttr("metadata", op->getAttr("metadata"));
+        rewriter.replaceOp(op, genericOp);
+        return success();
+        return success();
+    }
+
     // dia diag should always result in dia
     LogicalResult diaToDiaDiagMatmulRewriteToLinalg(dia::MatmulOp op,
                                                     PatternRewriter& rewriter) const {
@@ -53,7 +90,7 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             AffineMap::getMultiDimIdentityMap(2, context),
         };
 
-        llvm::SmallVector<utils::IteratorType, 1> iteratorTypes = { utils::IteratorType::parallel,
+        llvm::SmallVector<utils::IteratorType, 2> iteratorTypes = { utils::IteratorType::parallel,
                                                                     utils::IteratorType::parallel };
 
         auto genericOp = linalg::GenericOp::create(
@@ -240,9 +277,30 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         auto lower = opBandInfo.Property.LowerBandwidth;
         auto upper = opBandInfo.Property.UpperBandwidth;
 
-        if (lower == 0 && upper == 0)
-            return diaToDiaDiagMatmulRewriteToLinalg(op, rewriter);
-        else
+        Value A = op.getLhs();
+        Value B = op.getRhs();
+        Value C = op.getOutput();
+
+        Operation* defOpA = A.getDefiningOp();
+        Operation* defOpB = B.getDefiningOp();
+
+        auto dictA = defOpA->getAttrDictionary();
+        auto dictB = defOpB->getAttrDictionary();
+
+        if (!dictA || !dictB) return failure();
+
+        const BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
+        const BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
+
+        // diagonal possible combinations
+        if (lower == 0 && upper == 0) {
+            if (bandA.IsDia && !bandB.IsDia)
+                return diaTimesDenseToDiaDiagMatmulRewriteToLinalg(op, rewriter);
+            else if (!bandA.IsDia && bandB.IsDia)
+                return denseTimesDiaToDiaDiagMatmulRewriteToLinalg(op, rewriter);
+            else
+                return diaToDiaDiagMatmulRewriteToLinalg(op, rewriter);
+        } else
             return diaToDiaBandedMatmulRewriteToSCF(op, rewriter, opBandInfo);
     }
 };
