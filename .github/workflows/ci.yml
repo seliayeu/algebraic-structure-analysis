@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [**]
 
 jobs:
   build-and-test:
@@ -12,8 +12,10 @@ jobs:
       image: ghcr.io/andradekaio/mlir-base:104e82b
 
     steps:
+      # Checkout your repo
       - uses: actions/checkout@v4
 
+      # Configure your project using the LLVM/MLIR inside the container
       - name: Configure ASP
         run: |
           cmake -S . -B build \
@@ -27,4 +29,4 @@ jobs:
 
       # Run tests
       - name: Run Tests
-        run: ninja -C build check-bpa
+        run: ninja -C build check-asp
