@@ -342,6 +342,7 @@ struct BatchMatmulPattern : public OpRewritePattern<linalg::BatchMatmulOp> {
         rewriter.replaceOp(op, genericOp);
         return success();
     }
+
     LogicalResult denseTimesDenseToDenseBandedBatchMatmulRewriteToSCF(
         linalg::BatchMatmulOp op, PatternRewriter& rewriter) const {
         Location loc = op.getLoc();
