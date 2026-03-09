@@ -6,7 +6,6 @@
 #include "Dialect/DIA/DIAOps.h"
 #include "Utils/TransformUtils.h"
 #include "llvm/ADT/SmallVector.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -297,11 +296,62 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             if (bandA.IsDia && !bandB.IsDia)
                 return diaTimesDenseToDiaDiagMatmulRewriteToLinalg(op, rewriter);
             else if (!bandA.IsDia && bandB.IsDia)
-                return denseTimesDiaToDiaDiagMatmulRewriteToLinalg(op, rewriter);
+                return failure();
+            // TODO: implement function below
+            //  return denseTimesDiaToDiaDiagMatmulRewriteToLinalg(op, rewriter);
             else
                 return diaToDiaDiagMatmulRewriteToLinalg(op, rewriter);
         } else
             return diaToDiaBandedMatmulRewriteToSCF(op, rewriter, opBandInfo);
+    }
+};
+
+// ------------------------------------------------------------------------------------------------------------------------------
+// linalg.BatchMatmul
+// ------------------------------------------------------------------------------------------------------------------------------
+
+struct BatchMatmulPattern : public OpRewritePattern<linalg::BatchMatmulOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult denseTimesDenseToDenseDiagBatchMatmulRewriteToLinalg(
+        linalg::BatchMatmulOp op, PatternRewriter& rewriter) const {
+        auto loc = op.getLoc();
+        Value A = op.getInputs()[0];
+        Value B = op.getInputs()[1];
+        Value C = op.getOutputs()[0];
+        MLIRContext* context = rewriter.getContext();
+
+        AffineExpr d0 = rewriter.getAffineDimExpr(0);
+        AffineExpr d1 = rewriter.getAffineDimExpr(1);
+
+        AffineMap batchDiagMap = AffineMap::get(2, 0, { d0, d1, d1 }, context);
+
+        SmallVector<AffineMap, 3> indexingMaps = { batchDiagMap, batchDiagMap, batchDiagMap };
+        SmallVector<utils::IteratorType, 2> iteratorTypes = { utils::IteratorType::parallel,
+                                                              utils::IteratorType::parallel };
+
+        auto genericOp = linalg::GenericOp::create(
+            rewriter, loc, TypeRange{ op.getResult(0).getType() }, ValueRange{ A, B },
+            ValueRange{ C }, indexingMaps, iteratorTypes,
+            [&](OpBuilder& b, Location loc, ValueRange args) {
+                Value mul = arith::MulFOp::create(b, loc, args[0], args[1]);
+                linalg::YieldOp::create(b, loc, ValueRange{ mul });
+            });
+
+        genericOp->setAttr("metadata", op->getAttr("metadata"));
+        rewriter.replaceOp(op, genericOp);
+        return success();
+    }
+    LogicalResult matchAndRewrite(linalg::BatchMatmulOp op,
+                                  PatternRewriter& rewriter) const override {
+        auto dict = op->getAttrDictionary();
+        if (!dict) dict = DictionaryAttr();
+
+        const BandedSubMatrix opBandInfo = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
+
+        if (opBandInfo.isDiagonal())
+            return denseTimesDenseToDenseDiagBatchMatmulRewriteToLinalg(op, rewriter);
+        return failure();
     }
 };
 
@@ -843,8 +893,8 @@ struct BandedRewrite : public impl::BandedRewriteBase<BandedRewrite> {
 
         RewritePatternSet patterns(context);
 
-        patterns.add<MatMulPattern, GenericElementWisePattern, TransposePattern, DIAMatMulPattern>(
-            context);
+        patterns.add<MatMulPattern, GenericElementWisePattern, TransposePattern, DIAMatMulPattern,
+                     BatchMatmulPattern>(context);
 
         GreedyRewriteConfig config;
         config.setMaxIterations(1);
