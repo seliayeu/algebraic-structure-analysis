@@ -149,6 +149,8 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
         return visitMatmul(&diaMatmulOp);
     } else if (auto diaFromDenseOp{ dyn_cast<dia::FromDenseOp>(op) }) {
         return visitFromDense(&diaFromDenseOp);
+    } else if (auto diaBatchMatmulOp{ dyn_cast<dia::BatchMatmulOp>(op) }) {
+        return visitDIABatchMatmul(&diaBatchMatmulOp);
     }
     return success();
 }
@@ -225,6 +227,37 @@ LogicalResult BandedStructureAnalysis::visitMatmul(linalg::MatmulOp* op) {
         resMat.Dims[0] = lhsMat.Dims[0];
         resMat.Dims[1] = rhsMat.Dims[1];
     }
+
+    return success();
+}
+
+LogicalResult BandedStructureAnalysis::visitDIABatchMatmul(dia::BatchMatmulOp* op) {
+    auto operands{ op->getOperands() };
+    auto result{ op->getResult() };
+    auto lhs{ op->getLhs() };
+    auto rhs{ op->getRhs() };
+    auto lhsType{ dyn_cast<TensorType>(lhs.getType()) };
+    auto rhsType{ dyn_cast<TensorType>(rhs.getType()) };
+
+    if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape()) return success();
+
+    auto lhsShape{ lhsType.getShape() };
+    auto rhsShape{ rhsType.getShape() };
+
+    if (!propertyMap.contains(lhs) || !propertyMap.contains(rhs)) return success();
+
+    const auto& lhsMat{ propertyMap[lhs] };
+    const auto& rhsMat{ propertyMap[rhs] };
+
+    std::array<uint64_t, 2> expectedDims{ 1, 2 };
+    if (lhsMat.Dims != expectedDims || rhsMat.Dims != expectedDims) return success();
+
+    BandedProperty newProperty{ binaryMatmul(lhsMat.Property, rhsMat.Property) };
+
+    newProperty.UpperBandwidth = std::min<uint64_t>(newProperty.UpperBandwidth, rhsShape[2] - 1);
+    newProperty.LowerBandwidth = std::min<uint64_t>(newProperty.LowerBandwidth, lhsShape[2] - 1);
+
+    propertyMap[result] = BandedSubMatrix{ newProperty, { 1, 2 } };
 
     return success();
 }
