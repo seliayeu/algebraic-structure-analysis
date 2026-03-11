@@ -11,3 +11,5 @@ build_dir = os.path.abspath(os.path.join(project_root, "build"))
 
 config.substitutions.append(("%project_root", project_root))
 config.substitutions.append(("%build", build_dir))
+llvm_root = os.environ.get("LLVM_ROOT", "")
+config.substitutions.append(("%llvm_root", llvm_root))
