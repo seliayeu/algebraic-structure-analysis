@@ -147,7 +147,18 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
         return visitGeneric(&genericOp);
     } else if (auto diaMatmulOp{ dyn_cast<dia::MatmulOp>(op) }) {
         return visitMatmul(&diaMatmulOp);
+    } else if (auto diaFromDenseOp{ dyn_cast<dia::FromDenseOp>(op) }) {
+        return visitFromDense(&diaFromDenseOp);
     }
+    return success();
+}
+
+LogicalResult BandedStructureAnalysis::visitFromDense(dia::FromDenseOp* op) {
+    auto input = op->getInput();
+    auto result = op->getResult();
+
+    if (!propertyMap.contains(input)) return failure();
+    propertyMap[result] = propertyMap[input];
     return success();
 }
 
