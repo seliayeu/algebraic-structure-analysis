@@ -15,13 +15,10 @@
 
 namespace mlir::bpa {
 
-enum class LayoutType { DIA };
-
 struct BandedSubMatrix {
     BandedProperty Property{ std::numeric_limits<int64_t>::max(),
                              std::numeric_limits<int64_t>::max() };
 
-    // TODO: chekc if Dims are being used
     std::array<uint64_t, 2> Dims{ 0, 1 };
 
     bool IsDia{ false };
@@ -34,10 +31,8 @@ struct BandedSubMatrix {
         return !operator==(other);
     }
 
-   public:
-    static inline std::optional<LayoutType> layoutTypeFromString(std::string_view s) {
-        if (s == "DIA") return LayoutType::DIA;
-        return std::nullopt;
+    bool isDiagonal() const {
+        return Property.LowerBandwidth == 0 && Property.UpperBandwidth == 0;
     }
 };
 
@@ -63,8 +58,10 @@ class BandedStructureAnalysis {
    private:
     // DIA ops
     LogicalResult visitMatmul(dia::MatmulOp* op);
-    LogicalResult visitBatchMatmul(dia::BatchMatmulOp* op);
+    LogicalResult visitFromDense(dia::FromDenseOp* op);
+    LogicalResult visitDIABatchMatmul(dia::BatchMatmulOp* op);
 
+    // Linalg ops
     LogicalResult visitOperation(Operation* op);
     LogicalResult visitMatmul(linalg::MatmulOp* op);
     LogicalResult visitBatchMatmul(linalg::BatchMatmulOp* op);

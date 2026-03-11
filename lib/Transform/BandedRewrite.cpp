@@ -6,7 +6,6 @@
 #include "Dialect/DIA/DIAOps.h"
 #include "Utils/TransformUtils.h"
 #include "llvm/ADT/SmallVector.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -29,9 +28,9 @@ namespace mlir::bpa {
 #include "lib/Transform/Passes.h.inc"
 
 // ------------------------------------------------------------------------------------------------------------------------------
-// dia.MatmulOp
+// dia.BatchMatmulOp
 // ------------------------------------------------------------------------------------------------------------------------------
-//
+
 struct DIABatchMatMulPattern : public OpRewritePattern<dia::BatchMatmulOp> {
     using OpRewritePattern::OpRewritePattern;
 
@@ -226,8 +225,82 @@ struct DIABatchMatMulPattern : public OpRewritePattern<dia::BatchMatmulOp> {
     }
 };
 
+// ------------------------------------------------------------------------------------------------------------------------------
+// dia.MatmulOp
+// ------------------------------------------------------------------------------------------------------------------------------
+
 struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
     using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult diaTimesDenseToDiaDiagMatmulRewriteToLinalg(dia::MatmulOp op,
+                                                              PatternRewriter& rewriter) const {
+        Location loc = op.getLoc();
+        Value A = op.getLhs();
+        Value B = op.getRhs();
+        Value C = op.getOutput();
+
+        MLIRContext* context = rewriter.getContext();
+
+        AffineExpr d0 = rewriter.getAffineDimExpr(0);
+        AffineExpr zero = rewriter.getAffineConstantExpr(0);
+
+        AffineMap diaInMap = AffineMap::get(1, 0, { zero, d0 }, context);
+        AffineMap denseMap = AffineMap::get(1, 0, { d0, d0 }, context);
+        AffineMap diaOutMap = AffineMap::get(1, 0, { zero, d0 }, context);
+
+        SmallVector<AffineMap, 3> indexingMaps = {
+            diaInMap,
+            denseMap,
+            diaOutMap,
+        };
+
+        llvm::SmallVector<utils::IteratorType, 1> iteratorTypes = { utils::IteratorType::parallel };
+
+        auto genericOp = linalg::GenericOp::create(
+            rewriter, loc, TypeRange{ op.getOutput().getType() }, ValueRange{ A, B },
+            ValueRange{ C }, indexingMaps, iteratorTypes,
+            [&](OpBuilder& b, Location loc, ValueRange args) {
+                Value mul = arith::MulFOp::create(b, loc, args[0], args[1]);
+                linalg::YieldOp::create(b, loc, ValueRange{ mul });
+            });
+        genericOp->setAttr("metadata", op->getAttr("metadata"));
+        rewriter.replaceOp(op, genericOp);
+        return success();
+        return success();
+    }
+
+    // dia diag should always result in dia
+    LogicalResult diaToDiaDiagMatmulRewriteToLinalg(dia::MatmulOp op,
+                                                    PatternRewriter& rewriter) const {
+        Location loc = op.getLoc();
+        Value A = op.getLhs();
+        Value B = op.getRhs();
+        Value C = op.getOutput();
+
+        MLIRContext* context = rewriter.getContext();
+
+        AffineExpr d0 = rewriter.getAffineDimExpr(0);
+
+        SmallVector<AffineMap, 3> indexingMaps = {
+            AffineMap::getMultiDimIdentityMap(2, context),
+            AffineMap::getMultiDimIdentityMap(2, context),
+            AffineMap::getMultiDimIdentityMap(2, context),
+        };
+
+        llvm::SmallVector<utils::IteratorType, 2> iteratorTypes = { utils::IteratorType::parallel,
+                                                                    utils::IteratorType::parallel };
+
+        auto genericOp = linalg::GenericOp::create(
+            rewriter, loc, TypeRange{ op.getOutput().getType() }, ValueRange{ A, B },
+            ValueRange{ C }, indexingMaps, iteratorTypes,
+            [&](OpBuilder& b, Location loc, ValueRange args) {
+                Value mul = arith::MulFOp::create(b, loc, args[0], args[1]);
+                linalg::YieldOp::create(b, loc, ValueRange{ mul });
+            });
+        genericOp->setAttr("metadata", op->getAttr("metadata"));
+        rewriter.replaceOp(op, genericOp);
+        return success();
+    }
 
     LogicalResult diaToDiaBandedMatmulRewriteToSCF(dia::MatmulOp op, PatternRewriter& rewriter,
                                                    const BandedSubMatrix& bandResult) const {
@@ -401,10 +474,194 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         auto lower = opBandInfo.Property.LowerBandwidth;
         auto upper = opBandInfo.Property.UpperBandwidth;
 
-        if (lower == 0 && upper == 0) return failure();
-        // banded
-        else
+        Value A = op.getLhs();
+        Value B = op.getRhs();
+        Value C = op.getOutput();
+
+        Operation* defOpA = A.getDefiningOp();
+        Operation* defOpB = B.getDefiningOp();
+
+        auto dictA = defOpA->getAttrDictionary();
+        auto dictB = defOpB->getAttrDictionary();
+
+        if (!dictA || !dictB) return failure();
+
+        const BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
+        const BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
+
+        // diagonal possible combinations
+        if (lower == 0 && upper == 0) {
+            if (bandA.IsDia && !bandB.IsDia)
+                return diaTimesDenseToDiaDiagMatmulRewriteToLinalg(op, rewriter);
+            else if (!bandA.IsDia && bandB.IsDia)
+                return failure();
+            // TODO: implement function below
+            //  return denseTimesDiaToDiaDiagMatmulRewriteToLinalg(op, rewriter);
+            else
+                return diaToDiaDiagMatmulRewriteToLinalg(op, rewriter);
+        } else
             return diaToDiaBandedMatmulRewriteToSCF(op, rewriter, opBandInfo);
+    }
+};
+
+// ------------------------------------------------------------------------------------------------------------------------------
+// linalg.BatchMatmul
+// ------------------------------------------------------------------------------------------------------------------------------
+
+struct BatchMatmulPattern : public OpRewritePattern<linalg::BatchMatmulOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult denseTimesDenseToDenseDiagBatchMatmulRewriteToLinalg(
+        linalg::BatchMatmulOp op, PatternRewriter& rewriter) const {
+        auto loc = op.getLoc();
+        Value A = op.getInputs()[0];
+        Value B = op.getInputs()[1];
+        Value C = op.getOutputs()[0];
+        MLIRContext* context = rewriter.getContext();
+
+        AffineExpr d0 = rewriter.getAffineDimExpr(0);
+        AffineExpr d1 = rewriter.getAffineDimExpr(1);
+
+        AffineMap batchDiagMap = AffineMap::get(2, 0, { d0, d1, d1 }, context);
+
+        SmallVector<AffineMap, 3> indexingMaps = { batchDiagMap, batchDiagMap, batchDiagMap };
+        SmallVector<utils::IteratorType, 2> iteratorTypes = { utils::IteratorType::parallel,
+                                                              utils::IteratorType::parallel };
+
+        auto genericOp = linalg::GenericOp::create(
+            rewriter, loc, TypeRange{ op.getResult(0).getType() }, ValueRange{ A, B },
+            ValueRange{ C }, indexingMaps, iteratorTypes,
+            [&](OpBuilder& b, Location loc, ValueRange args) {
+                Value mul = arith::MulFOp::create(b, loc, args[0], args[1]);
+                linalg::YieldOp::create(b, loc, ValueRange{ mul });
+            });
+
+        genericOp->setAttr("metadata", op->getAttr("metadata"));
+        rewriter.replaceOp(op, genericOp);
+        return success();
+    }
+
+    LogicalResult denseTimesDenseToDenseBandedBatchMatmulRewriteToSCF(
+        linalg::BatchMatmulOp op, PatternRewriter& rewriter) const {
+        Location loc = op.getLoc();
+        Value A = op.getInputs()[0];
+        Value B = op.getInputs()[1];
+        Value C = op.getOutputs()[0];
+
+        Operation* defOpA = A.getDefiningOp();
+        Operation* defOpB = B.getDefiningOp();
+
+        auto dictA = defOpA->getAttrDictionary();
+        auto dictB = defOpB->getAttrDictionary();
+
+        if (!dictA || !dictB) return failure();
+
+        BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
+        BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
+
+        auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
+        const uint64_t K = resultType.getDimSize(0);
+        const uint64_t N = resultType.getDimSize(1);
+        const uint64_t M = resultType.getDimSize(2);
+
+        Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
+        Value c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
+        Value dimK = arith::ConstantIndexOp::create(rewriter, loc, K);
+        Value dimN = arith::ConstantIndexOp::create(rewriter, loc, N);
+        Value dimM = arith::ConstantIndexOp::create(rewriter, loc, M);
+
+        Value lowerA = arith::ConstantIndexOp::create(rewriter, loc, bandA.Property.LowerBandwidth);
+        Value upperA = arith::ConstantIndexOp::create(rewriter, loc, bandA.Property.UpperBandwidth);
+        Value lowerB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.LowerBandwidth);
+        Value upperB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.UpperBandwidth);
+
+        // Same as before but with an extra loop around the batch
+        // for b in [0, K):
+        //   for i in [0, N):
+        //     for k in [max(0, i-(lA+lB)), min(M, i+(uA+uB)+1)):
+        //       for j in [max(0, max(i-lA, k-uB)), min(N, min(i+uA, k+lB)+1)):
+        //         C[b,i,k] += A[b,i,j] * B[b,j,k]
+
+        auto bLoop = scf::ForOp::create(
+            rewriter, loc, c0, dimK, c1, ValueRange{ C },
+            [&](OpBuilder& bb, Location loc, Value b, ValueRange bArgs) {
+                Value cOut = bArgs[0];
+
+                auto iLoop = scf::ForOp::create(
+                    bb, loc, c0, dimN, c1, ValueRange{ cOut },
+                    [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
+                        Value cMid = iArgs[0];
+
+                        // k start = max(0, i - (lA + lB))
+                        Value lAplB = arith::AddIOp::create(ob, loc, lowerA, lowerB);
+                        Value iMinusLALB = arith::SubIOp::create(ob, loc, i, lAplB);
+                        Value kStart = arith::MaxSIOp::create(ob, loc, c0, iMinusLALB);
+
+                        // k end = min(M, i + (uA + uB) + 1)
+                        Value uApuB = arith::AddIOp::create(ob, loc, upperA, upperB);
+                        Value iPlusuAuB = arith::AddIOp::create(ob, loc, i, uApuB);
+                        Value kEndRaw = arith::AddIOp::create(ob, loc, iPlusuAuB, c1);
+                        Value kEnd = arith::MinSIOp::create(ob, loc, dimM, kEndRaw);
+
+                        auto kLoop = scf::ForOp::create(
+                            ob, loc, kStart, kEnd, c1, ValueRange{ cMid },
+                            [&](OpBuilder& mb, Location loc, Value k, ValueRange kArgs) {
+                                Value cInner = kArgs[0];
+
+                                // j start = max(0, max(i - lA, k - uB))
+                                Value iMinusLa = arith::SubIOp::create(mb, loc, i, lowerA);
+                                Value kMinusUb = arith::SubIOp::create(mb, loc, k, upperB);
+                                Value jStartInner =
+                                    arith::MaxSIOp::create(mb, loc, iMinusLa, kMinusUb);
+                                Value jStart = arith::MaxSIOp::create(mb, loc, c0, jStartInner);
+
+                                // j end = min(N, min(i + uA, k + lB) + 1)
+                                Value iPlusUa = arith::AddIOp::create(mb, loc, i, upperA);
+                                Value kPlusLb = arith::AddIOp::create(mb, loc, k, lowerB);
+                                Value jEndInner = arith::MinSIOp::create(mb, loc, iPlusUa, kPlusLb);
+                                Value jEndRaw = arith::AddIOp::create(mb, loc, jEndInner, c1);
+                                Value jEnd = arith::MinSIOp::create(mb, loc, dimN, jEndRaw);
+
+                                auto jLoop = scf::ForOp::create(
+                                    mb, loc, jStart, jEnd, c1, ValueRange{ cInner },
+                                    [&](OpBuilder& ib, Location loc, Value j, ValueRange jArgs) {
+                                        Value cInnest = jArgs[0];
+                                        Value cbik = tensor::ExtractOp::create(
+                                            ib, loc, cInnest, ValueRange{ b, i, k });
+                                        Value abij = tensor::ExtractOp::create(
+                                            ib, loc, A, ValueRange{ b, i, j });
+                                        Value bbjk = tensor::ExtractOp::create(
+                                            ib, loc, B, ValueRange{ b, j, k });
+                                        Value mul = arith::MulFOp::create(ib, loc, abij, bbjk);
+                                        Value add = arith::AddFOp::create(ib, loc, cbik, mul);
+                                        Value updated = tensor::InsertOp::create(
+                                            ib, loc, add, cInnest, ValueRange{ b, i, k });
+                                        scf::YieldOp::create(ib, loc, ValueRange{ updated });
+                                    });
+                                scf::YieldOp::create(mb, loc, jLoop.getResults());
+                            });
+                        scf::YieldOp::create(ob, loc, kLoop.getResults());
+                    });
+                scf::YieldOp::create(bb, loc, iLoop.getResults());
+            });
+
+        bLoop->setAttr("metadata", op->getAttr("metadata"));
+        rewriter.replaceOp(op, bLoop.getResult(0));
+        return success();
+    }
+
+    LogicalResult matchAndRewrite(linalg::BatchMatmulOp op,
+                                  PatternRewriter& rewriter) const override {
+        auto dict = op->getAttrDictionary();
+        if (!dict) dict = DictionaryAttr();
+
+        const BandedSubMatrix opBandInfo = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
+
+        if (opBandInfo.isDiagonal())
+            return denseTimesDenseToDenseDiagBatchMatmulRewriteToLinalg(op, rewriter);
+        else
+            return denseTimesDenseToDenseBandedBatchMatmulRewriteToSCF(op, rewriter);
+        return failure();
     }
 };
 
@@ -500,7 +757,6 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
                 // j end = min(M, i + (Ua + Ub))
                 Value uAPlusUb = arith::AddIOp::create(ob, loc, upperA, upperB);
                 Value iPlusUpper = arith::AddIOp::create(ob, loc, i, uAPlusUb);
-                Value mMinusOne = arith::AddIOp::create(ob, loc, dimM, c1);
                 Value iPlusUpperP1 = arith::AddIOp::create(ob, loc, iPlusUpper, c1);
                 Value jEnd = arith::MinSIOp::create(ob, loc, dimM, iPlusUpperP1);
 
@@ -684,7 +940,6 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
                 // k end = min(M, i + (Ua + Ub))
                 Value uAPlusUb = arith::AddIOp::create(ob, loc, upperA, upperB);
                 Value iPlusUpper = arith::AddIOp::create(ob, loc, i, uAPlusUb);
-                Value mMinusOne = arith::AddIOp::create(ob, loc, dimM, c1);
                 Value iPlusUpperP1 = arith::AddIOp::create(ob, loc, iPlusUpper, c1);
                 Value kEnd = arith::MinSIOp::create(ob, loc, dimM, iPlusUpperP1);
                 // k loop
@@ -947,7 +1202,7 @@ struct BandedRewrite : public impl::BandedRewriteBase<BandedRewrite> {
         RewritePatternSet patterns(context);
 
         patterns.add<MatMulPattern, GenericElementWisePattern, TransposePattern, DIAMatMulPattern,
-                     DIABatchMatMulPattern>(context);
+                     BatchMatmulPattern, DIABatchMatMulPattern>(context);
 
         GreedyRewriteConfig config;
         config.setMaxIterations(1);

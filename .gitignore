@@ -1,4 +1,7 @@
 .cache/
-build
+build/
+venv/
+env/
 tests/.lit_test_times.txt
 tests/*/Output/
+.DS_Store

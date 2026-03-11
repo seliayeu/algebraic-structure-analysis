@@ -1,7 +1,6 @@
 #include "Analysis/BandedStructureAnalysis.h"
 
 #include <algorithm>
-#include <iostream>
 
 #include "Analysis/BandedProperty.h"
 #include "Dialect/DIA/DIAOps.h"
@@ -120,7 +119,8 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
     if (op->getNumResults() != 1) return success();
     auto dialect{ op->getDialect() };
     if (!dialect || (dialect->getNamespace() != "linalg" && dialect->getNamespace() != "arith" &&
-                     dialect->getNamespace() != "tensor" && dialect->getNamespace() != "dia")) {
+                     dialect->getNamespace() != "tensor" && dialect->getNamespace() != "dia") &&
+                        dialect->getNamespace() != "func") {
         return success();
     }
 
@@ -147,10 +147,20 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
         return visitGeneric(&genericOp);
     } else if (auto diaMatmulOp{ dyn_cast<dia::MatmulOp>(op) }) {
         return visitMatmul(&diaMatmulOp);
+    } else if (auto diaFromDenseOp{ dyn_cast<dia::FromDenseOp>(op) }) {
+        return visitFromDense(&diaFromDenseOp);
     } else if (auto diaBatchMatmulOp{ dyn_cast<dia::BatchMatmulOp>(op) }) {
-        return visitBatchMatmul(&diaBatchMatmulOp);
+        return visitDIABatchMatmul(&diaBatchMatmulOp);
     }
+    return success();
+}
 
+LogicalResult BandedStructureAnalysis::visitFromDense(dia::FromDenseOp* op) {
+    auto input = op->getInput();
+    auto result = op->getResult();
+
+    if (!propertyMap.contains(input)) return failure();
+    propertyMap[result] = propertyMap[input];
     return success();
 }
 
@@ -221,7 +231,7 @@ LogicalResult BandedStructureAnalysis::visitMatmul(linalg::MatmulOp* op) {
     return success();
 }
 
-LogicalResult BandedStructureAnalysis::visitBatchMatmul(dia::BatchMatmulOp* op) {
+LogicalResult BandedStructureAnalysis::visitDIABatchMatmul(dia::BatchMatmulOp* op) {
     auto operands{ op->getOperands() };
     auto result{ op->getResult() };
     auto lhs{ op->getLhs() };

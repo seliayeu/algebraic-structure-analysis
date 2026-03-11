@@ -22,6 +22,7 @@ def DIA_MatmulOp : DIA_Op<"matmul", [Pure]> {
         `->` type($result) attr-dict
     }];
 }
+
 def DIA_BatchMatmulOp : DIA_Op<"batch_matmul", [Pure]> {
     let summary = "DIA batched matrix multiplication with heterogeneous layouts";
     let arguments = (ins
@@ -36,5 +37,24 @@ def DIA_BatchMatmulOp : DIA_Op<"batch_matmul", [Pure]> {
         `->` type($result) attr-dict
     }];
 }
+
+def DIA_FromDenseOp : DIA_Op<"from_dense", [Pure]> {
+    let summary = "Construct a DIA tensor from a dense constant tensor";
+
+    let arguments = (ins
+      AnyTensor:$input
+    );
+
+    let results = (outs
+      AnyTensor:$output
+    );
+
+    let assemblyFormat = [{
+      $input attr-dict `:` type($input) `->` type($output)
+    }];
+
+    let hasCanonicalizer = 1;
+}
+
 
 #endif // DIA_OPS
