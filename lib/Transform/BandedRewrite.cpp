@@ -157,7 +157,7 @@ struct DIABatchMatMulPattern : public OpRewritePattern<dia::BatchMatmulOp> {
                                 Value jShiftedI64 = toI64(mb, jShifted);
                                 Value j = arith::SubIOp::create(mb, loc, jShiftedI64, lAi64);
 
-                                // aIdx = jShifted (already shifted, no negatives)
+                                // aIdx = jShifted
                                 Value aIdx = jShifted;
 
                                 // k = i - j in i64, bIdx = k + lB
@@ -406,9 +406,11 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                 // shift j to index: j_shifted_start = j_start + lA
                 Value jStartShifted = toIndex(ob, arith::AddIOp::create(ob, loc, jStartI64, lAi64));
                 Value jEndShifted = toIndex(ob, arith::AddIOp::create(ob, loc, jEndI64, lAi64));
+                Value maxDiaIdx = arith::ConstantIndexOp::create(ob, loc, lA + uA + 1);
+                Value jEndShiftedClamped = arith::MinSIOp::create(ob, loc, jEndShifted, maxDiaIdx);
 
                 auto jLoop = scf::ForOp::create(
-                    ob, loc, jStartShifted, jEndShifted, c1, ValueRange{ cOuter },
+                    ob, loc, jStartShifted, jEndShiftedClamped, c1, ValueRange{ cOuter },
                     [&](OpBuilder& mb, Location loc, Value jShifted, ValueRange jArgs) {
                         Value cMid = jArgs[0];
 
@@ -416,12 +418,13 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                         Value jShiftedI64 = toI64(mb, jShifted);
                         Value j = arith::SubIOp::create(mb, loc, jShiftedI64, lAi64);
 
-                        // aIdx = jShifted (already shifted, no negatives)
                         Value aIdx = jShifted;
 
                         // k = i - j in i64, bIdx = k + lB
                         Value k = arith::SubIOp::create(mb, loc, i, j);
                         Value bIdx = toIndex(mb, arith::AddIOp::create(mb, loc, k, lBi64));
+                        Value maxBDiaIdx = arith::ConstantIndexOp::create(mb, loc, lB + uB);
+                        Value bIdxClamped = arith::MinSIOp::create(mb, loc, bIdx, maxBDiaIdx);
 
                         // r_start = max(0, -j) in i64
                         Value negJ = arith::SubIOp::create(mb, loc, c0i64, j);
@@ -444,8 +447,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                                 // r + j in i64, then cast to index
                                 Value rI64 = toI64(ib, r);
                                 Value rPlusJ = toIndex(ib, arith::AddIOp::create(ib, loc, rI64, j));
-                                Value bVal = tensor::ExtractOp::create(ib, loc, B,
-                                                                       ValueRange{ bIdx, rPlusJ });
+                                Value bVal = tensor::ExtractOp::create(
+                                    ib, loc, B, ValueRange{ bIdxClamped, rPlusJ });
 
                                 Value mul = arith::MulFOp::create(ib, loc, aVal, bVal);
                                 Value acc = arith::AddFOp::create(ib, loc, cVal, mul);
@@ -678,11 +681,7 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
 
         const BandedSubMatrix opBandInfo = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
 
-        auto lower = opBandInfo.Property.LowerBandwidth;
-        auto upper = opBandInfo.Property.UpperBandwidth;
-
-        // diagonal
-        if (lower == 0 && upper == 0) return denseToDenseDiagMatmulRewriteToLinalg(op, rewriter);
+        if (opBandInfo.isDiagonal()) return denseToDenseDiagMatmulRewriteToLinalg(op, rewriter);
         // banded
         else
             return denseToDenseBandedMatmulRewriteToSCF(op, rewriter);
@@ -904,8 +903,8 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
 
         if (!dictA || !dictB) return failure();
 
-        BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
-        BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
+        const BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
+        const BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
 
         auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
         const uint64_t N = resultType.getDimSize(0);
@@ -950,7 +949,8 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
                         // j start = max(i-La, k - Ub)
                         Value iMinusLa = arith::SubIOp::create(mb, loc, i, lowerA);
                         Value kMinusUb = arith::SubIOp::create(mb, loc, k, upperB);
-                        Value jStart = arith::MaxSIOp::create(mb, loc, kMinusUb, iMinusLa);
+                        Value jStart = arith::MaxSIOp::create(
+                            mb, loc, arith::MaxSIOp::create(mb, loc, kMinusUb, iMinusLa), c0);
 
                         // j end = min(i + Ua, k + Lb)
                         Value iPlusUa = arith::AddIOp::create(mb, loc, i, upperA);
@@ -1009,11 +1009,9 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
 
         BandedSubMatrix opBandInfo = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
 
-        auto lower = opBandInfo.Property.LowerBandwidth;
-        auto upper = opBandInfo.Property.UpperBandwidth;
         auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
         uint64_t n = resultType.getDimSize(0);
-        if (lower == 0 && upper == 0)
+        if (opBandInfo.isDiagonal())
             return denseToDenseDiagElementWiseRewriteToLinalg(op, rewriter);
         else
             return denseToDenseBandedElementwiseRewriteToSCF(op, rewriter);
@@ -1151,29 +1149,27 @@ struct TransposePattern : public OpRewritePattern<linalg::TransposeOp> {
 
     LogicalResult matchAndRewrite(linalg::TransposeOp op,
                                   PatternRewriter& rewriter) const override {
+        // TODO: check for permutation.
         auto dict = op->getAttrDictionary();
         if (!dict) dict = DictionaryAttr();
         BandedSubMatrix opBandInfo = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
 
-        if (opBandInfo.Property.LowerBandwidth == 0 && opBandInfo.Property.UpperBandwidth == 0) {
+        if (opBandInfo.isDiagonal()) {
             rewriter.replaceOp(op, op.getInput());
             return success();
         }
-
-        auto inputUpper = opBandInfo.Property.LowerBandwidth;
-        auto inputLower = opBandInfo.Property.UpperBandwidth;
 
         MLIRContext* context = rewriter.getContext();
 
         AffineExpr d0 = rewriter.getAffineDimExpr(0);
         AffineExpr d1 = rewriter.getAffineDimExpr(1);
 
-        AffineMap inputMap = AffineMap::get(2, 0, { d0, d1 }, context);
-        AffineMap outputMap = AffineMap::get(2, 0, { d1, d0 }, context);
+        AffineMap inputMap = AffineMap::get(2, 0, { d1, d0 }, context);
+        AffineMap outputMap = AffineMap::get(2, 0, { d0, d1 }, context);
 
         SmallVector<AffineMap, 2> indexingMaps = { inputMap, outputMap };
 
-        llvm::SmallVector<utils::IteratorType, 1> iteratorTypes = { utils::IteratorType::parallel,
+        llvm::SmallVector<utils::IteratorType, 2> iteratorTypes = { utils::IteratorType::parallel,
                                                                     utils::IteratorType::parallel };
 
         Location loc = op->getLoc();
