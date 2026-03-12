@@ -1,7 +1,7 @@
 // RUN: %build/tools/alg-opt %s --banded-analysis --banded-rewrite | FileCheck %s
 
-// CHECK: #map = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK: #map1 = affine_map<(d0, d1) -> (d1, d0)>
+// CHECK: #map = affine_map<(d0, d1) -> (d1, d0)>
+// CHECK: #map1 = affine_map<(d0, d1) -> (d0, d1)>
 
 // CHECK-LABEL: func.func @banded_transpose
 // CHECK-NOT: linalg.transpose

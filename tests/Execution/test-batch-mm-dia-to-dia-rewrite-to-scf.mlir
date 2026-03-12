@@ -13,11 +13,11 @@ module {
     
     func.func @main() {
         %0 = tensor.empty() : tensor<2x3x3xf32>
-        
+
         %dia1 = arith.constant {metadata = {dia = true, upperBw = 0 : i64, lowerBw = 1 : i64, propertyDims = [1, 2]}}
             dense<[[[0.0, 1.0, 2.0], [1.0, 2.0, 3.0]],
                    [[0.0, 2.0, 3.0], [5.0, 6.0, 7.0]]]> : tensor<2x2x3xf32>
-                   
+
         %dia2 = arith.constant {metadata = {dia = true, upperBw = 0 : i64, lowerBw = 1 : i64, propertyDims = [1, 2]}}
             dense<[[[0.0, 4.0, 2.0], [3.0, 9.0, 3.0]],
                    [[0.0, 2.0, 2.0], [1.0, 5.0, 1.0]]]> : tensor<2x2x3xf32>
