@@ -34,9 +34,9 @@ namespace mlir::bpa {
 struct DIABatchMatMulPattern : public OpRewritePattern<dia::BatchMatmulOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult diaToDiaBandedBatchMatmulRewriteToSCF(dia::BatchMatmulOp op,
-                                                        PatternRewriter& rewriter,
-                                                        const BandedSubMatrix& bandResult) const {
+    LogicalResult diaTimesDiaToDiaBandedBatchMatmulToSCF(dia::BatchMatmulOp op,
+                                                         PatternRewriter& rewriter,
+                                                         const BandedSubMatrix& bandResult) const {
         Location loc = op.getLoc();
         Value A = op.getLhs();
         Value B = op.getRhs();
@@ -221,7 +221,7 @@ struct DIABatchMatMulPattern : public OpRewritePattern<dia::BatchMatmulOp> {
         if (lower == 0 && upper == 0) return failure();
         // banded
         else
-            return diaToDiaBandedBatchMatmulRewriteToSCF(op, rewriter, opBandInfo);
+            return diaTimesDiaToDiaBandedBatchMatmulToSCF(op, rewriter, opBandInfo);
     }
 };
 
@@ -232,8 +232,8 @@ struct DIABatchMatMulPattern : public OpRewritePattern<dia::BatchMatmulOp> {
 struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult diaTimesDenseToDiaDiagMatmulRewriteToLinalg(dia::MatmulOp op,
-                                                              PatternRewriter& rewriter) const {
+    LogicalResult diaTimesDenseToDiaDiagMatmulToLinalg(dia::MatmulOp op,
+                                                       PatternRewriter& rewriter) const {
         Location loc = op.getLoc();
         Value A = op.getLhs();
         Value B = op.getRhs();
@@ -270,8 +270,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
     }
 
     // dia diag should always result in dia
-    LogicalResult diaToDiaDiagMatmulRewriteToLinalg(dia::MatmulOp op,
-                                                    PatternRewriter& rewriter) const {
+    LogicalResult diaTimesDiaToDiaDiagMatmulToLinalg(dia::MatmulOp op,
+                                                     PatternRewriter& rewriter) const {
         Location loc = op.getLoc();
         Value A = op.getLhs();
         Value B = op.getRhs();
@@ -302,8 +302,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         return success();
     }
 
-    LogicalResult diaToDiaBandedMatmulRewriteToSCF(dia::MatmulOp op, PatternRewriter& rewriter,
-                                                   const BandedSubMatrix& bandResult) const {
+    LogicalResult diaTimesDiaToDiaBandedMatmulToSCF(dia::MatmulOp op, PatternRewriter& rewriter,
+                                                    const BandedSubMatrix& bandResult) const {
         Location loc = op.getLoc();
         Value A = op.getLhs();
         Value B = op.getRhs();
@@ -493,17 +493,17 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         const BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
 
         // diagonal possible combinations
-        if (lower == 0 && upper == 0) {
+        if (opBandInfo.isDiagonal()) {
             if (bandA.IsDia && !bandB.IsDia)
-                return diaTimesDenseToDiaDiagMatmulRewriteToLinalg(op, rewriter);
+                return diaTimesDenseToDiaDiagMatmulToLinalg(op, rewriter);
             else if (!bandA.IsDia && bandB.IsDia)
                 return failure();
             // TODO: implement function below
-            //  return denseTimesDiaToDiaDiagMatmulRewriteToLinalg(op, rewriter);
+            //  return denseTimesDiaToDiaDiagMatmulToLinalg(op, rewriter);
             else
-                return diaToDiaDiagMatmulRewriteToLinalg(op, rewriter);
+                return diaTimesDiaToDiaDiagMatmulToLinalg(op, rewriter);
         } else
-            return diaToDiaBandedMatmulRewriteToSCF(op, rewriter, opBandInfo);
+            return diaTimesDiaToDiaBandedMatmulToSCF(op, rewriter, opBandInfo);
     }
 };
 
@@ -514,8 +514,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
 struct BatchMatmulPattern : public OpRewritePattern<linalg::BatchMatmulOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult denseTimesDenseToDenseDiagBatchMatmulRewriteToLinalg(
-        linalg::BatchMatmulOp op, PatternRewriter& rewriter) const {
+    LogicalResult denseTimesDenseToDenseDiagBatchMatmulToLinalg(linalg::BatchMatmulOp op,
+                                                                PatternRewriter& rewriter) const {
         auto loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
@@ -544,8 +544,8 @@ struct BatchMatmulPattern : public OpRewritePattern<linalg::BatchMatmulOp> {
         return success();
     }
 
-    LogicalResult denseTimesDenseToDenseBandedBatchMatmulRewriteToSCF(
-        linalg::BatchMatmulOp op, PatternRewriter& rewriter) const {
+    LogicalResult denseTimesDenseToDenseBandedBatchMatmulToSCF(linalg::BatchMatmulOp op,
+                                                               PatternRewriter& rewriter) const {
         Location loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
@@ -661,9 +661,9 @@ struct BatchMatmulPattern : public OpRewritePattern<linalg::BatchMatmulOp> {
         const BandedSubMatrix opBandInfo = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
 
         if (opBandInfo.isDiagonal())
-            return denseTimesDenseToDenseDiagBatchMatmulRewriteToLinalg(op, rewriter);
+            return denseTimesDenseToDenseDiagBatchMatmulToLinalg(op, rewriter);
         else
-            return denseTimesDenseToDenseBandedBatchMatmulRewriteToSCF(op, rewriter);
+            return denseTimesDenseToDenseBandedBatchMatmulToSCF(op, rewriter);
         return failure();
     }
 };
@@ -681,10 +681,10 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
 
         const BandedSubMatrix opBandInfo = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
 
-        if (opBandInfo.isDiagonal()) return denseToDenseDiagMatmulRewriteToLinalg(op, rewriter);
+        if (opBandInfo.isDiagonal()) return denseTimesDenseToDenseDiagMatmulToLinalg(op, rewriter);
         // banded
         else
-            return denseToDenseBandedMatmulRewriteToSCF(op, rewriter);
+            return denseTimesDenseToDenseBandedMatmulToSCF(op, rewriter);
         return failure();
     }
 
@@ -692,8 +692,9 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
     /// computes only the entries within the intersection.
     ///
     /// The result is materialized in the DIA format.
-    LogicalResult denseToDiaBandedMatmulRewriteToSCF(linalg::MatmulOp op, PatternRewriter& rewriter,
-                                                     const BandedSubMatrix& outputBand) const {
+    LogicalResult denseTimesDenseToDiaBandedMatmulToSCF(linalg::MatmulOp op,
+                                                        PatternRewriter& rewriter,
+                                                        const BandedSubMatrix& outputBand) const {
         Location loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
@@ -813,8 +814,8 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
         return success();
     }
 
-    LogicalResult denseToDiaDiagMatmulRewriteToLinalg(linalg::MatmulOp op,
-                                                      PatternRewriter& rewriter) const {
+    LogicalResult denseTimesDenseToDiaDiagMatmulToLinalg(linalg::MatmulOp op,
+                                                         PatternRewriter& rewriter) const {
         auto loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
@@ -856,8 +857,8 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
         return success();
     }
 
-    LogicalResult denseToDenseDiagMatmulRewriteToLinalg(linalg::MatmulOp op,
-                                                        PatternRewriter& rewriter) const {
+    LogicalResult denseTimesDenseToDenseDiagMatmulToLinalg(linalg::MatmulOp op,
+                                                           PatternRewriter& rewriter) const {
         auto loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
@@ -888,8 +889,8 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
         return success();
     }
 
-    LogicalResult denseToDenseBandedMatmulRewriteToSCF(linalg::MatmulOp op,
-                                                       PatternRewriter& rewriter) const {
+    LogicalResult denseTimesDenseToDenseBandedMatmulToSCF(linalg::MatmulOp op,
+                                                          PatternRewriter& rewriter) const {
         Location loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
@@ -1012,13 +1013,13 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
         auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
         uint64_t n = resultType.getDimSize(0);
         if (opBandInfo.isDiagonal())
-            return denseToDenseDiagElementWiseRewriteToLinalg(op, rewriter);
+            return denseTimesDenseToDenseDiagElementwiseToLinalg(op, rewriter);
         else
-            return denseToDenseBandedElementwiseRewriteToSCF(op, rewriter);
+            return denseTimesDenseToDenseBandedElementwiseToSCF(op, rewriter);
     }
 
-    LogicalResult denseToDenseDiagElementWiseRewriteToLinalg(linalg::ElementwiseOp op,
-                                                             PatternRewriter& rewriter) const {
+    LogicalResult denseTimesDenseToDenseDiagElementwiseToLinalg(linalg::ElementwiseOp op,
+                                                                PatternRewriter& rewriter) const {
         auto loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
@@ -1051,8 +1052,8 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
         return success();
     }
 
-    LogicalResult denseToDenseBandedElementwiseRewriteToSCF(linalg::ElementwiseOp op,
-                                                            PatternRewriter& rewriter) const {
+    LogicalResult denseTimesDenseToDenseBandedElementwiseToSCF(linalg::ElementwiseOp op,
+                                                               PatternRewriter& rewriter) const {
         Location loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
