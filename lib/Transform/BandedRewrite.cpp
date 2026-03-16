@@ -1223,13 +1223,71 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
 };
 
 // ------------------------------------------------------------------------------------------------------------------------------
-// Transposition
+// linalg.tranpose
 // ------------------------------------------------------------------------------------------------------------------------------
 
 struct TransposePattern : public OpRewritePattern<linalg::TransposeOp> {
     using OpRewritePattern::OpRewritePattern;
 
     LogicalResult denseBandedTranspose(linalg::TransposeOp op, PatternRewriter& rewriter) const {
+        auto input = op.getInput();
+        Operation* defInput = input.getDefiningOp();
+
+        auto dict = defInput->getAttrDictionary();
+        if (!dict) return failure();
+
+        const BandedSubMatrix inputBand = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
+
+        const uint64_t lower = inputBand.Property.LowerBandwidth;
+        const uint64_t upper = inputBand.Property.UpperBandwidth;
+
+        auto resultType = cast<RankedTensorType>(op->getResult(0).getType());
+        const int64_t N = resultType.getDimSize(0);
+        const int64_t M = resultType.getDimSize(1);
+
+        Location loc = op->getLoc();
+
+        Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
+        Value c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
+        Value dimN = arith::ConstantIndexOp::create(rewriter, loc, N);
+        Value dimM = arith::ConstantIndexOp::create(rewriter, loc, M);
+
+        Value lowerBW = arith::ConstantIndexOp::create(rewriter, loc, (int64_t)lower);
+        Value upperBW = arith::ConstantIndexOp::create(rewriter, loc, (int64_t)upper);
+
+        // result
+        Value emptyTensor = tensor::EmptyOp::create(rewriter, loc, resultType, ValueRange{});
+        auto elementType = resultType.getElementType();
+        Value zero = arith::ConstantOp::create(rewriter, loc, elementType,
+                                               rewriter.getZeroAttr(elementType));
+        Value result =
+            linalg::FillOp::create(rewriter, loc, ValueRange{ zero }, ValueRange{ op.getInit() })
+                .getResult(0);
+
+        auto iLoop = scf::ForOp::create(
+            rewriter, loc, c0, dimN, c1, ValueRange{ result },
+            [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
+                Value cOut = iArgs[0];
+                // jStart = max(0, i - L)
+                Value lMinusI = arith::SubIOp::create(ob, loc, i, lowerBW);
+                Value jStart = arith::MaxSIOp::create(ob, loc, lMinusI, c0);
+                // end = min(i + U + 1, M)
+                Value iPlusU = arith::AddIOp::create(ob, loc, i, upperBW);
+                Value iPlusUPlusOne =
+                    arith::AddIOp::create(ob, loc, arith::AddIOp::create(ob, loc, i, upperBW), c1);
+                Value jEnd = arith::MinSIOp::create(ob, loc, iPlusUPlusOne, dimM);
+                auto jLoop = scf::ForOp::create(
+                    ob, loc, jStart, jEnd, c1, ValueRange{ cOut },
+                    [&](OpBuilder& ib, Location loc, Value j, ValueRange jArgs) {
+                        Value cIn = jArgs[0];
+                        Value val = tensor::ExtractOp::create(ib, loc, input, ValueRange{ i, j });
+                        Value updated =
+                            tensor::InsertOp::create(ib, loc, val, cIn, ValueRange{ j, i });
+                        scf::YieldOp::create(ib, loc, ValueRange{ updated });
+                    });
+                scf::YieldOp::create(ob, loc, jLoop.getResults());
+            });
+        rewriter.replaceOp(op, iLoop.getResult(0));
         return success();
     }
 
@@ -1244,33 +1302,7 @@ struct TransposePattern : public OpRewritePattern<linalg::TransposeOp> {
             rewriter.replaceOp(op, op.getInput());
             return success();
         }
-
-        MLIRContext* context = rewriter.getContext();
-
-        AffineExpr d0 = rewriter.getAffineDimExpr(0);
-        AffineExpr d1 = rewriter.getAffineDimExpr(1);
-
-        AffineMap inputMap = AffineMap::get(2, 0, { d1, d0 }, context);
-        AffineMap outputMap = AffineMap::get(2, 0, { d0, d1 }, context);
-
-        SmallVector<AffineMap, 2> indexingMaps = { inputMap, outputMap };
-
-        llvm::SmallVector<utils::IteratorType, 2> iteratorTypes = { utils::IteratorType::parallel,
-                                                                    utils::IteratorType::parallel };
-
-        Location loc = op->getLoc();
-        auto input = op->getOperand(0);
-        auto output = op->getOperand(1);
-
-        auto genericOp = linalg::GenericOp::create(
-            rewriter, loc, TypeRange{ op.getResult().getType() }, ValueRange{ input },
-            ValueRange{ output }, indexingMaps, iteratorTypes,
-            [&](OpBuilder& b, Location loc, ValueRange args) {
-                linalg::YieldOp::create(b, loc, ValueRange{ args[0] });
-            });
-        genericOp->setAttr("metadata", op->getAttr("metadata"));
-        rewriter.replaceOp(op, genericOp);
-        return success();
+        return denseBandedTranspose(op, rewriter);
     }
 };
 
