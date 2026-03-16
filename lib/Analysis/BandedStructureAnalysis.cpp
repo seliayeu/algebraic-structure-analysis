@@ -151,6 +151,8 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
         return visitFromDense(&diaFromDenseOp);
     } else if (auto diaBatchMatmulOp{ dyn_cast<dia::BatchMatmulOp>(op) }) {
         return visitDIABatchMatmul(&diaBatchMatmulOp);
+    } else if (auto diaTransposeOp{ dyn_cast<dia::TransposeOp>(op) }) {
+        return visitTranspose(&diaTransposeOp);
     }
     return success();
 }
@@ -333,6 +335,20 @@ LogicalResult BandedStructureAnalysis::visitMul(linalg::MulOp* op) {
     auto newProperty{ binaryElementwiseProduct(lhsMat.Property, rhsMat.Property) };
     propertyMap[result] = { join(propertyMap[result].Property, newProperty),
                             propertyMap[operands[0]].Dims };
+    return success();
+}
+
+LogicalResult BandedStructureAnalysis::visitTranspose(dia::TransposeOp* op) {
+    auto input = op->getInput();
+    auto result = op->getResult();
+
+    if (!propertyMap.contains(input)) return failure();
+
+    const BandedSubMatrix inputBand = propertyMap[input];
+    const BandedProperty newProperty(inputBand.Property.LowerBandwidth,
+                                     inputBand.Property.UpperBandwidth);
+    propertyMap[result] = BandedSubMatrix{ newProperty, { 0, 1 } };
+
     return success();
 }
 

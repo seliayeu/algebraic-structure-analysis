@@ -3,6 +3,7 @@
 
 include "DIADialect.td"
 include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 class DIA_Op<string mnemonic, list<Trait> traits = []>
@@ -56,5 +57,17 @@ def DIA_FromDenseOp : DIA_Op<"from_dense", [Pure]> {
     let hasCanonicalizer = 1;
 }
 
+def DIA_TransposeOp : DIA_Op<"transpose", [Pure, SameOperandsAndResultType]> {
+    let summary = "Transpose a DIA tensor";
+    let arguments = (ins
+        2DTensorOf<[AnyType]>:$input
+    );
+    let results = (outs
+        2DTensorOf<[AnyType]>:$output
+    );
+    let assemblyFormat = [{
+        `(`$input attr-dict `:` type($input)`)`
+    }];
+}
 
 #endif // DIA_OPS
