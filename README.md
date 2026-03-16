@@ -49,7 +49,7 @@
 |`banded` |` matmul` | `dia,dense -> dia`| - |
 |`banded` |` matmul` | `dense,dia -> dia`| - |
 |`banded` |` matmul` | `dense,dia -> dense`| - |
-|`banded` | `transposition` | `dense`| - |
+|`banded` | `transposition` | `dense`| ✅ |
 |`banded` | `transposition` | `dia`| ✅ |
 |`banded` | `elementwise` | `dense,dense -> dense`| ✅ |
 |`banded` | `elementwise` | `dense,dense -> dia`| - |
