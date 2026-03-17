@@ -61,6 +61,7 @@ class BandedStructureAnalysis {
     LogicalResult visitFromDense(dia::FromDenseOp* op);
     LogicalResult visitDIABatchMatmul(dia::BatchMatmulOp* op);
     LogicalResult visitDIAElementwise(dia::ElementwiseOp* op);
+    LogicalResult visitTranspose(dia::TransposeOp* op);
 
     // Linalg ops
     LogicalResult visitOperation(Operation* op);

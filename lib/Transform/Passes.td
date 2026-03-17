@@ -6,6 +6,9 @@ def BandedRewrite: Pass<"banded-rewrite", "mlir::func::FuncOp"> {
         Run Banded Structure Analysis on a function to find operations that have operands deduced
         to have certain bandwidths to be replaced with cheaper versions
     }];
+    let dependentDialects = [
+      "tensor::TensorDialect",
+    ];
 }
 
 def BandedAnalysis : Pass<"banded-analysis", "mlir::func::FuncOp"> {
