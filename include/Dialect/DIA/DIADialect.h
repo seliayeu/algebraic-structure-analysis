@@ -1,7 +1,5 @@
 #ifndef DIA_DIALECT_H
 #define DIA_DIALECT_H
-
-#pragma once
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/MLIRContext.h"

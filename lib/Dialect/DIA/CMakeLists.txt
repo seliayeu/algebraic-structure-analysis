@@ -4,6 +4,8 @@ add_mlir_dialect_library(MLIRDIADialect
     DEPENDS
     MLIRDIADialectIncGen
     MLIRDIAOpsIncGen
+    MLIRDIAAttrsIncGen
+    MLIRDIAEnumsIncGen
     LINK_LIBS PUBLIC
     MLIRIR
     MLIRSupport

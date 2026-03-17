@@ -7,6 +7,7 @@ def DIA_Dialect : Dialect {
     let name = "dia";
     let summary = "Dialect for DIA banded matrix operations";
     let cppNamespace = "::mlir::bpa::dia";
+    let useDefaultAttributePrinterParser = 1;
 }
 
 #endif // DIA_DIALECT

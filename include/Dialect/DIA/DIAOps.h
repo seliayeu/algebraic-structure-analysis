@@ -1,7 +1,6 @@
 #ifndef DIA_OPS_H
 #define DIA_OPS_H
-
-#pragma once
+#include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -14,6 +13,9 @@
 #include "Dialect/DIA/DIADialect.h"
 // clang-format on
 
+#include "Dialect/DIA/DIAEnums.h.inc"
+#define GET_ATTRDEF_CLASSES
+#include "Dialect/DIA/DIAAttrs.h.inc"
 #define GET_OP_CLASSES
 #include "Dialect/DIA/DIAOps.h.inc"
 

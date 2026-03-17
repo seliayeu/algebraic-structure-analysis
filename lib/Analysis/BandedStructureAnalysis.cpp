@@ -151,7 +151,10 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
         return visitFromDense(&diaFromDenseOp);
     } else if (auto diaBatchMatmulOp{ dyn_cast<dia::BatchMatmulOp>(op) }) {
         return visitDIABatchMatmul(&diaBatchMatmulOp);
+    } else if (auto diaElementwiseOp{ dyn_cast<dia::ElementwiseOp>(op) }) {
+        return visitDIAElementwise(&diaElementwiseOp);
     }
+
     return success();
 }
 
@@ -364,6 +367,41 @@ LogicalResult BandedStructureAnalysis::visitTranspose(linalg::TransposeOp* op) {
 
     auto newProperty{ transpose(mat.Property) };
     propertyMap[result] = { join(resMat.Property, newProperty), { dim1, dim0 } };
+
+    return success();
+}
+
+LogicalResult BandedStructureAnalysis::visitDIAElementwise(dia::ElementwiseOp* op) {
+    auto operands{ op->getOperands() };
+    auto result{ op->getResult() };
+
+    if (!result.getType().hasStaticShape()) return success();
+
+    auto lhs{ operands[0] };
+    if (!propertyMap.contains(lhs)) return success();
+
+    const auto& lhsMat{ propertyMap[lhs] };
+
+    auto& resMat{ propertyMap[result] };
+
+    if (operands.size() == 2) {  // output matrix counts as an operand
+        auto inputProp{ propertyMap[operands[0]] };
+        auto newProperty{ unaryElementwise(inputProp.Property) };
+        resMat = { join(propertyMap[result].Property, newProperty), lhsMat.Dims };
+        return success();
+    }
+
+    auto rhs{ operands[1] };
+    if (!propertyMap.contains(rhs)) return success();
+
+    const auto& rhsMat{ propertyMap[rhs] };
+
+    if (rhsMat.Dims[0] != lhsMat.Dims[0] || rhsMat.Dims[1] != lhsMat.Dims[1]) return success();
+
+    if (operands.size() == 3) {
+        auto newProperty{ binaryElementwiseGeneral(lhsMat.Property, rhsMat.Property) };
+        resMat = { join(propertyMap[result].Property, newProperty), lhsMat.Dims };
+    }
 
     return success();
 }
