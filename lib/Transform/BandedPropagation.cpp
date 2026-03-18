@@ -55,6 +55,10 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
             auto dictAttr = builder.getDictionaryAttr(attrs);
             inst->setAttr("metadata", dictAttr);
         });
+        // cache information
+        auto& result = getAnalysis<BandedAnalysisResult>();
+        result.detectDIA = detectDIA;
+        markAnalysesPreserved<BandedAnalysisResult>();
     }
 };
 

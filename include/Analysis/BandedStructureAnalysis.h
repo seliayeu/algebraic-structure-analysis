@@ -40,8 +40,6 @@ class BandedStructureAnalysis {
     llvm::DenseMap<Value, BandedSubMatrix> propertyMap;
     std::vector<Operation*> bwList;  // list of ops to perform bw prop on
 
-    bool detectDIA{ false };
-
    public:
     LogicalResult run(Block* block);
 
