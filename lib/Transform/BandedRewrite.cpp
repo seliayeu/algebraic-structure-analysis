@@ -1,9 +1,11 @@
 #include "Transform/BandedRewrite.h"
 
 #include <cstdint>
+#include <optional>
 
 #include "Analysis/BandedStructureAnalysis.h"
 #include "Dialect/DIA/DIAOps.h"
+#include "Transform/BandedPropagation.h"
 #include "Utils/TransformUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -623,6 +625,9 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
 
 struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
     using OpRewritePattern::OpRewritePattern;
+    DIAMatMulPattern(MLIRContext* ctx, bool detectDIA)
+        : OpRewritePattern(ctx), detectDIA(detectDIA) {
+    }
 
     LogicalResult diaTimesDenseToDiaDiagMatmulToLinalg(dia::MatmulOp op,
                                                        PatternRewriter& rewriter) const {
@@ -1013,13 +1018,18 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             else
                 return diaTimesDiaToDiaDiagMatmulToLinalg(op, rewriter);
         } else {
-            // Output should be mapped to dense
-            if (bandA.IsDia && bandB.IsDia && !opBandInfo.IsDia) {
+            // Output should be mapped to dense when:
+            // inputs are in DIA, the analysis concluded that the result is not DIA
+            // the `detect-dia` flag is `true`
+            if (bandA.IsDia && bandB.IsDia && !opBandInfo.IsDia && detectDIA) {
                 return diaTimesDiaToDenseBandedMatmulToSCF(op, rewriter);
             }
             return diaTimesDiaToDiaBandedMatmulToSCF(op, rewriter, opBandInfo);
         }
     }
+
+   private:
+    bool detectDIA;
 };
 
 // ------------------------------------------------------------------------------------------------------------------------------
@@ -1746,12 +1756,20 @@ struct BandedRewrite : public impl::BandedRewriteBase<BandedRewrite> {
     void runOnOperation() override {
         func::FuncOp funcOp = getOperation();
         MLIRContext* context = funcOp.getContext();
-
+        bool detectDIA = false;
+        std::optional<BandedAnalysisOptions> bandedAnalysis =
+            getCachedAnalysis<BandedAnalysisOptions>();
+        if (bandedAnalysis.has_value()) {
+            detectDIA = bandedAnalysis->detectDIA;
+        }
         RewritePatternSet patterns(context);
 
-        patterns.add<MatMulPattern, GenericElementWisePattern, TransposePattern, DIAMatMulPattern,
-                     BatchMatmulPattern, DIABatchMatMulPattern, DIAElementwisePattern,
-                     DIATransposePattern>(context);
+        patterns.add<
+            // linalg operators
+            MatMulPattern, GenericElementWisePattern, TransposePattern, BatchMatmulPattern,
+            // custom dia operators
+            DIAMatMulPattern, DIABatchMatMulPattern, DIAElementwisePattern, DIATransposePattern>(
+            context, detectDIA);
 
         GreedyRewriteConfig config;
         config.setMaxIterations(1);
