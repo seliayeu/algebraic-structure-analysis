@@ -17,7 +17,7 @@ inline bool shouldCompressResult(const bool detectDia, Operation& op,
     const bool isDialectSupported =
         (dialect && (dialect->getNamespace() == "linalg" || dialect->getNamespace() == "dia"));
     const bool isOverheadSmaller =
-        (resultBand.Property.LowerBandwidth + resultBand.Property.UpperBandwidth) < N;
+        (resultBand.Property.LowerBandwidth + resultBand.Property.UpperBandwidth) < N - 1;
 
     return isAlreadyDIA || (detectDia && isDialectSupported && isOverheadSmaller);
 }

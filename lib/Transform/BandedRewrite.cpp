@@ -908,14 +908,12 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             return arith::IndexCastOp::create(b, loc, b.getI64Type(), v);
         };
 
-        // row loop
-        auto rowLoop = scf::ForOp::create(
+        auto iLoop = scf::ForOp::create(
             rewriter, loc, c0, cN, c1, ValueRange{ zeroedC },
             [&](OpBuilder& ob, Location loc, Value row, ValueRange rowArgs) {
                 Value cRow = rowArgs[0];
 
-                // col loop
-                auto colLoop = scf::ForOp::create(
+                auto jLoop = scf::ForOp::create(
                     ob, loc, c0, cN, c1, ValueRange{ cRow },
                     [&](OpBuilder& cb, Location loc, Value col, ValueRange colArgs) {
                         Value cCol = colArgs[0];
@@ -934,13 +932,12 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                         Value kend0 = arith::MinSIOp::create(cb, loc, cN, rowPlusUA1);
                         Value kend = arith::MinSIOp::create(cb, loc, kend0, colPlusLB1);
 
-                        // k loop
                         auto kLoop = scf::ForOp::create(
                             cb, loc, kstart, kend, c1, ValueRange{ cCol },
                             [&](OpBuilder& kb, Location loc, Value k, ValueRange kArgs) {
                                 Value cK = kArgs[0];
 
-                                // d_A = (k - row) + lA  →  index into A's diag dimension
+                                // d_A = (k - row) + lA
                                 Value rowI64 = toI64(kb, row);
                                 Value kI64 = toI64(kb, k);
                                 Value colI64 = toI64(kb, col);
@@ -949,7 +946,7 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                                             kb, loc, arith::SubIOp::create(kb, loc, kI64, rowI64),
                                             cLAi64));
 
-                                // d_B = (col - k) + lB  →  index into B's diag dimension
+                                // d_B = (col - k) + lB
                                 Value dB = toIndex(
                                     kb, arith::AddIOp::create(
                                             kb, loc, arith::SubIOp::create(kb, loc, colI64, kI64),
@@ -975,10 +972,10 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                         scf::YieldOp::create(cb, loc, kLoop.getResults());
                     });
 
-                scf::YieldOp::create(ob, loc, colLoop.getResults());
+                scf::YieldOp::create(ob, loc, jLoop.getResults());
             });
 
-        rewriter.replaceOp(op, rowLoop.getResult(0));
+        rewriter.replaceOp(op, iLoop.getResult(0));
         return success();
     }
     LogicalResult matchAndRewrite(dia::MatmulOp op, PatternRewriter& rewriter) const override {
@@ -1015,8 +1012,13 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             //  return denseTimesDiaToDiaDiagMatmulToLinalg(op, rewriter);
             else
                 return diaTimesDiaToDiaDiagMatmulToLinalg(op, rewriter);
-        } else
+        } else {
+            // Output should be mapped to dense
+            if (bandA.IsDia && bandB.IsDia && !opBandInfo.IsDia) {
+                return diaTimesDiaToDenseBandedMatmulToSCF(op, rewriter);
+            }
             return diaTimesDiaToDiaBandedMatmulToSCF(op, rewriter, opBandInfo);
+        }
     }
 };
 
