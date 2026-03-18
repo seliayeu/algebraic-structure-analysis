@@ -1756,12 +1756,11 @@ struct BandedRewrite : public impl::BandedRewriteBase<BandedRewrite> {
     void runOnOperation() override {
         func::FuncOp funcOp = getOperation();
         MLIRContext* context = funcOp.getContext();
-        bool detectDIA = false;
-        std::optional<BandedAnalysisOptions> bandedAnalysis =
-            getCachedAnalysis<BandedAnalysisOptions>();
-        if (bandedAnalysis.has_value()) {
-            detectDIA = bandedAnalysis->detectDIA;
-        }
+
+        // check if the analysis propagated dia flags
+        auto cached = getCachedAnalysis<BandedAnalysisResult>();
+        bool detectDIA = cached ? cached->get().detectDIA : false;
+
         RewritePatternSet patterns(context);
 
         patterns.add<
