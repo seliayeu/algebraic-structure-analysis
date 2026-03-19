@@ -66,3 +66,14 @@ struct FromDensePattern : public mlir::OpRewritePattern<FromDenseOp> {
 void FromDenseOp::getCanonicalizationPatterns(RewritePatternSet& patterns, MLIRContext* ctx) {
     patterns.add<FromDensePattern>(ctx);
 }
+
+LogicalResult dia::MatmulOp::verify() {
+    auto lhsType = cast<RankedTensorType>(getLhs().getType());
+    auto rhsType = cast<RankedTensorType>(getRhs().getType());
+
+    if (lhsType.getDimSize(1) != rhsType.getDimSize(1))
+        return emitOpError("number of columns must match: lhs has ")
+               << lhsType.getDimSize(1) << " but rhs has " << rhsType.getDimSize(1);
+
+    return success();
+}

@@ -43,6 +43,10 @@ class BandedStructureAnalysis {
     bool detectDIA{ false };
 
    public:
+    BandedStructureAnalysis(bool detectDIA) {
+        this->detectDIA = detectDIA;
+    }
+
     LogicalResult run(Block* block);
 
     BandedSubMatrix getProperty(Value value) {
