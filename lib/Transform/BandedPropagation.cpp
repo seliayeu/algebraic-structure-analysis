@@ -17,7 +17,7 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
     void runOnOperation() override {
         auto funcOp{ getOperation() };
         auto* context{ funcOp->getContext() };
-        BandedStructureAnalysis BSA;
+        BandedStructureAnalysis BSA(detectDIA);
 
         for (auto& block : funcOp.getBody()) (void)BSA.run(&block);
 
@@ -49,7 +49,10 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
 
             llvm::SmallVector<mlir::NamedAttribute> attrs{ upperAttr, lowerAttr, dimsArrayAttr };
 
-            if (shouldCompressResult(detectDIA, *inst, analysisResult, N))
+            if (detectDIA) {
+                if (shouldCompressResult(*inst, analysisResult, N))
+                    attrs.emplace_back(builder.getNamedAttr("dia", builder.getBoolAttr(true)));
+            } else if (analysisResult.IsDia)
                 attrs.emplace_back(builder.getNamedAttr("dia", builder.getBoolAttr(true)));
 
             auto dictAttr = builder.getDictionaryAttr(attrs);
