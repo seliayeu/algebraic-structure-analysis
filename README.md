@@ -26,11 +26,10 @@
 |`diagonal` | `matmul` | `dense,dia -> dense`| - |
 |`diagonal` | `transposition` | `dense`| ✅ |
 |`diagonal` | `transposition` | `dia`| ✅ |
-|`diagonal` | `elementwise` | `dia -> dia`| ✅ |
 |`diagonal` | `elementwise` | `dense -> dense`| - |
-|`diagonal` | `elementwise` | `dense,dense -> dense`| ✅ |
+|`diagonal` | `elementwise` | `dense,dense -> dense`| - |
 |`diagonal` | `elementwise` | `dense,dense -> dia`| - |
-|`diagonal` | `elementwise` | `dia,dia -> dia`| ✅ |
+|`diagonal` | `elementwise` | `dia,dia -> dia`| - |
 |`diagonal` | `elementwise` | `dense,dia -> dia`| - |
 |`diagonal` | `elementwise` | `dense,dia -> dense`| - |
 |`diagonal` | `elementwise` | `dia,dense -> dia`| - |
@@ -54,14 +53,15 @@
 |`banded` |` matmul` | `dense,dia -> dense`| - |
 |`banded` | `transposition` | `dense`| ✅ |
 |`banded` | `transposition` | `dia`| ✅ |
+|`banded` | `elementwise` | `dia -> dia`| ✅ |
 |`banded` | `elementwise` | `dense,dense -> dense`| ✅ |
 |`banded` | `elementwise` | `dense,dense -> dia`| - |
-|`banded` | `elementwise` | `dia,dia -> dia`| - |
+|`banded` | `elementwise` | `dia,dia -> dia`| ✅ |
 |`banded` | `elementwise` | `dense,dia -> dia`| - |
 |`banded` | `elementwise` | `dense,dia -> dense`| - |
 |`banded` | `elementwise` | `dia,dense -> dia`| - |
 |`banded` | `elementwise` | `dia,dense -> dense`| - |
-|`banded` | `elementwise` | `dia,dia -> dense`| - |
+|`banded` | `elementwise` | `dia,dia -> dense`| ✅ |
 |`banded` | `batch_matmul` | `dense,dense -> dense`| ✅ |
 |`banded` | `batch_matmul` | `dense,dense -> dia`| - |
 |`banded` | `batch_matmul` | `dia,dia -> dia`| - |
