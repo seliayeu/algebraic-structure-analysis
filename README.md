@@ -50,7 +50,7 @@
 |`banded` |` matmul` | `dia,dia -> dense`| ✅ |
 |`banded` |` matmul` | `dia,dense -> dense`| - |
 |`banded` |` matmul` | `dia,dense -> dia`| - |
-|`banded` |` matmul` | `dense,dia -> dia`| - |
+|`banded` |` matmul` | `dense,dia -> dia`| ✅ |
 |`banded` |` matmul` | `dense,dia -> dense`| - |
 |`banded` | `transposition` | `dense`| ✅ |
 |`banded` | `transposition` | `dia`| ✅ |
