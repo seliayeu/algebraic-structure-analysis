@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: func.func @main
 // CHECK: arith.constant {metadata = {lowerBw = 2 : i64, propertyDims = [0, 1], upperBw = 0 : i64}}
-// CHECK: dia.transpose({{.*}} {metadata = {lowerBw = 0 : i64, propertyDims = [0, 1], upperBw = 2 : i64}}
+// CHECK: dia.transpose({{.*}} {metadata = {dia = true, lowerBw = 0 : i64, propertyDims = [0, 1], upperBw = 2 : i64}}
 // CHECK-NOT: lowerBw = 0 : i64{{.*}}upperBw = 2 : i64{{.*}}dia.transpose
 module {
   func.func @main() -> tensor<5x3xf32> {
