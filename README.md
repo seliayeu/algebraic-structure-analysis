@@ -21,7 +21,7 @@
 |`diagonal` | `matmul` | `dia,dia -> dia`| ✅ |
 |`diagonal` | `matmul` | `dia,dense -> dia`| ✅ |
 |`diagonal` | `matmul` | `dia,dense -> dense`| - |
-|`diagonal` | `matmul` | `dia,dia -> dense`| - |
+|`diagonal` | `matmul` | `dia,dia -> dense`| N/A |
 |`diagonal` | `matmul` | `dense,dia -> dia`| - |
 |`diagonal` | `matmul` | `dense,dia -> dense`| - |
 |`diagonal` | `transposition` | `dense`| ✅ |
@@ -47,6 +47,7 @@
 |`banded`| `matmul` | `dense,dense -> dense`| ✅ |
 |`banded` | `matmul` | `dense,dense -> dia`| ✅ |
 |`banded` | `matmul` | `dia,dia -> dia`| ✅ |
+|`banded` |` matmul` | `dia,dia -> dense`| ✅ |
 |`banded` |` matmul` | `dia,dense -> dense`| - |
 |`banded` |` matmul` | `dia,dense -> dia`| - |
 |`banded` |` matmul` | `dense,dia -> dia`| - |

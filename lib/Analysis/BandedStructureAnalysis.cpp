@@ -165,7 +165,9 @@ LogicalResult BandedStructureAnalysis::visitFromDense(dia::FromDenseOp* op) {
     auto result = op->getResult();
 
     if (!propertyMap.contains(input)) return failure();
-    propertyMap[result] = propertyMap[input];
+    auto inputProperty = propertyMap[input];
+    inputProperty.IsDia = true;
+    propertyMap[result] = inputProperty;
     return success();
 }
 
@@ -198,6 +200,7 @@ LogicalResult BandedStructureAnalysis::visitMatmul(dia::MatmulOp* op) {
     resMat.Property = join(resMat.Property, newProperty);
     resMat.Dims[0] = lhsMat.Dims[0];
     resMat.Dims[1] = rhsMat.Dims[1];
+    resMat.IsDia = detectDIA ? false : true;
 
     return success();
 }
@@ -262,7 +265,7 @@ LogicalResult BandedStructureAnalysis::visitDIABatchMatmul(dia::BatchMatmulOp* o
     newProperty.UpperBandwidth = std::min<uint64_t>(newProperty.UpperBandwidth, rhsShape[2] - 1);
     newProperty.LowerBandwidth = std::min<uint64_t>(newProperty.LowerBandwidth, lhsShape[2] - 1);
 
-    propertyMap[result] = BandedSubMatrix{ newProperty, { 1, 2 } };
+    propertyMap[result] = BandedSubMatrix{ newProperty, { 1, 2 }, true };
 
     return success();
 }
@@ -350,7 +353,7 @@ LogicalResult BandedStructureAnalysis::visitTranspose(dia::TransposeOp* op) {
     const BandedSubMatrix inputBand = propertyMap[input];
     const BandedProperty newProperty(inputBand.Property.LowerBandwidth,
                                      inputBand.Property.UpperBandwidth);
-    propertyMap[result] = BandedSubMatrix{ newProperty, { 0, 1 } };
+    propertyMap[result] = BandedSubMatrix{ newProperty, { 0, 1 }, true };
 
     return success();
 }
@@ -419,6 +422,7 @@ LogicalResult BandedStructureAnalysis::visitDIAElementwise(dia::ElementwiseOp* o
         resMat = { join(propertyMap[result].Property, newProperty), lhsMat.Dims };
     }
 
+    resMat.IsDia = detectDIA ? false : true;
     return success();
 }
 
