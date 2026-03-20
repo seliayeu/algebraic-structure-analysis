@@ -5,6 +5,10 @@ add_public_tablegen_target(MLIRBandedStructurePasses)
 add_mlir_library(BandedStructurePasses
     BandedPropagation.cpp
     BandedRewrite.cpp
+    Operators/DIAMatmulRewrite.cpp
+    Operators/DIATransposeRewrite.cpp
+    Operators/DIAElementwiseRewrite.cpp
+    Operators/DIABatchMatmulRewrite.cpp
 
     DEPENDS
     MLIRBandedStructurePasses
