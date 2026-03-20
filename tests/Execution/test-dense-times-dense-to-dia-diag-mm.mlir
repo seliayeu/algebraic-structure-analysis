@@ -5,7 +5,7 @@
 // RUN:  --convert-arith-to-llvm --finalize-memref-to-llvm --convert-func-to-llvm \
 // RUN:  --reconcile-unrealized-casts | \
 // RUN:  mlir-runner --entry-point-result=void \
-// RUN:  --shared-libs=%llvm_root/build/lib/libmlir_runner_utils.so > %t
+// RUN:  --shared-libs=%llvm_root/build/lib/libmlir_runner_utils.%lib_format > %t
 // RUN: FileCheck %s < %t
 
 // diag(1.0) * diag(2.0) = diag(2.0)
