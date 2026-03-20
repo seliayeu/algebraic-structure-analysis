@@ -21,15 +21,15 @@ module {
                [ 0.0,  0.0,  0.0,  4.0,  1.0]]> : tensor<5x5xf32>
 
     %diaB = arith.constant {metadata = {dia = true, lowerBw = 2 : i64, upperBw = 1 : i64, propertyDims = [0, 1]}} 
-        dense<[[ 6.0, 10.0, 14.0,  0.0,  0.0], // L2: 3 elements
-               [ 3.0,  7.0, 11.0, 15.0,  0.0], // L1: 4 elements
+        dense<[[ 0.0, 0.0, 6.0, 10.0, 14.0], // L2: 3 elements
+               [ 0.0, 3.0,  7.0, 11.0, 15.0], // L1: 4 elements
                [ 1.0,  4.0,  8.0, 12.0, 16.0], // M0: 5 elements
-               [ 2.0,  5.0,  9.0, 13.0,  0.0]]> : tensor<4x5xf32> // U1: 4 elements
+               [ 2.0,  5.0,  9.0, 13.0, 0.0 ]]> : tensor<4x5xf32> // U1: 4 elements
 
     // CHECK:      Unranked Memref
     // CHECK-SAME: sizes = [3, 5]
     // CHECK-SAME: data =
-    // CHECK-NEXT: {{\[\[}}12, 28, 44, 60, 0],
+    // CHECK-NEXT: {{\[\[}}0, 12, 28, 44, 60],
     // CHECK-NEXT:  [1, 4, 8, 12, 16],
     // CHECK-NEXT:  [4, 10, 18, 26, 0]]
     %mul_res = dia.elementwise kind = <mul> ins(%denseA, %diaB : tensor<5x5xf32>, tensor<4x5xf32>) 

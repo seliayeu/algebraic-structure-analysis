@@ -92,16 +92,17 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                             auto cInner{ rArgs[0] };
+                            Value cRow{ arith::AddIOp::create(ib, loc, r, currBand) };
                             Value operand1, operand2;
 
                             if (lA > lB) {
                                 operand1 =
-                                    tensor::ExtractOp::create(ib, loc, elementType, A, { i, r });
+                                    tensor::ExtractOp::create(ib, loc, elementType, A, { i, cRow });
                                 operand2 = cf0;
                             } else {
                                 operand1 = cf0;
                                 operand2 =
-                                    tensor::ExtractOp::create(ib, loc, elementType, B, { i, r });
+                                    tensor::ExtractOp::create(ib, loc, elementType, B, { i, cRow });
                             }
 
                             Value newOp;
@@ -115,7 +116,7 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                                 default:
                                     assert(false);
                             }
-                            Value cRow{ arith::AddIOp::create(ib, loc, r, currBand) };
+                            
                             auto updated{ tensor::InsertOp::create(ib, loc, newOp, cInner,
                                                                    ValueRange{ cRow, r }) };
                             scf::YieldOp::create(ib, loc, ValueRange{ updated });
@@ -145,16 +146,17 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                             auto cInner{ rArgs[0] };
+                            Value cCol{ arith::AddIOp::create(ib, loc, r, currBand) };
                             Value operand1, operand2;
-                            Value shiftedR{ arith::AddIOp::create(ib, loc, r, currBand) };
+                            
                             if (uA > uB) {
                                 operand1 = tensor::ExtractOp::create(ib, loc, elementType, A,
-                                                                     { aInd, shiftedR });
+                                                                     { aInd, r });
                                 operand2 = cf0;
                             } else {
                                 operand1 = cf0;
                                 operand2 = tensor::ExtractOp::create(ib, loc, elementType, B,
-                                                                     { bInd, shiftedR });
+                                                                     { bInd, r });
                             }
 
                             Value newOp;
@@ -169,9 +171,8 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                                     assert(false);
                             }
 
-                            Value cInd{ arith::AddIOp::create(ib, loc, r, currBand) };
                             auto updated{ tensor::InsertOp::create(ib, loc, newOp, cInner,
-                                                                   { r, cInd }) };
+                                                                   ValueRange{ r, cCol }) };
                             scf::YieldOp::create(ib, loc, ValueRange{ updated });
                         }) };
                     scf::YieldOp::create(ob, loc, ValueRange{ rLoop.getResult(0) });
@@ -194,10 +195,11 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                     ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                     [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                         auto cInner{ rArgs[0] };
+                        Value cRow{ arith::AddIOp::create(ib, loc, r, currBand) };
                         auto operand1{ tensor::ExtractOp::create(ib, loc, elementType, A,
-                                                                 { aInd, r }) };
+                                                                 { aInd, cRow }) };
                         auto operand2{ tensor::ExtractOp::create(ib, loc, elementType, B,
-                                                                 { bInd, r }) };
+                                                                 { bInd, cRow }) };
 
                         Value newOp;
                         switch (op.getKind()) {
@@ -211,7 +213,6 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                                 assert(false);
                         }
 
-                        Value cRow{ arith::AddIOp::create(ib, loc, r, currBand) };
                         auto updated{ tensor::InsertOp::create(ib, loc, newOp, cInner,
                                                                ValueRange{ cRow, r }) };
                         scf::YieldOp::create(ib, loc, ValueRange{ updated });
@@ -234,12 +235,12 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                     auto rLoop{ scf::ForOp::create(
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
-                            Value shiftedR{ arith::AddIOp::create(ib, loc, r, i) };
                             auto cInner{ rArgs[0] };
+                            Value cCol{ arith::AddIOp::create(ib, loc, r, i) };
                             auto operand1{ tensor::ExtractOp::create(ib, loc, elementType, A,
-                                                                     { aInd, shiftedR }) };
+                                                                     { aInd, r }) };
                             auto operand2{ tensor::ExtractOp::create(ib, loc, elementType, B,
-                                                                     { bInd, shiftedR }) };
+                                                                     { bInd, r }) };
 
                             Value newOp;
                             switch (op.getKind()) {
@@ -253,7 +254,6 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                                     assert(false);
                             }
 
-                            Value cCol{ arith::AddIOp::create(ib, loc, r, i) };
                             auto updated{ tensor::InsertOp::create(ib, loc, newOp, cInner,
                                                                    ValueRange{ r, cCol }) };
                             scf::YieldOp::create(ib, loc, ValueRange{ updated });
@@ -303,7 +303,7 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                                             rewriter.getFloatAttr(elementType, 0.0)) };
 
         auto resultType{ cast<RankedTensorType>(A.getType()) };
-        auto totalCols{ arith::ConstantIndexOp::create(
+        auto totalRows{ arith::ConstantIndexOp::create(
             rewriter, loc, resultType.getDimSize(resultType.getRank() - 1)) };
 
         auto cLA{ arith::ConstantIndexOp::create(rewriter, loc, lA) };
@@ -331,7 +331,7 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                         bInd = arith::AddIOp::create(ob, loc, cLB, currBand).getResult();
 
                     auto rLoop{ scf::ForOp::create(
-                        ob, loc, c0, totalCols, c1, ValueRange{ cOuter },
+                        ob, loc, c0, totalRows, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                             Value operand1{ lA > lB
                                                 ? tensor::ExtractOp::create(ib, loc, elementType, A,
@@ -381,7 +381,7 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                         bInd = arith::AddIOp::create(ob, loc, cLB, currBand).getResult();
 
                     auto rLoop{ scf::ForOp::create(
-                        ob, loc, c0, totalCols, c1, ValueRange{ cOuter },
+                        ob, loc, c0, totalRows, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                             Value operand1{ uA > uB
                                                 ? tensor::ExtractOp::create(ib, loc, elementType, A,
@@ -425,7 +425,7 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                 Value cInd{ arith::AddIOp::create(ob, loc, cLC, currBand).getResult() };
 
                 auto rLoop{ scf::ForOp::create(
-                    ob, loc, c0, totalCols, c1, ValueRange{ cOuter },
+                    ob, loc, c0, totalRows, c1, ValueRange{ cOuter },
                     [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                         Value operand1{ tensor::ExtractOp::create(ib, loc, elementType, A,
                                                                   ValueRange{ aInd, r }) };
@@ -528,7 +528,7 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                             Value cRow{ arith::AddIOp::create(ib, loc, r, currBand).getResult() };
 
                             Value operand1{ tensor::ExtractOp::create(ib, loc, elementType, A,
-                                                                      ValueRange{ aInd, r })
+                                                                      ValueRange{ aInd, cRow })
                                                 .getResult() };
                             Value operand2{ tensor::ExtractOp::create(ib, loc, elementType, B,
                                                                       ValueRange{ cRow, r })
@@ -538,7 +538,7 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                                 arith::MulFOp::create(ib, loc, operand1, operand2).getResult()
                             };
                             auto updated{ tensor::InsertOp::create(ib, loc, newOp, cInner,
-                                                                   ValueRange{ i, r }) };
+                                                                   ValueRange{ i, cRow }) };
                             scf::YieldOp::create(ib, loc, ValueRange{ updated });
                         }) };
                     scf::YieldOp::create(ob, loc, ValueRange{ rLoop.getResult(0) });
@@ -653,14 +653,14 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                                                                       ValueRange{ cRow, r })
                                                 .getResult() };
                             Value operand2{ tensor::ExtractOp::create(ib, loc, elementType, B,
-                                                                      ValueRange{ bInd, r })
+                                                                      ValueRange{ bInd, cRow })
                                                 .getResult() };
 
                             Value newOp{
                                 arith::MulFOp::create(ib, loc, operand1, operand2).getResult()
                             };
                             auto updated{ tensor::InsertOp::create(ib, loc, newOp, cInner,
-                                                                   ValueRange{ i, r }) };
+                                                                   ValueRange{ i, cRow }) };
                             scf::YieldOp::create(ib, loc, ValueRange{ updated });
                         }) };
                     scf::YieldOp::create(ob, loc, ValueRange{ rLoop.getResult(0) });
@@ -856,7 +856,7 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                         auto cInner{ rArgs[0] };
                         Value cRow{ arith::AddIOp::create(ib, loc, r, currBand).getResult() };
                         Value operand1{ tensor::ExtractOp::create(ib, loc, elementType, A,
-                                                                  ValueRange{ aInd, r })
+                                                                  ValueRange{ aInd, cRow })
                                             .getResult() };
                         Value operand2{ tensor::ExtractOp::create(ib, loc, elementType, B,
                                                                   ValueRange{ cRow, r })
@@ -1084,7 +1084,7 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                                                                   ValueRange{ cRow, r })
                                             .getResult() };
                         Value operand2{ tensor::ExtractOp::create(ib, loc, elementType, B,
-                                                                  ValueRange{ bInd, r })
+                                                                  ValueRange{ bInd, cRow })
                                             .getResult() };
                         Value newOp;
                         switch (op.getKind()) {
