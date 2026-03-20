@@ -381,9 +381,6 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         auto resultType = cast<RankedTensorType>(C.getType());
         const int64_t N = cast<RankedTensorType>(B.getType()).getDimSize(1);
 
-        llvm::outs() << "A type: " << A.getType() << "\n";
-        llvm::outs() << "B type: " << B.getType() << "\n";
-        llvm::outs() << "N = " << N << "\n";
         Operation* defOpA = A.getDefiningOp();
         Operation* defOpB = B.getDefiningOp();
 
