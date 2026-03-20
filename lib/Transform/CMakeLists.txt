@@ -3,14 +3,23 @@ mlir_tablegen(Passes.h.inc -gen-pass-decls -name Banded)
 add_public_tablegen_target(MLIRBandedStructurePasses)
 
 add_mlir_library(BandedStructurePasses
-    BandedPropagation.cpp
     BandedRewrite.cpp
-
+    BandedPropagation.cpp
+    Operators/DIAMatmulRewrite.cpp
+    Operators/DIATransposeRewrite.cpp
+    Operators/DIAElementwiseRewrite.cpp
+    Operators/DIABatchMatmulRewrite.cpp
     DEPENDS
-    MLIRBandedStructurePasses
-
+    MLIRDIADialectIncGen
     LINK_LIBS PUBLIC
+    MLIRDIADialect
     BandedStructureAnalysis
+    MLIRPass
+    MLIRTransforms
+    MLIRLinalgDialect
+    MLIRArithDialect
+    MLIRTensorDialect
+    MLIRSCFDialect
 )
 
 target_include_directories(BandedStructurePasses PUBLIC
