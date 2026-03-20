@@ -316,16 +316,16 @@ struct DIABatchMatMulPattern : public OpRewritePattern<dia::BatchMatmulOp> {
 struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult diaTimesDiaToDenseBandedElementwiseToSCF(
-        dia::ElementwiseOp op, PatternRewriter& rewriter, const BandedSubMatrix& bandResult) const {
+    LogicalResult diaTimesDiaToDenseBandedElementwiseToSCF(dia::ElementwiseOp op, PatternRewriter& rewriter,
+                                                    const BandedSubMatrix& bandResult) const {
         assert(op.getKind() != dia::ElementwiseKind::mul);
 
         Location loc{ op.getLoc() };
         Value A{ op.getInputs()[0] };
         Value B{ op.getInputs()[1] };
         Value C{ op.getOutput() };
-
-        auto outputType{ cast<RankedTensorType>(C.getType()) };
+    
+        auto outputType{ cast<RankedTensorType>(C.getType()) }; 
 
         auto elementType{ cast<RankedTensorType>(A.getType()).getElementType() };
 
@@ -344,29 +344,23 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
         auto uB{ bandB.Property.UpperBandwidth };
 
         Value zero{ arith::ConstantOp::create(rewriter, loc, elementType,
-                                              rewriter.getZeroAttr(elementType)) };
-        Value zeroedC{
-            linalg::FillOp::create(rewriter, loc, ValueRange{ zero }, ValueRange{ C }).getResult(0)
-        };
+                                               rewriter.getZeroAttr(elementType)) };
+        Value zeroedC{ 
+            linalg::FillOp::create(rewriter, loc, ValueRange{ zero }, ValueRange{ C }).getResult(0) };
 
         auto c0{ arith::ConstantIndexOp::create(rewriter, loc, 0) };
         auto c1{ arith::ConstantIndexOp::create(rewriter, loc, 1) };
-        auto cf0{ arith::ConstantOp::create(rewriter, loc,
-                                            rewriter.getFloatAttr(elementType, 0.0)) };
+        auto cf0{ arith::ConstantOp::create(rewriter, loc, rewriter.getFloatAttr(elementType, 0.0)) };
 
         auto rank{ outputType.getRank() };
 
-        auto totalRows{ arith::ConstantIndexOp::create(rewriter, loc,
-                                                       outputType.getDimSize(rank - 2)) };
-        auto totalCols{ arith::ConstantIndexOp::create(rewriter, loc,
-                                                       outputType.getDimSize(rank - 1)) };
+        auto totalRows{ arith::ConstantIndexOp::create(rewriter, loc, outputType.getDimSize(rank - 2)) };
+        auto totalCols{ arith::ConstantIndexOp::create(rewriter, loc, outputType.getDimSize(rank - 1)) };
 
-        auto lDiff{ arith::ConstantIndexOp::create(rewriter, loc,
-                                                   std::max(lA, lB) - std::min(lA, lB)) };
+        auto lDiff{ arith::ConstantIndexOp::create(rewriter, loc, std::max(lA, lB) - std::min(lA, lB)) };
         auto lMax{ arith::ConstantIndexOp::create(rewriter, loc, std::max(lA, lB)) };
         auto lMin{ arith::ConstantIndexOp::create(rewriter, loc, std::min(lA, lB)) };
-        auto uDiff{ arith::ConstantIndexOp::create(rewriter, loc,
-                                                   std::max(uA, uB) - std::min(uA, uB)) };
+        auto uDiff{ arith::ConstantIndexOp::create(rewriter, loc, std::max(uA, uB) - std::min(uA, uB)) };
         auto uMin{ arith::ConstantIndexOp::create(rewriter, loc, std::min(uA, uB)) };
 
         auto cLA{ arith::ConstantIndexOp::create(rewriter, loc, lA) };
@@ -387,15 +381,13 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                             auto cInner{ rArgs[0] };
                             Value operand1, operand2;
-
+                            
                             if (lA > lB) {
-                                operand1 =
-                                    tensor::ExtractOp::create(ib, loc, elementType, A, { i, r });
+                                operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, { i, r });
                                 operand2 = cf0;
                             } else {
                                 operand1 = cf0;
-                                operand2 =
-                                    tensor::ExtractOp::create(ib, loc, elementType, B, { i, r });
+                                operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, { i, r });
                             }
 
                             Value newOp;
@@ -410,18 +402,16 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                                     assert(false);
                             }
                             Value cRow{ arith::AddIOp::create(ib, loc, r, currBand) };
-                            auto updated{ tensor::InsertOp::create(ib, loc, newOp, cInner,
-                                                                   ValueRange{ cRow, r }) };
+                            auto updated{ tensor::InsertOp::create(ib, loc, newOp, cInner, ValueRange{ cRow, r }) };
                             scf::YieldOp::create(ib, loc, ValueRange{ updated });
-                        }) };
-                    scf::YieldOp::create(ob, loc, ValueRange{ rLoop.getResult(0) });
-                }) };
+                        })};
+                        scf::YieldOp::create(ob, loc, ValueRange{ rLoop.getResult(0) });
+                })};
             currC = iLoop.getResult(0);
         }
 
         if (uA > uB || uB > uA) {
-            auto startUpperBand{ arith::ConstantIndexOp::create(rewriter, loc,
-                                                                std::min(uA, uB) + 1) };
+            auto startUpperBand{ arith::ConstantIndexOp::create(rewriter, loc, std::min(uA, uB) + 1) };
             scf::ForOp iLoop{ scf::ForOp::create(
                 rewriter, loc, c0, uDiff, c1, ValueRange{ currC },
                 [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
@@ -434,7 +424,7 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                         bInd = arith::AddIOp::create(ob, loc, currBand, cLB);
                     }
                     Value nMinusBand{ arith::SubIOp::create(ob, loc, totalCols, currBand) };
-                    Value numEls{ arith::MinUIOp::create(ob, loc, totalRows, nMinusBand) };
+                    Value numEls{ arith::MinUIOp::create(ob, loc, totalRows, nMinusBand) }; 
                     auto rLoop{ scf::ForOp::create(
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
@@ -442,13 +432,11 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                             Value operand1, operand2;
                             Value shiftedR{ arith::AddIOp::create(ib, loc, r, currBand) };
                             if (uA > uB) {
-                                operand1 = tensor::ExtractOp::create(ib, loc, elementType, A,
-                                                                     { aInd, shiftedR });
+                                operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, { aInd, shiftedR });
                                 operand2 = cf0;
                             } else {
                                 operand1 = cf0;
-                                operand2 = tensor::ExtractOp::create(ib, loc, elementType, B,
-                                                                     { bInd, shiftedR });
+                                operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, { bInd, shiftedR });
                             }
 
                             Value newOp;
@@ -464,12 +452,11 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                             }
 
                             Value cInd{ arith::AddIOp::create(ib, loc, r, currBand) };
-                            auto updated{ tensor::InsertOp::create(ib, loc, newOp, cInner,
-                                                                   { r, cInd }) };
+                            auto updated{ tensor::InsertOp::create(ib, loc, newOp, cInner, { r, cInd }) };
                             scf::YieldOp::create(ib, loc, ValueRange{ updated });
-                        }) };
-                    scf::YieldOp::create(ob, loc, ValueRange{ rLoop.getResult(0) });
-                }) };
+                        })};
+                        scf::YieldOp::create(ob, loc, ValueRange{ rLoop.getResult(0) } );
+                })};
             currC = iLoop.getResult(0);
         }
 
@@ -488,10 +475,8 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                     ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                     [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                         auto cInner{ rArgs[0] };
-                        auto operand1{ tensor::ExtractOp::create(ib, loc, elementType, A,
-                                                                 { aInd, r }) };
-                        auto operand2{ tensor::ExtractOp::create(ib, loc, elementType, B,
-                                                                 { bInd, r }) };
+                        auto operand1{ tensor::ExtractOp::create(ib, loc, elementType, A, { aInd, r }) };
+                        auto operand2{ tensor::ExtractOp::create(ib, loc, elementType, B, { bInd, r }) };
 
                         Value newOp;
                         switch (op.getKind()) {
@@ -506,17 +491,15 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                         }
 
                         Value cRow{ arith::AddIOp::create(ib, loc, r, currBand) };
-                        auto updated{ tensor::InsertOp::create(ib, loc, newOp, cInner,
-                                                               ValueRange{ cRow, r }) };
+                        auto updated{ tensor::InsertOp::create(ib, loc, newOp, cInner, ValueRange{ cRow, r }) };
                         scf::YieldOp::create(ib, loc, ValueRange{ updated });
-                    }) };
-                scf::YieldOp::create(ob, loc, ValueRange{ rLoop.getResult(0) });
-            }) };
+                    })};
+                    scf::YieldOp::create(ob, loc, ValueRange{ rLoop.getResult(0) });
+            })};
         currC = iLoop.getResult(0);
-
+       
         if (std::min(uA, uB) != 0) {
-            auto totalUpperDiags{ arith::ConstantIndexOp::create(rewriter, loc,
-                                                                 std::min(uA, uB) + 1) };
+            auto totalUpperDiags{ arith::ConstantIndexOp::create(rewriter, loc, std::min(uA, uB) + 1) };
             auto iLoop{ scf::ForOp::create(
                 rewriter, loc, c1, totalUpperDiags, c1, ValueRange{ currC },
                 [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
@@ -530,10 +513,8 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                             Value shiftedR{ arith::AddIOp::create(ib, loc, r, i) };
                             auto cInner{ rArgs[0] };
-                            auto operand1{ tensor::ExtractOp::create(ib, loc, elementType, A,
-                                                                     { aInd, shiftedR }) };
-                            auto operand2{ tensor::ExtractOp::create(ib, loc, elementType, B,
-                                                                     { bInd, shiftedR }) };
+                            auto operand1{ tensor::ExtractOp::create(ib, loc, elementType, A, { aInd, shiftedR }) };
+                            auto operand2{ tensor::ExtractOp::create(ib, loc, elementType, B, { bInd, shiftedR }) };
 
                             Value newOp;
                             switch (op.getKind()) {
@@ -548,12 +529,11 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                             }
 
                             Value cCol{ arith::AddIOp::create(ib, loc, r, i) };
-                            auto updated{ tensor::InsertOp::create(ib, loc, newOp, cInner,
-                                                                   ValueRange{ r, cCol }) };
+                            auto updated{ tensor::InsertOp::create(ib, loc, newOp, cInner, ValueRange{ r, cCol }) };
                             scf::YieldOp::create(ib, loc, ValueRange{ updated });
-                        }) };
-                    scf::YieldOp::create(ob, loc, ValueRange{ rLoop.getResult(0) });
-                }) };
+                        })};
+                        scf::YieldOp::create(ob, loc, ValueRange{ rLoop.getResult(0) });
+                })};
             currC = iLoop.getResult(0);
         }
 
@@ -563,14 +543,8 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
         return success();
     }
 
-<<<<<<< HEAD
     LogicalResult diaTimesDiaToDiaBandedElementwiseToSCF(dia::ElementwiseOp op, PatternRewriter& rewriter,
                                                     const BandedSubMatrix& bandResult) const {
-=======
-    LogicalResult diaTimesDiaToDiaBandedElementwiseToSCF(dia::ElementwiseOp op,
-                                                         PatternRewriter& rewriter,
-                                                         const BandedSubMatrix& bandResult) const {
->>>>>>> eef54b24785336690504d4cf77753478ae05978b
         Location loc{ op.getLoc() };
         Value A{ op.getInputs()[0] };
         Value B{ op.getInputs()[1] };
@@ -579,10 +553,8 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
         auto elementType{ cast<RankedTensorType>(A.getType()).getElementType() };
         MLIRContext* context{ rewriter.getContext() };
 
-        BandedSubMatrix bandA{ BandedStructureAnalysis::readPropertyFromDictAttr(
-            A.getDefiningOp()->getAttrDictionary()) };
-        BandedSubMatrix bandB{ BandedStructureAnalysis::readPropertyFromDictAttr(
-            B.getDefiningOp()->getAttrDictionary()) };
+        BandedSubMatrix bandA{ BandedStructureAnalysis::readPropertyFromDictAttr(A.getDefiningOp()->getAttrDictionary()) };
+        BandedSubMatrix bandB{ BandedStructureAnalysis::readPropertyFromDictAttr(B.getDefiningOp()->getAttrDictionary()) };
 
         auto lA{ bandA.Property.LowerBandwidth };
         auto uA{ bandA.Property.UpperBandwidth };
@@ -590,20 +562,15 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
         auto uB{ bandB.Property.UpperBandwidth };
         auto lC{ bandResult.Property.LowerBandwidth };
 
-        Value zero{ arith::ConstantOp::create(rewriter, loc, elementType,
-                                              rewriter.getZeroAttr(elementType)) };
-        Value zeroedC{
-            linalg::FillOp::create(rewriter, loc, ValueRange{ zero }, ValueRange{ C }).getResult(0)
-        };
+        Value zero{ arith::ConstantOp::create(rewriter, loc, elementType, rewriter.getZeroAttr(elementType)) };
+        Value zeroedC{ linalg::FillOp::create(rewriter, loc, ValueRange{ zero }, ValueRange{ C }).getResult(0) };
 
         auto c0{ arith::ConstantIndexOp::create(rewriter, loc, 0) };
         auto c1{ arith::ConstantIndexOp::create(rewriter, loc, 1) };
-        auto cf0{ arith::ConstantOp::create(rewriter, loc,
-                                            rewriter.getFloatAttr(elementType, 0.0)) };
+        auto cf0{ arith::ConstantOp::create(rewriter, loc, rewriter.getFloatAttr(elementType, 0.0)) };
 
         auto resultType{ cast<RankedTensorType>(A.getType()) };
-        auto totalCols{ arith::ConstantIndexOp::create(
-            rewriter, loc, resultType.getDimSize(resultType.getRank() - 1)) };
+        auto totalCols{ arith::ConstantIndexOp::create(rewriter, loc, resultType.getDimSize(resultType.getRank() - 1)) };
 
         auto cLA{ arith::ConstantIndexOp::create(rewriter, loc, lA) };
         auto cLB{ arith::ConstantIndexOp::create(rewriter, loc, lB) };
@@ -612,114 +579,74 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
         auto currC{ zeroedC };
 
         if (op.getKind() != dia::ElementwiseKind::mul && (lA > lB || lB > lA)) {
-            auto totalDiags{ arith::ConstantIndexOp::create(rewriter, loc,
-                                                            std::max(lA, lB) - std::min(lA, lB)) };
+            auto totalDiags{ arith::ConstantIndexOp::create(rewriter, loc, std::max(lA, lB) - std::min(lA, lB)) };
             auto lMax{ arith::ConstantIndexOp::create(rewriter, loc, std::max(lA, lB)) };
-
+            
             scf::ForOp iLoop{ scf::ForOp::create(
                 rewriter, loc, c0, totalDiags, c1, ValueRange{ currC },
                 [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
                     auto cOuter{ iArgs[0] };
                     Value currBand{ arith::SubIOp::create(ob, loc, i, lMax).getResult() };
                     Value cInd{ arith::AddIOp::create(ob, loc, cLC, currBand).getResult() };
-
+                    
                     Value aInd, bInd;
-                    if (lA > lB)
-                        aInd = arith::AddIOp::create(ob, loc, cLA, currBand).getResult();
-                    else
-                        bInd = arith::AddIOp::create(ob, loc, cLB, currBand).getResult();
+                    if (lA > lB) aInd = arith::AddIOp::create(ob, loc, cLA, currBand).getResult();
+                    else         bInd = arith::AddIOp::create(ob, loc, cLB, currBand).getResult();
 
                     auto rLoop{ scf::ForOp::create(
                         ob, loc, c0, totalCols, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
-                            Value operand1{ lA > lB
-                                                ? tensor::ExtractOp::create(ib, loc, elementType, A,
-                                                                            ValueRange{ aInd, r })
-                                                      .getResult()
-                                                : cf0 };
-                            Value operand2{ lA > lB
-                                                ? cf0
-                                                : tensor::ExtractOp::create(ib, loc, elementType, B,
-                                                                            ValueRange{ bInd, r })
-                                                      .getResult() };
-
+                            Value operand1{ lA > lB ? tensor::ExtractOp::create(ib, loc, elementType, A, ValueRange{ aInd, r }).getResult() : cf0 };
+                            Value operand2{ lA > lB ? cf0 : tensor::ExtractOp::create(ib, loc, elementType, B, ValueRange{ bInd, r }).getResult() };
+                            
                             Value newOp;
-                            if (op.getKind() == dia::ElementwiseKind::add)
-                                newOp =
-                                    arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
-                            else
-                                newOp =
-                                    arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                            if (op.getKind() == dia::ElementwiseKind::add) newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                            else newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
 
-                            auto updated{ tensor::InsertOp::create(ib, loc, newOp, rArgs[0],
-                                                                   ValueRange{ cInd, r }) };
+                            auto updated{ tensor::InsertOp::create(ib, loc, newOp, rArgs[0], ValueRange{ cInd, r }) };
                             scf::YieldOp::create(ib, loc, ValueRange{ updated });
-                        }) };
+                        })};
                     scf::YieldOp::create(ob, loc, ValueRange{ rLoop.getResult(0) });
-                }) };
+                })};
             currC = iLoop.getResult(0);
         }
 
         if (op.getKind() != dia::ElementwiseKind::mul && (uA > uB || uB > uA)) {
-            auto numDiagonals{ arith::ConstantIndexOp::create(
-                rewriter, loc, std::max(uA, uB) - std::min(uA, uB)) };
-            auto startUpperBand{ arith::ConstantIndexOp::create(rewriter, loc,
-                                                                std::min(uA, uB) + 1) };
-
+            auto numDiagonals{ arith::ConstantIndexOp::create(rewriter, loc, std::max(uA, uB) - std::min(uA, uB)) };
+            auto startUpperBand{ arith::ConstantIndexOp::create(rewriter, loc, std::min(uA, uB) + 1) };
+            
             scf::ForOp iLoop{ scf::ForOp::create(
                 rewriter, loc, c0, numDiagonals, c1, ValueRange{ currC },
                 [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
                     auto cOuter{ iArgs[0] };
                     Value currBand{ arith::AddIOp::create(ob, loc, i, startUpperBand).getResult() };
                     Value cInd{ arith::AddIOp::create(ob, loc, cLC, currBand).getResult() };
-
+                    
                     Value aInd, bInd;
-                    if (uA > uB)
-                        aInd = arith::AddIOp::create(ob, loc, cLA, currBand).getResult();
-                    else
-                        bInd = arith::AddIOp::create(ob, loc, cLB, currBand).getResult();
-
+                    if (uA > uB) aInd = arith::AddIOp::create(ob, loc, cLA, currBand).getResult();
+                    else         bInd = arith::AddIOp::create(ob, loc, cLB, currBand).getResult();
+                    
                     auto rLoop{ scf::ForOp::create(
                         ob, loc, c0, totalCols, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
-                            Value operand1{ uA > uB
-                                                ? tensor::ExtractOp::create(ib, loc, elementType, A,
-                                                                            ValueRange{ aInd, r })
-                                                      .getResult()
-                                                : cf0 };
-                            Value operand2{ uA > uB
-                                                ? cf0
-                                                : tensor::ExtractOp::create(ib, loc, elementType, B,
-                                                                            ValueRange{ bInd, r })
-                                                      .getResult() };
+                            Value operand1{ uA > uB ? tensor::ExtractOp::create(ib, loc, elementType, A, ValueRange{ aInd, r }).getResult() : cf0 };
+                            Value operand2{ uA > uB ? cf0 : tensor::ExtractOp::create(ib, loc, elementType, B, ValueRange{ bInd, r }).getResult() };
 
                             Value newOp;
-                            if (op.getKind() == dia::ElementwiseKind::add)
-                                newOp =
-                                    arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
-                            else
-                                newOp =
-                                    arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                            if (op.getKind() == dia::ElementwiseKind::add) newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                            else newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
 
-                            auto updated{ tensor::InsertOp::create(ib, loc, newOp, rArgs[0],
-                                                                   ValueRange{ cInd, r }) };
+                            auto updated{ tensor::InsertOp::create(ib, loc, newOp, rArgs[0], ValueRange{ cInd, r }) };
                             scf::YieldOp::create(ib, loc, ValueRange{ updated });
-                        }) };
+                        })};
                     scf::YieldOp::create(ob, loc, ValueRange{ rLoop.getResult(0) });
-                }) };
+                })};
             currC = iLoop.getResult(0);
         }
-<<<<<<< HEAD
         
         auto numDiagonals{ arith::ConstantIndexOp::create(rewriter, loc, std::min(lA, lB) + 1 + std::min(uA, uB)) };
-=======
-
-        // Intersecting Bands (Handles Add, Sub, and Mul)
-        auto numDiagonals{ arith::ConstantIndexOp::create(
-            rewriter, loc, std::min(lA, lB) + 1 + std::min(uA, uB)) };
->>>>>>> eef54b24785336690504d4cf77753478ae05978b
         auto minL{ arith::ConstantIndexOp::create(rewriter, loc, std::min(lA, lB)) };
-
+        
         scf::ForOp iLoop{ scf::ForOp::create(
             rewriter, loc, c0, numDiagonals, c1, ValueRange{ currC },
             [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
@@ -732,36 +659,30 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
                 auto rLoop{ scf::ForOp::create(
                     ob, loc, c0, totalCols, c1, ValueRange{ cOuter },
                     [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
-                        Value operand1{ tensor::ExtractOp::create(ib, loc, elementType, A,
-                                                                  ValueRange{ aInd, r }) };
-                        Value operand2{ tensor::ExtractOp::create(ib, loc, elementType, B,
-                                                                  ValueRange{ bInd, r }) };
+                        Value operand1{ tensor::ExtractOp::create(ib, loc, elementType, A, ValueRange{ aInd, r }) };
+                        Value operand2{ tensor::ExtractOp::create(ib, loc, elementType, B, ValueRange{ bInd, r }) };
 
                         Value newOp;
                         switch (op.getKind()) {
                             case dia::ElementwiseKind::add:
-                                newOp =
-                                    arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             case dia::ElementwiseKind::sub:
-                                newOp =
-                                    arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             case dia::ElementwiseKind::mul:
-                                newOp =
-                                    arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp = arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             default:
                                 assert(false);
                         }
 
-                        auto updated{ tensor::InsertOp::create(ib, loc, newOp, rArgs[0],
-                                                               ValueRange{ cInd, r }) };
+                        auto updated{ tensor::InsertOp::create(ib, loc, newOp, rArgs[0], ValueRange{ cInd, r }) };
                         scf::YieldOp::create(ib, loc, ValueRange{ updated });
-                    }) };
+                    })};
                 scf::YieldOp::create(ob, loc, ValueRange{ rLoop.getResult(0) });
-            }) };
-
+            })};
+        
         currC = iLoop.getResult(0);
 
         currC.getDefiningOp()->setAttr("metadata", op->getAttr("metadata"));
@@ -770,7 +691,6 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
         return success();
     }
 
-<<<<<<< HEAD
     LogicalResult diaTimesDenseToDiaBandedElementwiseToSCF(dia::ElementwiseOp op, PatternRewriter& rewriter,
                                                            const BandedSubMatrix& bandResult) const {
         assert(op.getKind() == dia::ElementwiseKind::mul);
@@ -969,10 +889,6 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
     }
 
     LogicalResult diaToDiaBandedElementwiseToLinalg(dia::ElementwiseOp op, PatternRewriter& rewriter,
-=======
-    LogicalResult diaToDiaBandedElementwiseToLinalg(dia::ElementwiseOp op,
-                                                    PatternRewriter& rewriter,
->>>>>>> eef54b24785336690504d4cf77753478ae05978b
                                                     const BandedSubMatrix& bandResult) const {
         Location loc{ op.getLoc() };
         Value input{ op.getInputs()[0] };
@@ -994,8 +910,8 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
         auto inputType{ cast<RankedTensorType>(input.getType()) };
         int64_t rank{ inputType.getRank() };
         AffineMap identityMap{ rewriter.getMultiDimIdentityMap(rank) };
-
-        auto indexingMapsAttr{ rewriter.getAffineMapArrayAttr({ identityMap, identityMap }) };
+        
+        auto indexingMapsAttr{ rewriter.getAffineMapArrayAttr({identityMap, identityMap}) };
 
         SmallVector<Attribute> iteratorTypes(
             rank, linalg::IteratorTypeAttr::get(context, utils::IteratorType::parallel));
@@ -1010,8 +926,7 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
         auto kindAttr{ linalg::ElementwiseKindAttr::get(context, linalgKind) };
         auto namedKindAttr{ rewriter.getNamedAttr("kind", kindAttr) };
 
-        auto elementwiseOp{ linalg::ElementwiseOp::create(rewriter, loc, ValueRange{ input },
-                                                          ValueRange{ output }, attrs) };
+        auto elementwiseOp{ linalg::ElementwiseOp::create(rewriter, loc, ValueRange{input}, ValueRange{output}, attrs) };
         rewriter.replaceOp(op, elementwiseOp->getResults());
         return success();
     }
@@ -1390,7 +1305,7 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
 
         BandedSubMatrix bandA;
         BandedSubMatrix bandB;
-
+    
         auto numOps{ op.getInputs().size() };
 
         if (numOps == 2) {
@@ -1428,7 +1343,7 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
             else
                 return failure();
             // }
-        } else if (numOps == 1) {
+        } else if (numOps == 1 ) {
             Value A = op.getInputs()[0];
             Value C = op.getOutput();
 
