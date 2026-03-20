@@ -1599,6 +1599,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             // the `detect-dia` flag is `true`
             if (bandA.IsDia && bandB.IsDia && !resultBand.IsDia && detectDIA) {
                 return diaTimesDiaToDenseBandedMatmulToSCF(op, rewriter);
+            } else if (bandA.IsDia && !bandB.IsDia && resultBand.IsDia) {
+                return diaTimesDenseTodiaBandedMatmulToSCF(op, rewriter);
             } else if (!bandA.IsDia && !bandB.IsDia && resultBand.IsDia) {
                 return denseTimesDenseToDiaBandedMatmulToSCF(op, rewriter, resultBand);
             }
