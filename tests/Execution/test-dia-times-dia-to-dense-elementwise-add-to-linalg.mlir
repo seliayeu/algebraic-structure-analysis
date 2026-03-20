@@ -13,14 +13,12 @@ module {
   func.func @main() {
     %0 = tensor.empty() : tensor<5x4xf32>
     
-    // A: Lower = 2, Upper = 1
     %diaA = arith.constant {metadata = {dia = true, lowerBw = 2 : i64, upperBw = 1 : i64, propertyDims = [0, 1]}} 
         dense<[[1.0, 2.0, 3.0, 0.0],   // L2: 3 elements
                [4.0, 5.0, 6.0, 7.0],   // L1: 4 elements
                [8.0, 9.0, 10.0, 11.0], // M0: 4 elements
                [0.0, 12.0, 13.0, 14.0]]> : tensor<4x4xf32> // U1: 3 elements
                
-    // B: Lower = 1, Upper = 2
     %diaB = arith.constant {metadata = {dia = true, lowerBw = 1 : i64, upperBw = 2 : i64, propertyDims = [0, 1]}} 
         dense<[[1.0, 1.0, 1.0, 1.0],   // L1: 4 elements
                [2.0, 2.0, 2.0, 2.0],   // M0: 4 elements
