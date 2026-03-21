@@ -74,6 +74,8 @@ LogicalResult dia::MatmulOp::verify() {
     if (lhsType.getDimSize(1) != rhsType.getDimSize(1))
         return emitOpError("number of columns must match: lhs has ")
                << lhsType.getDimSize(1) << " but rhs has " << rhsType.getDimSize(1);
+    if (lhsType.isDynamicDim(1)) return emitOpError("lhs column dimension must be static");
+    if (rhsType.isDynamicDim(1)) return emitOpError("rhs column dimension must be static");
 
     return success();
 }

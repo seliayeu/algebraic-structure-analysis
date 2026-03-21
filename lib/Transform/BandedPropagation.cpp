@@ -27,7 +27,7 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
             auto results{ inst->getResults() };
             if (results.size() != 1 || !BSA.hasProperty(results[0])) return;
 
-            const BandedSubMatrix analysisResult{ BSA.getProperty(results[0]) };
+            BandedSubMatrix analysisResult{ BSA.getProperty(results[0]) };
             auto property{ analysisResult.Property };
             auto dims{ analysisResult.Dims };
 
@@ -50,13 +50,49 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
             llvm::SmallVector<mlir::NamedAttribute> attrs{ upperAttr, lowerAttr, dimsArrayAttr };
 
             if (detectDIA) {
-                if (shouldCompressResult(*inst, analysisResult, N))
+                if (shouldCompressResult(*inst, analysisResult, N)) {
                     attrs.emplace_back(builder.getNamedAttr("dia", builder.getBoolAttr(true)));
+                    analysisResult.IsDia = true;
+                }
             } else if (analysisResult.IsDia)
                 attrs.emplace_back(builder.getNamedAttr("dia", builder.getBoolAttr(true)));
 
             auto dictAttr = builder.getDictionaryAttr(attrs);
             inst->setAttr("metadata", dictAttr);
+        });
+        // Propagates dia shapes
+        // I believe that this second walk could be blended in the first by moving this logic
+        // inside the visitOp functions
+        funcOp->walk([&](Operation* inst) {
+            auto matmulOp = dyn_cast<dia::MatmulOp>(inst);
+            if (!matmulOp) return;
+
+            auto results = inst->getResults();
+            if (results.size() != 1) return;
+            if (!BSA.hasProperty(results[0])) return;
+
+            const BandedSubMatrix opBand = BSA.getProperty(results[0]);
+
+            if (!opBand.IsDia) return;
+
+            auto resultType = dyn_cast<RankedTensorType>(results[0].getType());
+            if (!resultType) return;
+
+            int64_t lC = static_cast<int64_t>(opBand.Property.UpperBandwidth);
+            int64_t uC = static_cast<int64_t>(opBand.Property.LowerBandwidth);
+            int64_t N = cast<RankedTensorType>(inst->getOperand(1).getType()).getDimSize(1);
+            int64_t numDiags = std::min(2 * N - 1, lC + uC + 1);
+
+            auto newType = RankedTensorType::get({ numDiags, N }, resultType.getElementType());
+            results[0].setType(newType);
+
+            Value outsVal = matmulOp.getOutput();
+            outsVal.setType(newType);
+
+            if (auto emptyOp = outsVal.getDefiningOp<tensor::EmptyOp>()) {
+                emptyOp.getResult().setType(newType);
+                emptyOp->setOperands({});
+            }
         });
         // cache information
         auto& result = getAnalysis<BandedAnalysisResult>();

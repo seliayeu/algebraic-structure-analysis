@@ -372,7 +372,7 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         return success();
     }
 
-    LogicalResult diaTimesDenseTodiaBandedMatmulToSCF(dia::MatmulOp op,
+    LogicalResult diaTimesDenseToDiaBandedMatmulToSCF(dia::MatmulOp op,
                                                       PatternRewriter& rewriter) const {
         Location loc = op->getLoc();
         Value A = op.getLhs();
@@ -522,6 +522,7 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                 scf::YieldOp::create(db, loc, rowLoop.getResults());
             });
 
+        dLoop->setAttr("metadata", op->getAttrOfType<DictionaryAttr>("metadata"));
         rewriter.replaceOp(op, dLoop.getResult(0));
         return success();
     }
@@ -738,7 +739,7 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             if (bandA.IsDia && bandB.IsDia && !resultBand.IsDia && detectDIA) {
                 return diaTimesDiaToDenseBandedMatmulToSCF(op, rewriter);
             } else if (bandA.IsDia && !bandB.IsDia && resultBand.IsDia) {
-                return diaTimesDenseTodiaBandedMatmulToSCF(op, rewriter);
+                return diaTimesDenseToDiaBandedMatmulToSCF(op, rewriter);
             } else if (!bandA.IsDia && !bandB.IsDia && resultBand.IsDia) {
                 return denseTimesDenseToDiaBandedMatmulToSCF(op, rewriter, resultBand);
             }
