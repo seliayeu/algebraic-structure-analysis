@@ -79,6 +79,7 @@ bool BandedStructureAnalysis::propagateBackward(Value value) {
 
 BandedSubMatrix BandedStructureAnalysis::readPropertyFromDictAttr(DictionaryAttr dictAttr) {
     BandedSubMatrix generalProp;
+    BandedSubMatrix res;
 
     auto metadataAttr{ dictAttr.get("metadata") };
     if (!metadataAttr) return generalProp;
@@ -102,7 +103,6 @@ BandedSubMatrix BandedStructureAnalysis::readPropertyFromDictAttr(DictionaryAttr
     std::size_t upperBw{ static_cast<std::size_t>(cast<IntegerAttr>(upperBwAttr).getInt()) };
     std::size_t lowerBw{ static_cast<std::size_t>(cast<IntegerAttr>(lowerBwAttr).getInt()) };
 
-    BandedSubMatrix res;
     res.Property = BandedProperty(upperBw, lowerBw);
     res.Dims[0] = cast<IntegerAttr>(propertyDimsArrayAttr[0]).getInt();
     res.Dims[1] = cast<IntegerAttr>(propertyDimsArrayAttr[1]).getInt();
@@ -178,9 +178,6 @@ LogicalResult BandedStructureAnalysis::visitMatmul(dia::MatmulOp* op) {
 
     auto lhsType = dyn_cast<RankedTensorType>(lhs.getType());
     auto rhsType = dyn_cast<RankedTensorType>(rhs.getType());
-
-    if (!lhsType || !rhsType) return success();
-    if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape()) return success();
 
     if (!propertyMap.contains(lhs) || !propertyMap.contains(rhs)) return success();
 
