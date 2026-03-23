@@ -1,0 +1,103 @@
+FROM ubuntu:24.04 AS base
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ---------------------------------------------------------------------------
+# Base build dependencies
+# ---------------------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        clang \
+        lld \
+        cmake \
+        ninja-build \
+        git \
+        wget \
+        ca-certificates \
+        python3 \
+        python3-pip \
+        python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV CC=clang
+ENV CXX=clang++
+
+# ---------------------------------------------------------------------------
+# Build MLIR (stage isolated so its source tree doesn't bloat the final image)
+# ---------------------------------------------------------------------------
+FROM base AS mlir-builder
+
+# Pin the tag so builds are reproducible; override with --build-arg if needed
+ARG LLVM_TAG=llvmorg-19.1.0
+
+RUN git clone --depth 1 --branch ${LLVM_TAG} \
+        https://github.com/llvm/llvm-project.git /llvm-project
+
+RUN cmake -G Ninja \
+        -S /llvm-project/llvm \
+        -B /llvm-project/build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/opt/mlir \
+        -DCMAKE_C_COMPILER=clang \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DLLVM_ENABLE_PROJECTS="mlir" \
+        -DLLVM_TARGETS_TO_BUILD="Native" \
+        -DLLVM_ENABLE_ASSERTIONS=ON \
+        -DLLVM_INSTALL_UTILS=ON \       
+    && ninja -C /llvm-project/build install \
+    && rm -rf /llvm-project   # drop source — build artifacts are in /opt/mlir
+
+# ---------------------------------------------------------------------------
+# Build BPA
+# ---------------------------------------------------------------------------
+FROM base AS bpa-builder
+
+COPY --from=mlir-builder /opt/mlir /opt/mlir
+
+RUN git clone https://github.com/seliayeu/algebraic-structure-analysis /app/bpa \
+    && cd /app/bpa \
+    && git checkout chain-benchmark
+
+RUN cmake -G Ninja \
+        -S /app/bpa \
+        -B /app/bpa/build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_C_COMPILER=clang \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DMLIR_DIR=/opt/mlir/lib/cmake/mlir \
+    && ninja -C /app/bpa/build
+
+# ---------------------------------------------------------------------------
+# Runtime image
+# ---------------------------------------------------------------------------
+FROM base AS runtime
+
+# Chrome needed by Kaleido for plot export; wget is already installed in base
+RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+    && apt-get install -y ./google-chrome-stable_current_amd64.deb \
+    && rm google-chrome-stable_current_amd64.deb \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pull in MLIR tools (mlir-translate, mlir-opt, llc, etc.) and the BPA build
+COPY --from=mlir-builder /opt/mlir /opt/mlir
+COPY --from=bpa-builder  /app/bpa  /app/bpa
+
+ENV PATH="/opt/mlir/bin:$PATH"
+
+# ---------------------------------------------------------------------------
+# Python environment
+# ---------------------------------------------------------------------------
+RUN python3 -m venv /venv \
+    && /venv/bin/pip install --upgrade pip \
+    && /venv/bin/pip install -r /app/bpa/benchmarking/scripts/requirements.txt
+
+ENV PATH="/venv/bin:/opt/mlir/bin:$PATH"
+
+# ---------------------------------------------------------------------------
+# Runtime env
+# ---------------------------------------------------------------------------
+ENV BUILD_PATH=/app/bpa/build
+
+WORKDIR /app/bpa
+
+ENTRYPOINT ["python", "-u", "benchmarking/scripts/bench.py"]
+CMD []
