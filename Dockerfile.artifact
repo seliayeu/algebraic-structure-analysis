@@ -74,6 +74,7 @@ FROM base AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
         clang \
         libstdc++-14-dev \
+        time \
     && rm -rf /var/lib/apt/lists/*
 
 # Pull in MLIR tools (mlir-translate, mlir-opt, llc, etc.) and the BPA build
