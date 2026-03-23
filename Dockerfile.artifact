@@ -4,33 +4,44 @@ ENV DEBIAN_FRONTEND=noninteractive
 # ---------------------------------------------------------------------------
 # Base build dependencies
 # ---------------------------------------------------------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        clang \
-        lld \
-        cmake \
-        ninja-build \
-        git \
-        wget \
-        ca-certificates \
-        python3 \
-        python3-pip \
-        python3-venv \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y \
+    build-essential \
+    git \
+    wget \
+    curl \
+    libssl-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libffi-dev \
+    tk-dev \
+    liblzma-dev \
+    cmake \
+    ninja-build \
+    python3.12 \
+    python3-pip \
+    python3.12-venv \
+    software-properties-common \
+    gnupg && \
+    rm -rf /var/lib/apt/lists/*
 
 ENV CC=clang
 ENV CXX=clang++
 
 # ---------------------------------------------------------------------------
-# Build MLIR (stage isolated so its source tree doesn't bloat the final image)
+# Build MLIR
 # ---------------------------------------------------------------------------
 FROM base AS mlir-builder
 
-# Pin the tag so builds are reproducible; override with --build-arg if needed
-ARG LLVM_TAG=llvmorg-19.1.0
 
-RUN git clone --depth 1 --branch ${LLVM_TAG} \
-        https://github.com/llvm/llvm-project.git /llvm-project
+# llvm is huge, so this trick helps
+RUN git init /llvm-project \
+    && cd /llvm-project \
+    && git remote add origin https://github.com/llvm/llvm-project.git \
+    && git fetch --depth 1 origin 104e82b75defd23ade610a5a75cd95244638ec0b \
+    && git checkout FETCH_HEAD
 
 RUN cmake -G Ninja \
         -S /llvm-project/llvm \
@@ -42,9 +53,9 @@ RUN cmake -G Ninja \
         -DLLVM_ENABLE_PROJECTS="mlir" \
         -DLLVM_TARGETS_TO_BUILD="Native" \
         -DLLVM_ENABLE_ASSERTIONS=ON \
-        -DLLVM_INSTALL_UTILS=ON \       
+        -DLLVM_INSTALL_UTILS=ON \
     && ninja -C /llvm-project/build install \
-    && rm -rf /llvm-project   # drop source — build artifacts are in /opt/mlir
+    && rm -rf /llvm-project
 
 # ---------------------------------------------------------------------------
 # Build BPA
@@ -70,6 +81,11 @@ RUN cmake -G Ninja \
 # Runtime image
 # ---------------------------------------------------------------------------
 FROM base AS runtime
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        clang \
+        libstdc++-14-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Chrome needed by Kaleido for plot export; wget is already installed in base
 RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \

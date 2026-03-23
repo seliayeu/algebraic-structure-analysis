@@ -4,7 +4,6 @@ from pathlib import Path
 import re
 import subprocess
 import csv
-from pathlib import Path
 from typing import List, Tuple
 
 BUILD_DIR = Path("./build")
@@ -29,8 +28,6 @@ def run_benchmark_full(exe_path: Path, warmup: int, runs: int):
 
     out_lines = result.stdout.splitlines()
     err_lines = result.stderr.splitlines()
-    # print(out_lines)
-    # print(err_lines)
 
     # ---- parse benchmark output ----
     total = float(
