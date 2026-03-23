@@ -183,6 +183,7 @@ def write_csv_row(csv_path: Path, row_dict: dict, write_header: bool = False):
         if write_header:
             writer.writeheader()
         writer.writerow(row_dict)
+        f.flush()
 
 
 def run(
