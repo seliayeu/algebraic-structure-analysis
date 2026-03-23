@@ -21,14 +21,6 @@ module {
     %R3 = dia.matmul ins(%R2, %I3 : tensor<?x5xf32>, tensor<5x5xf32>)
                      outs(%e2 : tensor<?x5xf32>) -> tensor<?x5xf32>
 
-    // %dim = tensor.dim %R3, %c0 : tensor<?x5xf32>
-    // %memref = memref.alloc(%dim) : memref<?x5xf32>
-    // bufferization.materialize_in_destination %R3 in writable %memref
-    //     : (tensor<?x5xf32>, memref<?x5xf32>) -> ()
-    // %cast = memref.cast %memref : memref<?x5xf32> to memref<*xf32>
-    // call @printMemrefF32(%cast) : (memref<*xf32>) -> ()
-    // memref.dealloc %memref : memref<?x5xf32>
-
     %index = arith.constant 5: index
     %result = tensor.extract %R3[%index, %index] : tensor<?x5xf32>
     return %result : f32

@@ -94,38 +94,6 @@ def replace_bandwidth(src: Path, dst: Path, bw: int):
     dst.write_text(src.read_text().replace("X", str(bw)))
 
 
-def replace_symbols(src: Path, dst: Path, X: int):
-    text = src.read_text()
-
-    current = None
-    first = True
-
-    def next_val(prev):
-        return prev + 2 * X
-
-    def compute():
-        nonlocal current, first
-        if first:
-            current = 4 * X + 1
-            first = False
-        else:
-            current = next_val(current)
-        return current
-
-    # Replace tensor shapes like tensor<Yx1024xf32> or Zx...
-    def replace_tensor_dims(match):
-        val = compute()
-        return f"tensor<{val}x1024xf32>"
-
-    # Replace all tensor<Yx1024xf32> / tensor<Zx1024xf32>
-    text = re.sub(r"tensor<[YZ]x1024xf32>", replace_tensor_dims, text)
-
-    # Replace remaining X in metadata
-    text = text.replace("X", str(X))
-
-    dst.write_text(text)
-
-
 def build_pipeline_flags(cfg):
     flags = []
     tag = ""
@@ -235,7 +203,7 @@ def run(
             obj_file = TMP_DIR / f"{name}.o"
             exe_file = TMP_DIR / f"{name}.out"
 
-            replace_symbols(src, mlir_file, bw)
+            replace_bandwidth(src, mlir_file, bw)
 
             llvm_ir = lower_to_llvm(mlir_file, flags)
             ll_file.write_text(llvm_ir)
