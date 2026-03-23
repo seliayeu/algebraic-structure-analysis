@@ -12,6 +12,7 @@ RESULT_DIR = Path("./results")
 
 
 def run_benchmark_full(exe_path: Path, warmup: int, runs: int):
+    print(f"    running {exe_path}")
     system = platform.system()
 
     if system == "Darwin":
@@ -138,7 +139,17 @@ def lower_to_llvm(mlir_file: Path, flags: List[str]):
 
 def compile_kernel(ll_path: Path, obj_path: Path):
     print(f"    compiling {ll_path}")
-    run_cmd(["llc", "-O3", "-filetype=obj", str(ll_path), "-o", str(obj_path)])
+    run_cmd(
+        [
+            "llc",
+            "-O3",
+            "-relocation-model=pic",
+            "-filetype=obj",
+            str(ll_path),
+            "-o",
+            str(obj_path),
+        ]
+    )
 
 
 def build_executable(obj_path: Path, exe_path: Path):
