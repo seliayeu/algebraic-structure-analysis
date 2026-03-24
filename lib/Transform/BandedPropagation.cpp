@@ -1,6 +1,7 @@
 #include "Transform/BandedPropagation.h"
 
 #include <cstdint>
+#include <iostream>
 
 #include "Analysis/BandedStructureAnalysis.h"
 #include "Utils/TransformUtils.h"
@@ -13,6 +14,26 @@ namespace mlir::bpa {
 
 struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> {
     using BandedAnalysisBase::BandedAnalysisBase;
+
+    LogicalResult updateShape(TypedValue<RankedTensorType> result, int64_t N,
+                              BandedStructureAnalysis& BSA) {
+        if (!BSA.hasProperty(result)) return failure();
+
+        BandedSubMatrix analysisResult{ BSA.getProperty(result) };
+
+        if (!analysisResult.IsDia) return failure();
+
+        auto resultType = dyn_cast<RankedTensorType>(result.getType());
+        if (!resultType) return failure();
+
+        int64_t lC = static_cast<int64_t>(analysisResult.Property.UpperBandwidth);
+        int64_t uC = static_cast<int64_t>(analysisResult.Property.LowerBandwidth);
+        int64_t numDiags = std::min(2 * N - 1, lC + uC + 1);
+
+        auto newType = RankedTensorType::get({ numDiags, N }, resultType.getElementType());
+        result.setType(newType);
+        return success();
+    }
 
     void runOnOperation() override {
         auto funcOp{ getOperation() };
@@ -60,41 +81,33 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
             auto dictAttr = builder.getDictionaryAttr(attrs);
             inst->setAttr("metadata", dictAttr);
         });
-        // Propagates dia shapes
-        // I believe that this second walk could be blended in the first by moving this logic
-        // inside the visitOp functions
+
         funcOp->walk([&](Operation* inst) {
-            auto matmulOp = dyn_cast<dia::MatmulOp>(inst);
-            if (!matmulOp) return;
+            if (!dyn_cast<dia::MatmulOp>(inst) && !dyn_cast<dia::ElementwiseOp>(inst)) return;
+            auto result{ inst->getResult(0) };
+            if (cast<RankedTensorType>(result.getType()).hasStaticShape()) return;
 
-            auto results = inst->getResults();
-            if (results.size() != 1) return;
-            if (!BSA.hasProperty(results[0])) return;
+            // works because assumed square
+            int64_t N = cast<RankedTensorType>(inst->getOperand(0).getType()).getDimSize(1);
 
-            const BandedSubMatrix opBand = BSA.getProperty(results[0]);
+            Value output;
+            if (auto matmulOp{ dyn_cast<dia::MatmulOp>(inst) }) {
+                output = matmulOp.getOutput();
+                if (failed(updateShape(matmulOp.getResult(), N, BSA))) return;
+            } else if (auto elementwiseOp{ dyn_cast<dia::ElementwiseOp>(inst) }) {
+                output = elementwiseOp.getOutput();
+                if (failed(updateShape(elementwiseOp.getResult(), N, BSA))) return;
+            } else {
+                return;
+            }
 
-            if (!opBand.IsDia) return;
-
-            auto resultType = dyn_cast<RankedTensorType>(results[0].getType());
-            if (!resultType) return;
-
-            int64_t lC = static_cast<int64_t>(opBand.Property.UpperBandwidth);
-            int64_t uC = static_cast<int64_t>(opBand.Property.LowerBandwidth);
-            int64_t N = cast<RankedTensorType>(inst->getOperand(1).getType()).getDimSize(1);
-            int64_t numDiags = std::min(2 * N - 1, lC + uC + 1);
-
-            auto newType = RankedTensorType::get({ numDiags, N }, resultType.getElementType());
-            results[0].setType(newType);
-
-            Value outsVal = matmulOp.getOutput();
-            outsVal.setType(newType);
-
-            if (auto emptyOp = outsVal.getDefiningOp<tensor::EmptyOp>()) {
-                emptyOp.getResult().setType(newType);
+            output.setType(cast<RankedTensorType>(result.getType()));
+            if (auto emptyOp = output.getDefiningOp<tensor::EmptyOp>()) {
+                emptyOp.getResult().setType(cast<RankedTensorType>(result.getType()));
                 emptyOp->setOperands({});
             }
         });
-        // cache information
+
         auto& result = getAnalysis<BandedAnalysisResult>();
         result.detectDIA = detectDIA;
         markAnalysesPreserved<BandedAnalysisResult>();

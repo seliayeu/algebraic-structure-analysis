@@ -79,3 +79,20 @@ LogicalResult dia::MatmulOp::verify() {
 
     return success();
 }
+
+LogicalResult dia::ElementwiseOp::verify() {
+    auto op1Type{ cast<RankedTensorType>(getInputs()[0].getType()) };
+    auto outputType{ cast<RankedTensorType>(getOutput().getType()) };
+    if (op1Type.isDynamicDim(1) || outputType.isDynamicDim(1))
+        return emitOpError("first operand column dimension must be static");
+    if (getOperands().size() == 2) return success();
+
+    auto op2Type{ cast<RankedTensorType>(getInputs()[1].getType()) };
+    if (op2Type.isDynamicDim(1))
+        return emitOpError("second operand column dimension must be static");
+
+    if (op1Type.getDimSize(1) != op2Type.getDimSize(1))
+        return emitOpError("number of columns must match: first operand has ")
+               << op1Type.getDimSize(1) << " but second oeprand has " << op2Type.getDimSize(1);
+    return success();
+}
