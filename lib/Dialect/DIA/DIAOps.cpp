@@ -80,6 +80,19 @@ LogicalResult dia::MatmulOp::verify() {
     return success();
 }
 
+LogicalResult dia::BatchMatmulOp::verify() {
+    auto lhsType = cast<RankedTensorType>(getLhs().getType());
+    auto rhsType = cast<RankedTensorType>(getRhs().getType());
+
+    if (lhsType.getDimSize(2) != rhsType.getDimSize(2))
+        return emitOpError("number of columns must match: lhs has ")
+               << lhsType.getDimSize(2) << " but rhs has " << rhsType.getDimSize(2);
+    if (lhsType.isDynamicDim(2)) return emitOpError("lhs column dimension must be static");
+    if (rhsType.isDynamicDim(2)) return emitOpError("rhs column dimension must be static");
+
+    return success();
+}
+
 LogicalResult dia::ElementwiseOp::verify() {
     auto op1Type{ cast<RankedTensorType>(getInputs()[0].getType()) };
     auto outputType{ cast<RankedTensorType>(getOutput().getType()) };

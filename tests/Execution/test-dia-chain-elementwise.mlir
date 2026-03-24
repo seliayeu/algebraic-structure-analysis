@@ -8,15 +8,6 @@
 // RUN:  --shared-libs=%llvm_root/build/lib/libmlir_runner_utils.%lib_format > %t
 // RUN: FileCheck %s < %t
 
-// Chain elementwise: (((A + B) * C) - D)
-// A: (lower=1, upper=0)
-// B: (lower=0, upper=1)
-// R1 = A + B   -> (lower=1, upper=1) size 3x5
-// C: (lower=1, upper=0)
-// R2 = R1 * C  -> (lower=1, upper=0) size 2x5
-// D: (lower=0, upper=0)
-// R3 = R2 - D  -> (lower=1, upper=0) size 2x5
-
 // CHECK: Unranked Memref {{.*}} rank = 2 offset = 0 sizes = [2, 5]
 // CHECK: {{\[\[}}2{{.*}}, 2{{.*}}, 2{{.*}}, 2{{.*}}, 0{{.*}}],
 // CHECK-NEXT:  [20{{.*}}, 20{{.*}}, 20{{.*}}, 20{{.*}}, 20{{.*}}]]
