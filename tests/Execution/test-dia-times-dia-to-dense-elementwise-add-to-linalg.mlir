@@ -14,16 +14,16 @@ module {
     %0 = tensor.empty() : tensor<5x4xf32>
     
     %diaA = arith.constant {metadata = {dia = true, lowerBw = 2 : i64, upperBw = 1 : i64, propertyDims = [0, 1]}} 
-        dense<[[1.0, 2.0, 3.0, 0.0],   // L2: 3 elements
-               [4.0, 5.0, 6.0, 7.0],   // L1: 4 elements
-               [8.0, 9.0, 10.0, 11.0], // M0: 4 elements
-               [0.0, 12.0, 13.0, 14.0]]> : tensor<4x4xf32> // U1: 3 elements
+        dense<[[0.0, 0.0, 1.0, 2.0, 3.0],      // L2: 3 elements
+               [0.0, 4.0, 5.0, 6.0, 7.0],      // L1: 4 elements
+               [8.0, 9.0, 10.0, 11.0, 0.0],    // M0: 4 elements
+               [12.0, 13.0, 14.0, 0.0, 0.0]]> : tensor<4x5xf32> // U1: 3 elements
                
     %diaB = arith.constant {metadata = {dia = true, lowerBw = 1 : i64, upperBw = 2 : i64, propertyDims = [0, 1]}} 
-        dense<[[1.0, 1.0, 1.0, 1.0],   // L1: 4 elements
-               [2.0, 2.0, 2.0, 2.0],   // M0: 4 elements
-               [0.0, 3.0, 3.0, 3.0],   // U1: 3 elements
-               [0.0, 0.0, 4.0, 4.0]]> : tensor<4x4xf32> // U2: 2 elements
+        dense<[[0.0, 1.0, 1.0, 1.0, 1.0],      // L1: 4 elements
+               [2.0, 2.0, 2.0, 2.0, 0.0],      // M0: 4 elements
+               [3.0, 3.0, 3.0, 0.0, 0.0],      // U1: 3 elements
+               [4.0, 4.0, 0.0, 0.0, 0.0]]> : tensor<4x5xf32> // U2: 2 elements
 
 
     // CHECK:      Unranked Memref
@@ -34,7 +34,7 @@ module {
     // CHECK-NEXT:  [1, 6, 12, 17],
     // CHECK-NEXT:  [0, 2, 7, 13],
     // CHECK-NEXT:  [0, 0, 3, 8]]
-    %1 = dia.elementwise kind = <add> ins(%diaA, %diaB : tensor<4x4xf32>, tensor<4x4xf32>) 
+    %1 = dia.elementwise kind = <add> ins(%diaA, %diaB : tensor<4x5xf32>, tensor<4x5xf32>) 
                                       outs(%0 : tensor<5x4xf32>) -> tensor<5x4xf32>
                                       
     %memref = memref.alloc() : memref<5x4xf32>
