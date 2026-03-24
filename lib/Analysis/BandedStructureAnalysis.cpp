@@ -391,8 +391,6 @@ LogicalResult BandedStructureAnalysis::visitDIAElementwise(dia::ElementwiseOp* o
     auto operands{ op->getOperands() };
     auto result{ op->getResult() };
 
-    if (!result.getType().hasStaticShape()) return success();
-
     auto lhs{ operands[0] };
     if (!propertyMap.contains(lhs)) return success();
 
@@ -417,13 +415,10 @@ LogicalResult BandedStructureAnalysis::visitDIAElementwise(dia::ElementwiseOp* o
     if (operands.size() != 3) return failure();
     if (op->getKind() == dia::ElementwiseKind::mul) {
         auto newProperty{ binaryElementwiseProduct(lhsMat.Property, rhsMat.Property) };
-        propertyMap[result] = { join(propertyMap[result].Property, newProperty),
-                                propertyMap[operands[0]].Dims };
+        resMat = { join(propertyMap[result].Property, newProperty), propertyMap[operands[0]].Dims };
     } else {
         auto newProperty{ binaryElementwiseGeneral(lhsMat.Property, rhsMat.Property) };
-        resMat = { join(propertyMap[result].Property, newProperty), lhsMat.Dims };
-        propertyMap[result] = { join(propertyMap[result].Property, newProperty),
-                                propertyMap[operands[0]].Dims };
+        resMat = { join(propertyMap[result].Property, newProperty), propertyMap[operands[0]].Dims };
     }
 
     resMat.IsDia = detectDIA ? false : true;

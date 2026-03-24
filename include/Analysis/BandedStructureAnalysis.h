@@ -49,11 +49,11 @@ class BandedStructureAnalysis {
 
     LogicalResult run(Block* block);
 
-    BandedSubMatrix getProperty(Value value) {
-        return propertyMap[value];
+    BandedSubMatrix getProperty(Value value) const {
+        return propertyMap.at(value);
     }
 
-    bool hasProperty(Value value) {
+    bool hasProperty(Value value) const {
         return propertyMap.contains(value);
     }
 
