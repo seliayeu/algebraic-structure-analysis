@@ -20,8 +20,6 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
 
         BandedSubMatrix analysisResult{ BSA.getProperty(result) };
 
-        // if (!analysisResult.IsDia) return failure();
-
         auto resultType = dyn_cast<RankedTensorType>(result.getType());
         if (!resultType) return failure();
 
