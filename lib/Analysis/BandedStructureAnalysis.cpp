@@ -244,8 +244,6 @@ LogicalResult BandedStructureAnalysis::visitDIABatchMatmul(dia::BatchMatmulOp* o
     auto lhsType{ dyn_cast<TensorType>(lhs.getType()) };
     auto rhsType{ dyn_cast<TensorType>(rhs.getType()) };
 
-    if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape()) return success();
-
     auto lhsShape{ lhsType.getShape() };
     auto rhsShape{ rhsType.getShape() };
 

@@ -1,6 +1,7 @@
 #include "Transform/BandedPropagation.h"
 
 #include <cstdint>
+#include <vector>
 
 #include "Analysis/BandedStructureAnalysis.h"
 #include "Utils/TransformUtils.h"
@@ -32,7 +33,16 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
             M = std::min(2 * N - 1, lC + uC + 1);
         }
 
-        auto newType = RankedTensorType::get({ M, N }, resultType.getElementType());
+        std::vector<int64_t> dims;
+        dims.reserve(resultType.getRank());
+        if (resultType.getRank() > 2) {
+            for (int64_t i = 0; i < resultType.getRank() - 2; ++i)
+                dims.push_back(resultType.getDimSize(i));
+        }
+        dims.push_back(M);
+        dims.push_back(N);
+
+        auto newType = RankedTensorType::get(dims, resultType.getElementType());
         result.setType(newType);
         return success();
     }
@@ -85,18 +95,23 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
         });
 
         funcOp->walk([&](Operation* inst) {
-            if (!dyn_cast<dia::MatmulOp>(inst) && !dyn_cast<dia::ElementwiseOp>(inst)) return;
+            if (!dyn_cast<dia::MatmulOp>(inst) && !dyn_cast<dia::ElementwiseOp>(inst) &&
+                !dyn_cast<dia::BatchMatmulOp>(inst))
+                return;
             auto result{ inst->getResult(0) };
             if (cast<RankedTensorType>(result.getType()).hasStaticShape()) return;
 
-            // works because assumed square
-            int64_t N = cast<RankedTensorType>(inst->getOperand(0).getType()).getDimSize(1);
-
             Value output;
             if (auto matmulOp{ dyn_cast<dia::MatmulOp>(inst) }) {
+                int64_t N = cast<RankedTensorType>(inst->getOperand(1).getType()).getDimSize(1);
                 output = matmulOp.getOutput();
                 if (failed(updateShape(matmulOp.getResult(), N, BSA))) return;
+            } else if (auto batchMatmulOp{ dyn_cast<dia::BatchMatmulOp>(inst) }) {
+                int64_t N = cast<RankedTensorType>(inst->getOperand(1).getType()).getDimSize(2);
+                output = batchMatmulOp.getOutput();
+                if (failed(updateShape(batchMatmulOp.getResult(), N, BSA))) return;
             } else if (auto elementwiseOp{ dyn_cast<dia::ElementwiseOp>(inst) }) {
+                int64_t N = cast<RankedTensorType>(inst->getOperand(0).getType()).getDimSize(1);
                 output = elementwiseOp.getOutput();
                 if (failed(updateShape(elementwiseOp.getResult(), N, BSA))) return;
             } else {

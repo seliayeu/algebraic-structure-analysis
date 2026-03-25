@@ -41,6 +41,7 @@ def DIA_BatchMatmulOp : DIA_Op<"batch_matmul", [Pure]> {
         `outs` `(` $output `:` type($output) `)`
         `->` type($result) attr-dict
     }];
+    let hasVerifier = 1;
 }
 
 def DIA_ElementwiseOp : DIA_Op<"elementwise", [Pure]> {
