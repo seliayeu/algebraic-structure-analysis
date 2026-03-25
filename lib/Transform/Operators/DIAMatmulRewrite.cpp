@@ -1,11 +1,16 @@
 
 #include <cstdint>
 
+#include "Analysis/BandedStructureAnalysis.h"
+#include "Dialect/DIA/DIAOps.h"
 #include "Utils/TransformUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LLVM.h"
 
@@ -696,6 +701,48 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         return success();
     }
 
+    LogicalResult denseTimesDenseToDenseBandedMatmulToLinalg(dia::MatmulOp op,
+                                                             PatternRewriter& rewriter,
+                                                             const BandedSubMatrix& bandA,
+                                                             const BandedSubMatrix& bandB,
+                                                             const BandedSubMatrix& bandC) const {
+        auto A = op.getLhs();
+        auto B = op.getRhs();
+        auto C = op.getOutput();
+        auto loc = op->getLoc();
+
+        auto aType = cast<RankedTensorType>(A.getType());
+        auto bType = cast<RankedTensorType>(B.getType());
+        auto cType = cast<RankedTensorType>(C.getType());
+        auto elementType = aType.getElementType();
+
+        int64_t N = aType.getDimSize(1);
+
+        auto staticAType = RankedTensorType::get({ N, N }, elementType);
+        auto staticBType = RankedTensorType::get({ N, N }, elementType);
+        auto staticCType = RankedTensorType::get({ N, N }, elementType);
+
+        Value castA = aType.isDynamicDim(0)
+                          ? tensor::CastOp::create(rewriter, loc, staticAType, A).getResult()
+                          : A;
+        Value castB = bType.isDynamicDim(0)
+                          ? tensor::CastOp::create(rewriter, loc, staticBType, B).getResult()
+                          : B;
+        Value castC = cType.isDynamicDim(0)
+                          ? tensor::CastOp::create(rewriter, loc, staticCType, C).getResult()
+                          : C;
+        castA.getDefiningOp()->setAttr("metadata", bandA.toAttribute(rewriter));
+        castB.getDefiningOp()->setAttr("metadata", bandB.toAttribute(rewriter));
+
+        auto newOp = linalg::MatmulOp::create(rewriter, loc, TypeRange{ staticCType },
+                                              ValueRange{ castA, castB }, ValueRange{ castC });
+
+        if (auto metadata = op->getAttr("metadata")) newOp->setAttr("metadata", metadata);
+
+        rewriter.replaceOp(op, newOp);
+        return success();
+    }
+
     LogicalResult matchAndRewrite(dia::MatmulOp op, PatternRewriter& rewriter) const override {
         auto dict = op->getAttrDictionary();
         if (!dict) dict = DictionaryAttr();
@@ -742,6 +789,10 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                 return diaTimesDenseToDiaBandedMatmulToSCF(op, rewriter);
             } else if (!bandA.IsDia && !bandB.IsDia && resultBand.IsDia) {
                 return denseTimesDenseToDiaBandedMatmulToSCF(op, rewriter, resultBand);
+            } else if (!bandA.IsDia && !bandB.IsDia && !resultBand.IsDia) {
+                // this op is already implemented in the linalg lowering.
+                return denseTimesDenseToDenseBandedMatmulToLinalg(op, rewriter, bandA, bandB,
+                                                                  resultBand);
             }
 
             return diaTimesDiaToDiaBandedMatmulToSCF(op, rewriter, resultBand);

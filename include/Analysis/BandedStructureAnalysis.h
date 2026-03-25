@@ -9,6 +9,7 @@
 #include "Dialect/DIA/DIAOps.h"
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
@@ -34,6 +35,20 @@ struct BandedSubMatrix {
     bool isDiagonal() const {
         return Property.LowerBandwidth == 0 && Property.UpperBandwidth == 0;
     }
+    mlir::DictionaryAttr toAttribute(mlir::OpBuilder& builder) const {
+        llvm::SmallVector<mlir::NamedAttribute> attrs;
+
+        attrs.push_back(
+            builder.getNamedAttr("upperBw", builder.getI64IntegerAttr(Property.UpperBandwidth)));
+        attrs.push_back(
+            builder.getNamedAttr("lowerBw", builder.getI64IntegerAttr(Property.LowerBandwidth)));
+        attrs.push_back(builder.getNamedAttr(
+            "propertyDims", builder.getI64ArrayAttr({ (int64_t)Dims[0], (int64_t)Dims[1] })));
+
+        if (IsDia) attrs.push_back(builder.getNamedAttr("isDia", builder.getBoolAttr(true)));
+
+        return builder.getDictionaryAttr(attrs);
+    }
 };
 
 class BandedStructureAnalysis {
@@ -49,7 +64,7 @@ class BandedStructureAnalysis {
 
     LogicalResult run(Block* block);
 
-    BandedSubMatrix getProperty(Value value) const {
+    BandedSubMatrix& getProperty(Value value) {
         return propertyMap.at(value);
     }
 
