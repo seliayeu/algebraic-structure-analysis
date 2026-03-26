@@ -16,13 +16,51 @@ namespace mlir::bpa {
 struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> {
     using BandedAnalysisBase::BandedAnalysisBase;
 
-    LogicalResult updateShape(TypedValue<RankedTensorType> result, int64_t N,
-                              BandedStructureAnalysis& BSA) {
+    LogicalResult updateShape(dia::MatmulOp op, BandedStructureAnalysis& BSA) {
+        int64_t N = cast<RankedTensorType>(op.getOperand(1).getType()).getDimSize(1);
+
+        auto result{ op.getResult() };
+        auto output{ op.getOutput() };
+
+        if (cast<RankedTensorType>(result.getType()).hasStaticShape()) return failure();
         if (!BSA.hasProperty(result)) return failure();
 
         BandedSubMatrix analysisResult{ BSA.getProperty(result) };
 
         auto resultType = dyn_cast<RankedTensorType>(result.getType());
+        if (!resultType) return failure();
+
+        int64_t M = 0;
+        if (!analysisResult.IsDia)
+            M = N;
+        else {
+            int64_t lC = static_cast<int64_t>(analysisResult.Property.UpperBandwidth);
+            int64_t uC = static_cast<int64_t>(analysisResult.Property.LowerBandwidth);
+            M = std::min(2 * N - 1, lC + uC + 1);
+        }
+
+        auto newType = RankedTensorType::get({ M, N }, resultType.getElementType());
+        result.setType(newType);
+        output.setType(newType);
+        if (auto emptyOp = output.getDefiningOp<tensor::EmptyOp>()) {
+            emptyOp.getResult().setType(newType);
+            emptyOp->setOperands({});
+        }
+        return success();
+    }
+
+    LogicalResult updateShape(dia::BatchMatmulOp op, BandedStructureAnalysis& BSA) {
+        auto rank{ cast<RankedTensorType>(op.getOperand(1).getType()).getRank() };
+        int64_t N = cast<RankedTensorType>(op.getOperand(1).getType()).getDimSize(rank - 1);
+
+        auto result{ op.getResult() };
+        auto output{ op.getOutput() };
+        if (cast<RankedTensorType>(result.getType()).hasStaticShape()) return failure();
+        if (!BSA.hasProperty(result)) return failure();
+
+        BandedSubMatrix analysisResult{ BSA.getProperty(result) };
+
+        auto resultType{ dyn_cast<RankedTensorType>(result.getType()) };
         if (!resultType) return failure();
 
         int64_t M = 0;
@@ -45,6 +83,150 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
 
         auto newType = RankedTensorType::get(dims, resultType.getElementType());
         result.setType(newType);
+        output.setType(newType);
+        if (auto emptyOp = output.getDefiningOp<tensor::EmptyOp>()) {
+            emptyOp.getResult().setType(newType);
+            emptyOp->setOperands({});
+        }
+        return success();
+    }
+
+    LogicalResult updateShape(dia::ElementwiseOp op, BandedStructureAnalysis& BSA) {
+        auto rank{ cast<RankedTensorType>(op.getOperand(0).getType()).getRank() };
+        int64_t N = cast<RankedTensorType>(op.getOperand(0).getType()).getDimSize(rank - 1);
+
+        auto result{ op.getResult() };
+        auto output{ op.getOutput() };
+        if (cast<RankedTensorType>(result.getType()).hasStaticShape()) return failure();
+        if (!BSA.hasProperty(result)) return failure();
+
+        BandedSubMatrix analysisResult{ BSA.getProperty(result) };
+
+        auto resultType{ dyn_cast<RankedTensorType>(result.getType()) };
+        if (!resultType) return failure();
+
+        int64_t M = 0;
+        if (!analysisResult.IsDia)
+            M = N;
+        else {
+            int64_t lC = static_cast<int64_t>(analysisResult.Property.UpperBandwidth);
+            int64_t uC = static_cast<int64_t>(analysisResult.Property.LowerBandwidth);
+            M = std::min(2 * N - 1, lC + uC + 1);
+        }
+
+        std::vector<int64_t> dims;
+        dims.reserve(resultType.getRank());
+        if (resultType.getRank() > 2) {
+            for (int64_t i = 0; i < resultType.getRank() - 2; ++i)
+                dims.push_back(resultType.getDimSize(i));
+        }
+        dims.push_back(M);
+        dims.push_back(N);
+
+        auto newType = RankedTensorType::get(dims, resultType.getElementType());
+        result.setType(newType);
+        output.setType(newType);
+        if (auto emptyOp = output.getDefiningOp<tensor::EmptyOp>()) {
+            emptyOp.getResult().setType(newType);
+            emptyOp->setOperands({});
+        }
+        return success();
+    }
+
+    LogicalResult updateShape(dia::TransposeOp op, BandedStructureAnalysis& BSA) {
+        auto rank{ cast<RankedTensorType>(op.getInput().getType()).getRank() };
+        int64_t N = cast<RankedTensorType>(op.getInput().getType()).getDimSize(rank - 1);
+
+        auto result{ op.getResult() };
+        auto output{ op.getOutput() };
+        if (cast<RankedTensorType>(result.getType()).hasStaticShape()) return failure();
+        if (!BSA.hasProperty(result)) return failure();
+
+        BandedSubMatrix analysisResult{ BSA.getProperty(result) };
+
+        auto resultType{ dyn_cast<RankedTensorType>(result.getType()) };
+        if (!resultType) return failure();
+
+        int64_t M = 0;
+        if (!analysisResult.IsDia)
+            M = N;
+        else {
+            int64_t lC = static_cast<int64_t>(analysisResult.Property.UpperBandwidth);
+            int64_t uC = static_cast<int64_t>(analysisResult.Property.LowerBandwidth);
+            M = std::min(2 * N - 1, lC + uC + 1);
+        }
+
+        std::vector<int64_t> dims;
+        dims.reserve(resultType.getRank());
+        if (resultType.getRank() > 2) {
+            for (int64_t i = 0; i < resultType.getRank() - 2; ++i)
+                dims.push_back(resultType.getDimSize(i));
+        }
+        dims.push_back(M);
+        dims.push_back(N);
+
+        auto newType = RankedTensorType::get(dims, resultType.getElementType());
+        result.setType(newType);
+        output.setType(newType);
+        if (auto emptyOp = output.getDefiningOp<tensor::EmptyOp>()) {
+            emptyOp.getResult().setType(newType);
+            emptyOp->setOperands({});
+        }
+        return success();
+    }
+
+    LogicalResult updateShape(arith::ConstantOp op, const BandedStructureAnalysis& BSA) {
+        auto oldType{ cast<RankedTensorType>(op.getResult().getType()) };
+        int64_t N = oldType.getShape().back();
+
+        auto result{ op.getResult() };
+        if (!BSA.hasProperty(result)) return failure();
+        BandedSubMatrix analysisResult{ BSA.getProperty(result) };
+        BandedSubMatrix originalMat{ BSA.getOriginalProperty(result) };
+        if (!analysisResult.IsDia) return failure();
+
+        auto oldAttr{ cast<ElementsAttr>(op.getValue()) };
+        auto oldValuesRange{ oldAttr.getValues<float>() };
+        llvm::SmallVector<float> oldValues(oldValuesRange.begin(), oldValuesRange.end());
+
+        auto newType{ cast<RankedTensorType>(op.getResult().getType()) };
+        llvm::SmallVector<float> newValues;
+
+        if (oldAttr.isSplat()) {
+            auto newAttr = DenseElementsAttr::get(newType, oldAttr.getSplatValue<float>());
+            op->setAttr("value", newAttr);
+            return failure();
+        }
+
+        newValues.resize(newType.getNumElements(), 0.0f);
+
+        auto oldL{ std::min(N - 1, static_cast<int64_t>(originalMat.Property.LowerBandwidth)) };
+        auto oldU{ std::min(N - 1, static_cast<int64_t>(originalMat.Property.UpperBandwidth)) };
+        auto newL{ std::min(N - 1, static_cast<int64_t>(analysisResult.Property.LowerBandwidth)) };
+        auto newU{ std::min(N - 1, static_cast<int64_t>(analysisResult.Property.UpperBandwidth)) };
+
+        auto oldDiags{ oldL + oldU + 1 };
+        auto newDiags{ newL + newU + 1 };
+
+        int64_t outerElements = oldType.getNumElements() / ((oldL + oldU + 1) * N);
+        for (int64_t b = 0; b < outerElements; ++b) {
+            int64_t oldBatchOffset = b * (oldL + oldU + 1) * N;
+            int64_t newBatchOffset = b * (newL + newU + 1) * N;
+
+            for (int64_t newRow = 0; newRow < newDiags; ++newRow) {
+                int64_t d = newRow - newL;
+                int64_t oldRow = d + oldL;
+                if (oldRow >= 0 && oldRow < oldDiags) {
+                    for (int64_t i = 0; i < N; ++i) {
+                        newValues[newBatchOffset + newRow * N + i] =
+                            oldValues[oldBatchOffset + oldRow * N + i];
+                    }
+                }
+            }
+        }
+
+        auto newAttr{ DenseElementsAttr::get(newType, llvm::ArrayRef<float>(newValues)) };
+        op->setAttr("value", newAttr);
         return success();
     }
 
@@ -102,90 +284,19 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
                   isa<RankedTensorType>(inst->getResult(0).getType())))
                 return;
 
-            auto result{ inst->getResult(0) };
-
-            Value output;
             if (auto matmulOp{ dyn_cast<dia::MatmulOp>(inst) }) {
-                int64_t N = cast<RankedTensorType>(inst->getOperand(1).getType()).getDimSize(1);
-                output = matmulOp.getOutput();
-                if (failed(updateShape(matmulOp.getResult(), N, BSA))) return;
+                if (failed(updateShape(matmulOp, BSA))) return;
             } else if (auto batchMatmulOp{ dyn_cast<dia::BatchMatmulOp>(inst) }) {
-                int64_t N = cast<RankedTensorType>(inst->getOperand(1).getType()).getDimSize(2);
-                output = batchMatmulOp.getOutput();
-                if (failed(updateShape(batchMatmulOp.getResult(), N, BSA))) return;
+                if (failed(updateShape(batchMatmulOp, BSA))) return;
             } else if (auto elementwiseOp{ dyn_cast<dia::ElementwiseOp>(inst) }) {
-                int64_t N = cast<RankedTensorType>(inst->getOperand(0).getType()).getDimSize(1);
-                output = elementwiseOp.getOutput();
-                if (failed(updateShape(elementwiseOp.getResult(), N, BSA))) return;
+                if (failed(updateShape(elementwiseOp, BSA))) return;
             } else if (auto transposeOp{ dyn_cast<dia::TransposeOp>(inst) }) {
-                int64_t N = cast<RankedTensorType>(inst->getOperand(0).getType()).getDimSize(1);
-                output = transposeOp.getOutput();
-                if (failed(updateShape(transposeOp.getResult(), N, BSA))) return;
+                if (failed(updateShape(transposeOp, BSA))) return;
             } else if (auto constantOp{ dyn_cast<arith::ConstantOp>(inst) }) {
-                auto oldType{ cast<RankedTensorType>(constantOp.getResult().getType()) };
-                int64_t N = oldType.getShape().back();
-                if (failed(updateShape(cast<TypedValue<RankedTensorType>>(constantOp.getResult()),
-                                       N, BSA))) {
-                    return;
-                }
+                if (failed(updateShape(constantOp, BSA))) return;
 
-                auto oldAttr{ cast<ElementsAttr>(constantOp.getValue()) };
-                auto oldValuesRange{ oldAttr.getValues<float>() };
-                llvm::SmallVector<float> oldValues(oldValuesRange.begin(), oldValuesRange.end());
-
-                auto newType{ cast<RankedTensorType>(constantOp.getResult().getType()) };
-                llvm::SmallVector<float> newValues;
-
-                if (oldAttr.isSplat()) {
-                    auto newAttr = DenseElementsAttr::get(newType, oldAttr.getSplatValue<float>());
-                    constantOp->setAttr("value", newAttr);
-                    return;
-                }
-
-                newValues.resize(newType.getNumElements(), 0.0f);
-
-                BandedSubMatrix analysisResult{ BSA.getProperty(result) };
-                BandedSubMatrix originalMat{ BSA.getOriginalProperty(result) };
-                auto oldL{ std::min(N - 1,
-                                    static_cast<int64_t>(originalMat.Property.LowerBandwidth)) };
-                auto oldU{ std::min(N - 1,
-                                    static_cast<int64_t>(originalMat.Property.UpperBandwidth)) };
-                auto newL{ std::min(N - 1,
-                                    static_cast<int64_t>(analysisResult.Property.LowerBandwidth)) };
-                auto newU{ std::min(N - 1,
-                                    static_cast<int64_t>(analysisResult.Property.UpperBandwidth)) };
-
-                auto oldDiags{ oldL + oldU + 1 };
-                auto newDiags{ newL + newU + 1 };
-
-                int64_t outerElements = oldType.getNumElements() / ((oldL + oldU + 1) * N);
-                for (int64_t b = 0; b < outerElements; ++b) {
-                    int64_t oldBatchOffset = b * (oldL + oldU + 1) * N;
-                    int64_t newBatchOffset = b * (newL + newU + 1) * N;
-
-                    for (int64_t newRow = 0; newRow < newDiags; ++newRow) {
-                        int64_t d = newRow - newL;
-                        int64_t oldRow = d + oldL;
-                        if (oldRow >= 0 && oldRow < oldDiags) {
-                            for (int64_t i = 0; i < N; ++i) {
-                                newValues[newBatchOffset + newRow * N + i] =
-                                    oldValues[oldBatchOffset + oldRow * N + i];
-                            }
-                        }
-                    }
-                }
-
-                auto newAttr{ DenseElementsAttr::get(newType, llvm::ArrayRef<float>(newValues)) };
-                constantOp->setAttr("value", newAttr);
-                return;
             } else {
                 return;
-            }
-
-            output.setType(cast<RankedTensorType>(result.getType()));
-            if (auto emptyOp = output.getDefiningOp<tensor::EmptyOp>()) {
-                emptyOp.getResult().setType(cast<RankedTensorType>(result.getType()));
-                emptyOp->setOperands({});
             }
         });
 

@@ -69,6 +69,10 @@ class BandedStructureAnalysis {
         return propertyMap.at(value);
     }
 
+    const BandedSubMatrix& getProperty(Value value) const {
+        return propertyMap.at(value);
+    }
+
     BandedSubMatrix getOriginalProperty(Value value) const {
         return originalPropertyMap.at(value);
     }
