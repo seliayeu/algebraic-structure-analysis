@@ -21,7 +21,6 @@ module {
                [ 0.0,  0.0, 12.0, 13.0, 14.0],
                [ 0.0,  0.0,  0.0, 15.0, 16.0]]> : tensor<5x5xf32>
 
-    // Updated for Row-Aligned: Lower bands are shifted to align with their row index
     %diaB = arith.constant {metadata = {dia = true, lowerBw = 2 : i64, upperBw = 1 : i64, propertyDims = [0, 1]}} 
         dense<[[ 0.0,  0.0,  6.0, 10.0, 14.0], // L2: 3 elements (rows 2, 3, 4)
                [ 0.0,  3.0,  7.0, 11.0, 15.0], // L1: 4 elements (rows 1, 2, 3, 4)

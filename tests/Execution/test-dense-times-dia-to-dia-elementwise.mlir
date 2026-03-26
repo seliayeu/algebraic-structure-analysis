@@ -1,4 +1,4 @@
-// RUN: %build/tools/alg-opt %s --banded-analysis="detect-dia=true" --banded-rewrite \
+// RUN: %build/tools/alg-opt %s --banded-analysis --banded-rewrite \
 // RUN:  --reconcile-unrealized-casts \
 // RUN:  --one-shot-bufferize="allow-return-allocs-from-loops=true bufferize-function-boundaries=true" \
 // RUN:  --convert-linalg-to-loops --convert-scf-to-cf --convert-cf-to-llvm \

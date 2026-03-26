@@ -53,6 +53,7 @@ struct BandedSubMatrix {
 
 class BandedStructureAnalysis {
     llvm::DenseMap<Value, BandedSubMatrix> propertyMap;
+    llvm::DenseMap<Value, BandedSubMatrix> originalPropertyMap;
     std::vector<Operation*> bwList;  // list of ops to perform bw prop on
 
     bool detectDIA{ false };
@@ -66,6 +67,14 @@ class BandedStructureAnalysis {
 
     BandedSubMatrix& getProperty(Value value) {
         return propertyMap.at(value);
+    }
+
+    const BandedSubMatrix& getProperty(Value value) const {
+        return propertyMap.at(value);
+    }
+
+    BandedSubMatrix getOriginalProperty(Value value) const {
+        return originalPropertyMap.at(value);
     }
 
     bool hasProperty(Value value) const {
