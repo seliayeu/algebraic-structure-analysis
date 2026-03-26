@@ -237,7 +237,7 @@ if __name__ == "__main__":
         ("chain_matmul_dense.mlir", None),
         ("chain_matmul_dense.mlir", "analysis", "rewrite"),
         ("chain_matmul_dia.mlir", "analysis", "rewrite"),
-        # ("chain_matmul_dia.mlir", "analysis-detect", "rewrite"),
+        ("chain_matmul_dia.mlir", "analysis-detect", "rewrite"),
     ]
 
     run(

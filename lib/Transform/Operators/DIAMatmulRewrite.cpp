@@ -701,6 +701,97 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         return success();
     }
 
+    LogicalResult diaTimesDenseToDenseBandedMatmulToSCF(dia::MatmulOp op, PatternRewriter& rewriter,
+                                                        const BandedSubMatrix& bandA,
+                                                        const BandedSubMatrix& bandB) const {
+        Location loc = op->getLoc();
+        Value A = op.getLhs();
+        Value B = op.getRhs();
+        Value C = op.getOutput();
+
+        auto resultType = cast<RankedTensorType>(C.getType());
+        const int64_t N = resultType.getDimSize(1);
+
+        Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
+        Value c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
+        Value cN = arith::ConstantIndexOp::create(rewriter, loc, N);
+        Value cLA = arith::ConstantIndexOp::create(rewriter, loc, bandA.Property.LowerBandwidth);
+        Value cUA = arith::ConstantIndexOp::create(rewriter, loc, bandA.Property.UpperBandwidth);
+        Value cLB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.LowerBandwidth);
+        Value cUB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.UpperBandwidth);
+        Value cLAi64 =
+            arith::ConstantIntOp::create(rewriter, loc, bandA.Property.LowerBandwidth, 64);
+
+        auto elementType = resultType.getElementType();
+        Value zero = arith::ConstantOp::create(rewriter, loc, elementType,
+                                               rewriter.getZeroAttr(elementType));
+        Value zeroedC =
+            linalg::FillOp::create(rewriter, loc, ValueRange{ zero }, ValueRange{ C }).getResult(0);
+
+        auto toIndex = [&](OpBuilder& b, Value v) {
+            return arith::IndexCastOp::create(b, loc, b.getIndexType(), v);
+        };
+        auto toI64 = [&](OpBuilder& b, Value v) {
+            return arith::IndexCastOp::create(b, loc, b.getI64Type(), v);
+        };
+
+        auto rowLoop = scf::ForOp::create(
+            rewriter, loc, c0, cN, c1, ValueRange{ zeroedC },
+            [&](OpBuilder& ob, Location loc, Value row, ValueRange rowArgs) {
+                Value cRow = rowArgs[0];
+                auto colLoop = scf::ForOp::create(
+                    ob, loc, c0, cN, c1, ValueRange{ cRow },
+                    [&](OpBuilder& cb, Location loc, Value col, ValueRange colArgs) {
+                        Value cCol = colArgs[0];
+
+                        // kstart = max(0, row - lA, col - uB)
+                        Value rowMinusLA = arith::SubIOp::create(cb, loc, row, cLA);
+                        Value colMinusUB = arith::SubIOp::create(cb, loc, col, cUB);
+                        Value ks0 = arith::MaxSIOp::create(cb, loc, c0, rowMinusLA);
+                        Value kstart = arith::MaxSIOp::create(cb, loc, ks0, colMinusUB);
+
+                        // kend = min(N, row + uA + 1, col + lB + 1)
+                        Value rowPlusUA1 = arith::AddIOp::create(
+                            cb, loc, arith::AddIOp::create(cb, loc, row, cUA), c1);
+                        Value colPlusLB1 = arith::AddIOp::create(
+                            cb, loc, arith::AddIOp::create(cb, loc, col, cLB), c1);
+                        Value ke0 = arith::MinSIOp::create(cb, loc, cN, rowPlusUA1);
+                        Value kend = arith::MinSIOp::create(cb, loc, ke0, colPlusLB1);
+
+                        auto kLoop = scf::ForOp::create(
+                            cb, loc, kstart, kend, c1, ValueRange{ cCol },
+                            [&](OpBuilder& kb, Location loc, Value k, ValueRange kArgs) {
+                                Value cK = kArgs[0];
+
+                                // d_A = (k - row) + lA
+                                Value kI64 = toI64(kb, k);
+                                Value rowI64 = toI64(kb, row);
+                                Value dA = toIndex(
+                                    kb, arith::AddIOp::create(
+                                            kb, loc, arith::SubIOp::create(kb, loc, kI64, rowI64),
+                                            cLAi64));
+
+                                Value aVal =
+                                    tensor::ExtractOp::create(kb, loc, A, ValueRange{ dA, row });
+                                Value bVal =
+                                    tensor::ExtractOp::create(kb, loc, B, ValueRange{ k, col });
+                                Value cVal =
+                                    tensor::ExtractOp::create(kb, loc, cK, ValueRange{ row, col });
+                                Value mul = arith::MulFOp::create(kb, loc, aVal, bVal);
+                                Value acc = arith::AddFOp::create(kb, loc, cVal, mul);
+                                Value updated = tensor::InsertOp::create(kb, loc, acc, cK,
+                                                                         ValueRange{ row, col });
+                                scf::YieldOp::create(kb, loc, ValueRange{ updated });
+                            });
+                        scf::YieldOp::create(cb, loc, kLoop.getResults());
+                    });
+                scf::YieldOp::create(ob, loc, colLoop.getResults());
+            });
+
+        if (auto metadata = op->getAttr("metadata")) rowLoop->setAttr("metadata", metadata);
+        rewriter.replaceOp(op, rowLoop.getResult(0));
+        return success();
+    }
     // The linalg pattern rewritter will figure out about the input bands.
     // This is way this function doesn't follow the name pattern.
     LogicalResult denseTimesDenseToDenseMatmulToLinalg(dia::MatmulOp op, PatternRewriter& rewriter,
@@ -722,15 +813,9 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         auto staticBType = RankedTensorType::get({ N, N }, elementType);
         auto staticCType = RankedTensorType::get({ N, N }, elementType);
 
-        Value castA = aType.isDynamicDim(0)
-                          ? tensor::CastOp::create(rewriter, loc, staticAType, A).getResult()
-                          : A;
-        Value castB = bType.isDynamicDim(0)
-                          ? tensor::CastOp::create(rewriter, loc, staticBType, B).getResult()
-                          : B;
-        Value castC = cType.isDynamicDim(0)
-                          ? tensor::CastOp::create(rewriter, loc, staticCType, C).getResult()
-                          : C;
+        Value castA = tensor::CastOp::create(rewriter, loc, staticAType, A).getResult();
+        Value castB = tensor::CastOp::create(rewriter, loc, staticBType, B).getResult();
+        Value castC = tensor::CastOp::create(rewriter, loc, staticCType, C).getResult();
         castA.getDefiningOp()->setAttr("metadata", bandA.toAttribute(rewriter));
         castB.getDefiningOp()->setAttr("metadata", bandB.toAttribute(rewriter));
 
@@ -791,11 +876,13 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                 return diaTimesDenseToDiaBandedMatmulToSCF(op, rewriter);
             } else if (!bandA.IsDia && !bandB.IsDia && resultBand.IsDia) {
                 return denseTimesDenseToDiaBandedMatmulToSCF(op, rewriter, resultBand);
+            } else if (bandA.IsDia && !bandB.IsDia && !resultBand.IsDia) {
+                // TODO: create a lowering in case a is diagonal
+                return diaTimesDenseToDenseBandedMatmulToSCF(op, rewriter, bandA, bandB);
             } else if (!bandA.IsDia && !bandB.IsDia && !resultBand.IsDia) {
                 // this op is already implemented in the linalg lowering.
                 return denseTimesDenseToDenseMatmulToLinalg(op, rewriter, bandA, bandB);
             }
-
             return diaTimesDiaToDiaBandedMatmulToSCF(op, rewriter, resultBand);
         }
     }
