@@ -701,11 +701,11 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         return success();
     }
 
-    LogicalResult denseTimesDenseToDenseBandedMatmulToLinalg(dia::MatmulOp op,
-                                                             PatternRewriter& rewriter,
-                                                             const BandedSubMatrix& bandA,
-                                                             const BandedSubMatrix& bandB,
-                                                             const BandedSubMatrix& bandC) const {
+    // The linalg pattern rewritter will figure out about the input bands.
+    // This is way this function doesn't follow the name pattern.
+    LogicalResult denseTimesDenseToDenseMatmulToLinalg(dia::MatmulOp op, PatternRewriter& rewriter,
+                                                       const BandedSubMatrix& bandA,
+                                                       const BandedSubMatrix& bandB) const {
         auto A = op.getLhs();
         auto B = op.getRhs();
         auto C = op.getOutput();
@@ -716,7 +716,7 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         auto cType = cast<RankedTensorType>(C.getType());
         auto elementType = aType.getElementType();
 
-        int64_t N = aType.getDimSize(1);
+        const int64_t N = aType.getDimSize(1);
 
         auto staticAType = RankedTensorType::get({ N, N }, elementType);
         auto staticBType = RankedTensorType::get({ N, N }, elementType);
@@ -731,8 +731,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         Value castC = cType.isDynamicDim(0)
                           ? tensor::CastOp::create(rewriter, loc, staticCType, C).getResult()
                           : C;
-        castA.getDefiningOp()->setAttr("metadata", bandA.toAttribute(rewriter));
-        castB.getDefiningOp()->setAttr("metadata", bandB.toAttribute(rewriter));
+        if (auto def = castA.getDefiningOp()) def->setAttr("metadata", bandA.toAttribute(rewriter));
+        if (auto def = castA.getDefiningOp()) def->setAttr("metadata", bandB.toAttribute(rewriter));
 
         auto newOp = linalg::MatmulOp::create(rewriter, loc, TypeRange{ staticCType },
                                               ValueRange{ castA, castB }, ValueRange{ castC });
@@ -775,6 +775,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                 return diaTimesDenseToDiaDiagMatmulToLinalg(op, rewriter);
             else if (!bandA.IsDia && bandB.IsDia)
                 return failure();
+            else if (!bandA.IsDia && !bandB.IsDia && !resultBand.IsDia)
+                return denseTimesDenseToDenseMatmulToLinalg(op, rewriter, bandA, bandB);
             // TODO: implement function below
             //  return denseTimesDiaToDiaDiagMatmulToLinalg(op, rewriter);
             else
@@ -791,8 +793,7 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                 return denseTimesDenseToDiaBandedMatmulToSCF(op, rewriter, resultBand);
             } else if (!bandA.IsDia && !bandB.IsDia && !resultBand.IsDia) {
                 // this op is already implemented in the linalg lowering.
-                return denseTimesDenseToDenseBandedMatmulToLinalg(op, rewriter, bandA, bandB,
-                                                                  resultBand);
+                return denseTimesDenseToDenseMatmulToLinalg(op, rewriter, bandA, bandB);
             }
 
             return diaTimesDiaToDiaBandedMatmulToSCF(op, rewriter, resultBand);

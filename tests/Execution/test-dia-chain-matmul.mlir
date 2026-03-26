@@ -7,8 +7,6 @@
 // RUN:  mlir-runner --shared-libs=%llvm_root/build/lib/libmlir_runner_utils.%lib_format > %t
 // RUN: FileCheck %s < %t
 
-// Chain matmul: I0(bw=2) * I1(bw=2) * I2(bw=2) * I3(bw=2)
-// Result is DIA tensor 9x5 (lowerBw=4+4=8, upperBw=4+4=8, clamped to N-1=4)
 // CHECK: Unranked Memref {{.*}} rank = 2 offset = 0 sizes = [9, 5]
 // CHECK: {{\[}}[0{{.*}}, 0{{.*}}, 0{{.*}}, 0{{.*}}, 27{{.*}}],
 // CHECK-NEXT: [0{{.*}}, 0{{.*}}, 0{{.*}}, 38{{.*}}, 38{{.*}}],

@@ -8,11 +8,11 @@
 // RUN: FileCheck %s < %t
 
 // CHECK: Unranked Memref {{.*}} rank = 2 offset = 0 sizes = [5, 5]
-// CHECK-NEXT: [32,   41,   47,   38,   27]
-// CHECK-NEXT: [41,   54,   63,   52,   38]
-// CHECK-NEXT: [47,   63,   75,   63,   47]
-// CHECK-NEXT: [38,   52,   63,   54,   41]
-// CHECK-NEXT: [27,   38,   47,   41,   32]
+// CHECK: {{\[}}[32{{.*}}, 41{{.*}}, 47{{.*}}, 38{{.*}}, 27{{.*}}],
+// CHECK-NEXT: [41{{.*}}, 54{{.*}}, 63{{.*}}, 52{{.*}}, 38{{.*}}],
+// CHECK-NEXT: [47{{.*}}, 63{{.*}}, 75{{.*}}, 63{{.*}}, 47{{.*}}],
+// CHECK-NEXT: [38{{.*}}, 52{{.*}}, 63{{.*}}, 54{{.*}}, 41{{.*}}],
+// CHECK-NEXT: [27{{.*}}, 38{{.*}}, 47{{.*}}, 41{{.*}}, 32{{.*}}]]
 module {
   func.func private @printMemrefF32(memref<*xf32>)
   func.func @main() -> f32 {
