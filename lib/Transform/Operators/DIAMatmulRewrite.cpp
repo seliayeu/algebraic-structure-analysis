@@ -722,15 +722,9 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         auto staticBType = RankedTensorType::get({ N, N }, elementType);
         auto staticCType = RankedTensorType::get({ N, N }, elementType);
 
-        Value castA = aType.isDynamicDim(0)
-                          ? tensor::CastOp::create(rewriter, loc, staticAType, A).getResult()
-                          : A;
-        Value castB = bType.isDynamicDim(0)
-                          ? tensor::CastOp::create(rewriter, loc, staticBType, B).getResult()
-                          : B;
-        Value castC = cType.isDynamicDim(0)
-                          ? tensor::CastOp::create(rewriter, loc, staticCType, C).getResult()
-                          : C;
+        Value castA = tensor::CastOp::create(rewriter, loc, staticAType, A).getResult();
+        Value castB = tensor::CastOp::create(rewriter, loc, staticBType, B).getResult();
+        Value castC = tensor::CastOp::create(rewriter, loc, staticCType, C).getResult();
         castA.getDefiningOp()->setAttr("metadata", bandA.toAttribute(rewriter));
         castB.getDefiningOp()->setAttr("metadata", bandB.toAttribute(rewriter));
 
