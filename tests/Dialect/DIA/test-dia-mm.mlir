@@ -20,14 +20,15 @@ module {
             [5.0, 6.0, 0.0, 0.0],
             [5.0, 0.0, 0.0, 0.0]]> : tensor<7x4xf32>
 
-    %0 = tensor.empty() : tensor<3x4xf32>
+    %01 = tensor.empty() : tensor<3x4xf32>
+    %02 = tensor.empty() : tensor<7x4xf32>
 
     %t1 = dia.matmul ins(%tridiag, %diag : tensor<3x4xf32>, tensor<1x4xf32>)
-                         outs(%0 : tensor<3x4xf32>)
+                         outs(%01 : tensor<3x4xf32>)
                          -> tensor<3x4xf32>
 
     %result = dia.matmul ins(%full, %t1: tensor<7x4xf32>, tensor<3x4xf32>)
-                         outs(%0 : tensor<3x4xf32>)
+                         outs(%02 : tensor<7x4xf32>)
                          -> tensor<7x4xf32>
   
     return %result : tensor<7x4xf32>
