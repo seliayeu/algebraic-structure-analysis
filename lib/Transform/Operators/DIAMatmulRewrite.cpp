@@ -731,8 +731,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         Value castC = cType.isDynamicDim(0)
                           ? tensor::CastOp::create(rewriter, loc, staticCType, C).getResult()
                           : C;
-        if (auto def = castA.getDefiningOp()) def->setAttr("metadata", bandA.toAttribute(rewriter));
-        if (auto def = castA.getDefiningOp()) def->setAttr("metadata", bandB.toAttribute(rewriter));
+        castA.getDefiningOp()->setAttr("metadata", bandA.toAttribute(rewriter));
+        castB.getDefiningOp()->setAttr("metadata", bandB.toAttribute(rewriter));
 
         auto newOp = linalg::MatmulOp::create(rewriter, loc, TypeRange{ staticCType },
                                               ValueRange{ castA, castB }, ValueRange{ castC });
