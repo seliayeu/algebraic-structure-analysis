@@ -22,14 +22,17 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
 
         BandedSubMatrix analysisResult{ BSA.getProperty(result) };
 
-        if (!analysisResult.IsDia) return failure();
-
         auto resultType = dyn_cast<RankedTensorType>(result.getType());
         if (!resultType) return failure();
 
-        int64_t lC = static_cast<int64_t>(analysisResult.Property.UpperBandwidth);
-        int64_t uC = static_cast<int64_t>(analysisResult.Property.LowerBandwidth);
-        int64_t numDiags = std::min(2 * N - 1, lC + uC + 1);
+        int64_t M = 0;
+        if (!analysisResult.IsDia)
+            M = N;
+        else {
+            int64_t lC = static_cast<int64_t>(analysisResult.Property.UpperBandwidth);
+            int64_t uC = static_cast<int64_t>(analysisResult.Property.LowerBandwidth);
+            M = std::min(2 * N - 1, lC + uC + 1);
+        }
 
         std::vector<int64_t> dims;
         dims.reserve(resultType.getRank());
@@ -37,7 +40,7 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
             for (int64_t i = 0; i < resultType.getRank() - 2; ++i)
                 dims.push_back(resultType.getDimSize(i));
         }
-        dims.push_back(numDiags);
+        dims.push_back(M);
         dims.push_back(N);
 
         auto newType = RankedTensorType::get(dims, resultType.getElementType());
@@ -58,7 +61,7 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
             auto results{ inst->getResults() };
             if (results.size() != 1 || !BSA.hasProperty(results[0])) return;
 
-            BandedSubMatrix analysisResult{ BSA.getProperty(results[0]) };
+            BandedSubMatrix& analysisResult{ BSA.getProperty(results[0]) };
             auto property{ analysisResult.Property };
             auto dims{ analysisResult.Dims };
 

@@ -1,5 +1,7 @@
 .cache/
+__pycache__/
 build/
+results/
 venv/
 env/
 tests/.lit_test_times.txt

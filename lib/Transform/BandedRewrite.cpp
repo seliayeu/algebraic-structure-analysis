@@ -273,6 +273,14 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
         Value lowerB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.LowerBandwidth);
         Value upperB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.UpperBandwidth);
 
+        // WARNING: CI was failing because of unitialized data. This fix it. Does it hurst dense
+        // performance?
+        auto elementType = resultType.getElementType();
+        Value zero = arith::ConstantOp::create(rewriter, loc, elementType,
+                                               rewriter.getZeroAttr(elementType));
+        Value zeroedC =
+            linalg::FillOp::create(rewriter, loc, ValueRange{ zero }, ValueRange{ C }).getResult(0);
+
         // C is the projection of the Minkowski sum of A and B bands.
         //----------------------------------------------------------
         // for i in [0, N)
@@ -280,7 +288,7 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
         //    for j in [max(i - La, k - Ub), min(i + Ua, k + Lb)]
         //        C[i,k] += A[i,j] * B[j,k]
         auto iLoop = scf::ForOp::create(
-            rewriter, loc, c0, dimN, c1, ValueRange{ C },
+            rewriter, loc, c0, dimN, c1, ValueRange{ zeroedC },
             [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
                 // C
                 Value cOut = iArgs[0];
