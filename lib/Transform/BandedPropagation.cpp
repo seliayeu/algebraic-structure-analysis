@@ -1,6 +1,7 @@
 #include "Transform/BandedPropagation.h"
 
 #include <cstdint>
+#include <iostream>
 #include <vector>
 
 #include "Analysis/BandedStructureAnalysis.h"
@@ -93,10 +94,12 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
 
         funcOp->walk([&](Operation* inst) {
             if (!dyn_cast<dia::MatmulOp>(inst) && !dyn_cast<dia::ElementwiseOp>(inst) &&
-                !dyn_cast<dia::BatchMatmulOp>(inst))
+                !dyn_cast<dia::BatchMatmulOp>(inst) && !dyn_cast<dia::TransposeOp>(inst) &&
+                !(dyn_cast<arith::ConstantOp>(inst) &&
+                  isa<RankedTensorType>(inst->getResult(0).getType())))
                 return;
+
             auto result{ inst->getResult(0) };
-            if (cast<RankedTensorType>(result.getType()).hasStaticShape()) return;
 
             Value output;
             if (auto matmulOp{ dyn_cast<dia::MatmulOp>(inst) }) {
@@ -111,6 +114,67 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
                 int64_t N = cast<RankedTensorType>(inst->getOperand(0).getType()).getDimSize(1);
                 output = elementwiseOp.getOutput();
                 if (failed(updateShape(elementwiseOp.getResult(), N, BSA))) return;
+            } else if (auto transposeOp{ dyn_cast<dia::TransposeOp>(inst) }) {
+                int64_t N = cast<RankedTensorType>(inst->getOperand(0).getType()).getDimSize(1);
+                output = transposeOp.getOutput();
+                if (failed(updateShape(transposeOp.getResult(), N, BSA))) return;
+            } else if (auto constantOp{ dyn_cast<arith::ConstantOp>(inst) }) {
+                auto oldType{ cast<RankedTensorType>(constantOp.getResult().getType()) };
+                int64_t N = oldType.getShape().back();
+                if (failed(updateShape(cast<TypedValue<RankedTensorType>>(constantOp.getResult()),
+                                       N, BSA))) {
+                    return;
+                }
+
+                auto oldAttr{ cast<ElementsAttr>(constantOp.getValue()) };
+                auto oldValuesRange{ oldAttr.getValues<float>() };
+                llvm::SmallVector<float> oldValues(oldValuesRange.begin(), oldValuesRange.end());
+
+                auto newType{ cast<RankedTensorType>(constantOp.getResult().getType()) };
+                llvm::SmallVector<float> newValues;
+
+                if (oldAttr.isSplat()) {
+                    auto newAttr = DenseElementsAttr::get(newType, oldAttr.getSplatValue<float>());
+                    constantOp->setAttr("value", newAttr);
+                    return;
+                }
+
+                newValues.resize(newType.getNumElements(), 0.0f);
+
+                BandedSubMatrix analysisResult{ BSA.getProperty(result) };
+                BandedSubMatrix originalMat{ BSA.getOriginalProperty(result) };
+                auto oldL{ std::min(N - 1,
+                                    static_cast<int64_t>(originalMat.Property.LowerBandwidth)) };
+                auto oldU{ std::min(N - 1,
+                                    static_cast<int64_t>(originalMat.Property.UpperBandwidth)) };
+                auto newL{ std::min(N - 1,
+                                    static_cast<int64_t>(analysisResult.Property.LowerBandwidth)) };
+                auto newU{ std::min(N - 1,
+                                    static_cast<int64_t>(analysisResult.Property.UpperBandwidth)) };
+
+                auto oldDiags{ oldL + oldU + 1 };
+                auto newDiags{ newL + newU + 1 };
+
+                int64_t outerElements = oldType.getNumElements() / ((oldL + oldU + 1) * N);
+                for (int64_t b = 0; b < outerElements; ++b) {
+                    int64_t oldBatchOffset = b * (oldL + oldU + 1) * N;
+                    int64_t newBatchOffset = b * (newL + newU + 1) * N;
+
+                    for (int64_t newRow = 0; newRow < newDiags; ++newRow) {
+                        int64_t d = newRow - newL;
+                        int64_t oldRow = d + oldL;
+                        if (oldRow >= 0 && oldRow < oldDiags) {
+                            for (int64_t i = 0; i < N; ++i) {
+                                newValues[newBatchOffset + newRow * N + i] =
+                                    oldValues[oldBatchOffset + oldRow * N + i];
+                            }
+                        }
+                    }
+                }
+
+                auto newAttr{ DenseElementsAttr::get(newType, llvm::ArrayRef<float>(newValues)) };
+                constantOp->setAttr("value", newAttr);
+                return;
             } else {
                 return;
             }

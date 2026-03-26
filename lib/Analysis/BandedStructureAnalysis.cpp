@@ -20,8 +20,11 @@ LogicalResult BandedStructureAnalysis::run(Block* block) {
         auto* parentOp{ block->getParentOp() };
         if (auto funcOp{ dyn_cast<func::FuncOp>(parentOp) })
             for (auto& arg : block->getArguments())
-                if (auto dict{ funcOp.getArgAttrDict(arg.getArgNumber()) })
-                    propertyMap[dyn_cast<Value>(arg)] = readPropertyFromDictAttr(dict);
+                if (auto dict{ funcOp.getArgAttrDict(arg.getArgNumber()) }) {
+                    auto prop{ readPropertyFromDictAttr(dict) };
+                    originalPropertyMap[dyn_cast<Value>(arg)] = prop;
+                    propertyMap[dyn_cast<Value>(arg)] = prop;
+                }
     }
 
     for (auto& op : block->getOperations())
@@ -35,11 +38,21 @@ LogicalResult BandedStructureAnalysis::runBackward() {
     while (!bwList.empty()) {
         auto* op{ bwList.back() };
         bwList.pop_back();
-        auto linalgOp{ dyn_cast<linalg::LinalgOp>(op) };
 
-        for (auto& v : linalgOp.getDpsInputs()) {
+        SmallVector<Value> inputs;
+        if (auto linalgOp{ dyn_cast<linalg::LinalgOp>(op) }) {
+            inputs = linalgOp.getDpsInputs();
+        } else if (auto diaOp{ dyn_cast<dia::ElementwiseOp>(op) }) {
+            inputs = diaOp.getInputs();
+        } else {
+            continue;  // emptyop or constant op: don't process
+        }
+
+        for (auto& v : inputs) {
             auto* definingOp{ v.getDefiningOp() };
-            if (isa<linalg::MatmulOp>(definingOp) || !isa<linalg::LinalgOp>(definingOp) ||
+            if (isa<linalg::MatmulOp>(definingOp) ||
+                !(isa<linalg::LinalgOp>(definingOp) || isa<dia::ElementwiseOp>(definingOp) ||
+                  isa<arith::ConstantOp>(definingOp) || isa<tensor::EmptyOp>(definingOp)) ||
                 !propagateBackward(v))
                 continue;
             bwList.push_back(definingOp);
@@ -61,7 +74,7 @@ bool BandedStructureAnalysis::propagateBackward(Value value) {
 
         auto resultValue{ op->getResult(0) };
         auto resMat{ propertyMap[resultValue] };
-        if (isa<linalg::TransposeOp>(op) &&
+        if ((isa<linalg::TransposeOp>(op) || isa<dia::TransposeOp>(op)) &&
             resMat.Property.LowerBandwidth != mat.Property.LowerBandwidth) {
             property = meet(property, BandedProperty{ resMat.Property.LowerBandwidth,
                                                       resMat.Property.UpperBandwidth });
@@ -128,7 +141,10 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
     if (!dict) dict = DictionaryAttr();
 
     auto result{ op->getResult(0) };
-    propertyMap[result] = readPropertyFromDictAttr(dict);
+    auto prop{ readPropertyFromDictAttr(dict) };
+
+    originalPropertyMap[result] = prop;
+    propertyMap[result] = prop;
 
     if (auto matmulOp{ dyn_cast<linalg::MatmulOp>(op) }) {
         return visitMatmul(&matmulOp);
@@ -152,6 +168,7 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
     } else if (auto diaBatchMatmulOp{ dyn_cast<dia::BatchMatmulOp>(op) }) {
         return visitDIABatchMatmul(&diaBatchMatmulOp);
     } else if (auto diaElementwiseOp{ dyn_cast<dia::ElementwiseOp>(op) }) {
+        if (diaElementwiseOp.getKind() == dia::ElementwiseKind::mul) bwList.push_back(op);
         return visitDIAElementwise(&diaElementwiseOp);
     } else if (auto diaTransposeOp{ dyn_cast<dia::TransposeOp>(op) }) {
         return visitTranspose(&diaTransposeOp);
