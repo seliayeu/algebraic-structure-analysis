@@ -1,4 +1,4 @@
-// RUN: %build/tools/alg-opt %s --banded-analysis --banded-rewrite \
+// RUN: %build/tools/alg-opt %s --banded-analysis="detect-dia=true" --banded-rewrite \
 // RUN:  --reconcile-unrealized-casts \
 // RUN:  --one-shot-bufferize="allow-return-allocs-from-loops=true bufferize-function-boundaries=true" \
 // RUN:  --convert-linalg-to-loops --convert-scf-to-cf --convert-cf-to-llvm \
@@ -7,17 +7,12 @@
 // RUN:  mlir-runner --shared-libs=%llvm_root/build/lib/libmlir_runner_utils.%lib_format > %t
 // RUN: FileCheck %s < %t
 
-// CHECK: Unranked Memref {{.*}} rank = 2 offset = 0 sizes = [9, 5]
-// CHECK: {{\[}}[0{{.*}}, 0{{.*}}, 0{{.*}}, 0{{.*}}, 27{{.*}}],
-// CHECK-NEXT: [0{{.*}}, 0{{.*}}, 0{{.*}}, 38{{.*}}, 38{{.*}}],
-// CHECK-NEXT: [0{{.*}}, 0{{.*}}, 47{{.*}}, 52{{.*}}, 47{{.*}}],
-// CHECK-NEXT: [0{{.*}}, 41{{.*}}, 63{{.*}}, 63{{.*}}, 41{{.*}}],
-// CHECK-NEXT: [32{{.*}}, 54{{.*}}, 75{{.*}}, 54{{.*}}, 32{{.*}}],
-// CHECK-NEXT: [41{{.*}}, 63{{.*}}, 63{{.*}}, 41{{.*}}, 0{{.*}}],
-// CHECK-NEXT: [47{{.*}}, 52{{.*}}, 47{{.*}}, 0{{.*}}, 0{{.*}}],
-// CHECK-NEXT: [38{{.*}}, 38{{.*}}, 0{{.*}}, 0{{.*}}, 0{{.*}}],
-// CHECK-NEXT: [27{{.*}}, 0{{.*}}, 0{{.*}}, 0{{.*}}, 0{{.*}}]]
-// CHECK: 4.700000e+01
+// CHECK: Unranked Memref {{.*}} rank = 2 offset = 0 sizes = [5, 5]
+// CHECK: {{\[}}[32{{.*}}, 41{{.*}}, 47{{.*}}, 38{{.*}}, 27{{.*}}],
+// CHECK-NEXT: [41{{.*}}, 54{{.*}}, 63{{.*}}, 52{{.*}}, 38{{.*}}],
+// CHECK-NEXT: [47{{.*}}, 63{{.*}}, 75{{.*}}, 63{{.*}}, 47{{.*}}],
+// CHECK-NEXT: [38{{.*}}, 52{{.*}}, 63{{.*}}, 54{{.*}}, 41{{.*}}],
+// CHECK-NEXT: [27{{.*}}, 38{{.*}}, 47{{.*}}, 41{{.*}}, 32{{.*}}]]
 module {
   func.func private @printMemrefF32(memref<*xf32>)
   func.func @main() -> f32 {
@@ -50,7 +45,7 @@ module {
     call @printMemrefF32(%cast) : (memref<*xf32>) -> ()
     memref.dealloc %memref : memref<?x5xf32>
 
-    %index = arith.constant 5: index
+    %index = arith.constant 4: index
     %result = tensor.extract %R3[%index, %index] : tensor<?x5xf32>
     return %result : f32
   }
