@@ -1410,6 +1410,7 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
         return success();
     }
 
+
     LogicalResult matchAndRewrite(dia::ElementwiseOp op, PatternRewriter& rewriter) const override {
         auto dict = op->getAttrDictionary();
         if (!dict) dict = DictionaryAttr();
@@ -1441,8 +1442,6 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
             bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
 
             // diagonal possible combinations
-            // if (opBandInfo.isDiagonal())
-            //     return failure();
             if (bandA.IsDia && bandB.IsDia && opBandInfo.IsDia)
                 return diaTimesDiaToDiaBandedElementwiseToSCF(op, rewriter, opBandInfo);
             else if (bandA.IsDia && bandB.IsDia && !opBandInfo.IsDia)
@@ -1470,11 +1469,7 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
             if (!dictA) return failure();
             bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
 
-            // diagonal possible combinations
-            if (opBandInfo.isDiagonal()) {
-                return failure();
-            } else
-                return diaToDiaBandedElementwiseToLinalg(op, rewriter, opBandInfo);
+            return diaToDiaBandedElementwiseToLinalg(op, rewriter, opBandInfo);
         } else
             return failure();
     }
