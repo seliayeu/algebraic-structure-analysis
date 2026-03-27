@@ -377,8 +377,9 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         return success();
     }
 
-    LogicalResult diaTimesDenseToDiaBandedMatmulToSCF(dia::MatmulOp op,
-                                                      PatternRewriter& rewriter) const {
+    LogicalResult diaTimesDenseToDiaBandedMatmulToSCF(dia::MatmulOp op, PatternRewriter& rewriter,
+                                                      const BandedSubMatrix& bandA,
+                                                      const BandedSubMatrix& bandB) const {
         Location loc = op->getLoc();
         Value A = op.getLhs();
         Value B = op.getRhs();
@@ -386,16 +387,6 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         auto resultType = cast<RankedTensorType>(C.getType());
         const int64_t N = cast<RankedTensorType>(B.getType()).getDimSize(1);
 
-        Operation* defOpA = A.getDefiningOp();
-        Operation* defOpB = B.getDefiningOp();
-
-        auto dictA = defOpA->getAttrDictionary();
-        auto dictB = defOpB->getAttrDictionary();
-
-        if (!dictA || !dictB) return failure();
-
-        const BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
-        const BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
         const uint64_t upperA = bandA.Property.UpperBandwidth;
         const uint64_t lowerA = bandA.Property.LowerBandwidth;
 
@@ -873,7 +864,7 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             if (bandA.IsDia && bandB.IsDia && !resultBand.IsDia && detectDIA) {
                 return diaTimesDiaToDenseBandedMatmulToSCF(op, rewriter);
             } else if (bandA.IsDia && !bandB.IsDia && resultBand.IsDia) {
-                return diaTimesDenseToDiaBandedMatmulToSCF(op, rewriter);
+                return diaTimesDenseToDiaBandedMatmulToSCF(op, rewriter, bandA, bandB);
             } else if (!bandA.IsDia && !bandB.IsDia && resultBand.IsDia) {
                 return denseTimesDenseToDiaBandedMatmulToSCF(op, rewriter, resultBand);
             } else if (bandA.IsDia && !bandB.IsDia && !resultBand.IsDia) {
