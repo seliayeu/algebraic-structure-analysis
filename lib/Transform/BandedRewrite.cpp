@@ -566,6 +566,7 @@ struct TransposePattern : public OpRewritePattern<linalg::TransposeOp> {
                     });
                 scf::YieldOp::create(ob, loc, jLoop.getResults());
             });
+        iLoop->setAttr("metadata", op->getAttr("metadata"));
         rewriter.replaceOp(op, iLoop.getResult(0));
         return success();
     }
