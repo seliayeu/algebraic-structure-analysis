@@ -1441,8 +1441,8 @@ struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
             bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
 
             // diagonal possible combinations
-            if (opBandInfo.isDiagonal())
-                return failure();
+            // if (opBandInfo.isDiagonal())
+            //     return failure();
             if (bandA.IsDia && bandB.IsDia && opBandInfo.IsDia)
                 return diaTimesDiaToDiaBandedElementwiseToSCF(op, rewriter, opBandInfo);
             else if (bandA.IsDia && bandB.IsDia && !opBandInfo.IsDia)
