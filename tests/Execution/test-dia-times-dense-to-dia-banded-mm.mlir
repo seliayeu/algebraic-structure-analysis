@@ -19,9 +19,9 @@ module {
     %dia = arith.constant {metadata = {dia = true, lowerBw = 0 : i64, upperBw = 0 : i64, propertyDims = [0, 1]}}
         dense<[[5.0, 2.0, 3.0]]> : tensor<1x3xf32>
     %dense = arith.constant {metadata = {lowerBw = 0 : i64, upperBw = 1 : i64, propertyDims = [0, 1]}}
-        dense<[[1.0, 1.0, 0.0],
-               [0.0, 2.0, 2.0],
-               [0.0, 0.0, 3.0]]> : tensor<3x3xf32>
+        dense<[[1.0, 1.0, 1.0],
+               [1.0, 2.0, 2.0],
+               [1.0, 1.0, 3.0]]> : tensor<3x3xf32>
     %1 = dia.matmul ins(%dia, %dense: tensor<1x3xf32>, tensor<3x3xf32>)
                     outs(%r0 : tensor<2x3xf32>) -> tensor<2x3xf32>
     %memref = memref.alloc() : memref<2x3xf32>
@@ -36,9 +36,9 @@ module {
     // CHECK-NEXT: [5{{.*}}, 4{{.*}}, 9{{.*}}]]
     %r1 = tensor.empty() : tensor<2x3xf32>
     %dense2 = arith.constant {metadata = {lowerBw = 1 : i64, upperBw = 0 : i64, propertyDims = [0, 1]}}
-        dense<[[1.0, 0.0, 0.0],
-               [1.0, 2.0, 0.0],
-               [0.0, 2.0, 3.0]]> : tensor<3x3xf32>
+        dense<[[1.0, 1.0, 1.0],
+               [1.0, 2.0, 1.0],
+               [1.0, 2.0, 3.0]]> : tensor<3x3xf32>
     %2 = dia.matmul ins(%dia, %dense2: tensor<1x3xf32>, tensor<3x3xf32>)
                     outs(%r1 : tensor<2x3xf32>) -> tensor<2x3xf32>
     %memref2 = memref.alloc() : memref<2x3xf32>

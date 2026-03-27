@@ -16,6 +16,7 @@
 // CHECK:     tensor.extract %{{.*}}[%[[I]], %[[J]]]
 // CHECK:     tensor.insert %{{.*}} into %[[JARG]][%[[J]], %[[I]]]
 // CHECK-NOT: linalg.transpose
+// CHECK: {metadata = {lowerBw = 3 : i64, propertyDims = [0, 1], upperBw = 0 : i64}}
 module {
   func.func @main() -> tensor<4x4xf32> {
     %0 = arith.constant {metadata = {upperBw = 3 : i64, lowerBw = 0 : i64, propertyDims = [0, 1]}}

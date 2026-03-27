@@ -47,7 +47,7 @@
 |`banded` | `matmul` | `dense,dense -> dia`| ✅ |
 |`banded` | `matmul` | `dia,dia -> dia`| ✅ |
 |`banded` |` matmul` | `dia,dia -> dense`| ✅ |
-|`banded` |` matmul` | `dia,dense -> dense`| - |
+|`banded` |` matmul` | `dia,dense -> dense`| ✅ |
 |`banded` |` matmul` | `dia,dense -> dia`| - |
 |`banded` |` matmul` | `dense,dia -> dia`| ✅ |
 |`banded` |` matmul` | `dense,dia -> dense`| - |
