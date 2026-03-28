@@ -16,7 +16,7 @@ func.func @kernel() -> f32 {
     %R3 = dia.matmul ins(%R2, %I3 : tensor<?x1024xf32>, tensor<1024x1024xf32>)
                       outs(%e2 : tensor<?x1024xf32>) -> tensor<?x1024xf32>
 
-    %index = arith.constant 5: index
+    %index = arith.constant 0: index
     %result = tensor.extract %R3[%index, %index] : tensor<?x1024xf32>
     return %result : f32
 }
