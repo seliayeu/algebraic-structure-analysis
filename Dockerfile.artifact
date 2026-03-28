@@ -99,5 +99,5 @@ ENV BUILD_PATH=/app/bpa/build
 
 WORKDIR /app/bpa
 
-ENTRYPOINT ["python3", "-u", "benchmarking/scripts/bench.py"]
+ENTRYPOINT ["python3", "-u", "benchmarking/scripts/artifact.py"]
 CMD []
