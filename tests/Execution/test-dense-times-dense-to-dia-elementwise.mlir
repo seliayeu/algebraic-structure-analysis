@@ -21,23 +21,23 @@ module {
                [ 0.0,  0.0,  4.0,  1.0,  2.0],
                [ 0.0,  0.0,  0.0,  4.0,  1.0]]> : tensor<5x5xf32>
 
-    %diaB = arith.constant {metadata = {dia = true, lowerBw = 2 : i64, upperBw = 1 : i64, propertyDims = [0, 1]}} 
-        dense<[[ 0.0, 0.0, 6.0, 10.0, 14.0], // L2
-               [ 0.0, 3.0,  7.0, 11.0, 15.0], // L1
-               [ 1.0,  4.0,  8.0, 12.0, 16.0], // M0
-               [ 2.0,  5.0,  9.0, 13.0,  0.0]]> : tensor<4x5xf32> // U1
-               
+    %denseB = arith.constant {metadata = {lowerBw = 2 : i64, upperBw = 1 : i64, propertyDims = [0, 1]}} 
+        dense<[[ 5.0,  6.0,  0.0,  0.0,  0.0],
+               [ 7.0,  5.0,  6.0,  0.0,  0.0],
+               [ 8.0,  7.0,  5.0,  6.0,  0.0],
+               [ 0.0,  8.0,  7.0,  5.0,  6.0],
+               [ 0.0,  0.0,  8.0,  7.0,  5.0]]> : tensor<5x5xf32>
 
     // CHECK:      Unranked Memref
     // CHECK-SAME: sizes = [5, 5]
     // CHECK-SAME: data =
-    // CHECK-NEXT: {{\[\[}}0, 0, 6, 10, 14],
-    // CHECK-NEXT:  [0, 7, 11, 15, 19],
-    // CHECK-NEXT:  [2, 5, 9, 13, 17],
-    // CHECK-NEXT:  [4, 7, 11, 15, 0],
+    // CHECK-NEXT: {{\[\[}}0, 0, 8, 8, 8],
+    // CHECK-NEXT:  [0, 11, 11, 11, 11],
+    // CHECK-NEXT:  [6, 6, 6, 6, 6],
+    // CHECK-NEXT:  [8, 8, 8, 8, 0],
     // CHECK-NEXT:  [3, 3, 3, 0, 0]]
-    %add_res = dia.elementwise kind = <add> ins(%denseA, %diaB : tensor<5x5xf32>, tensor<4x5xf32>) 
-                                            outs(%0 : tensor<5x5xf32>) -> tensor<5x5xf32>
+    %add_res = dia.elementwise kind = <add> ins(%denseA, %denseB : tensor<5x5xf32>, tensor<5x5xf32>) 
+                               outs(%0 : tensor<5x5xf32>) -> tensor<5x5xf32>
                                       
     %memref = memref.alloc() : memref<5x5xf32>
     bufferization.materialize_in_destination %add_res in %memref {writable} : (tensor<5x5xf32>, memref<5x5xf32>) -> ()
@@ -58,22 +58,23 @@ module {
                [ 0.0,  0.0,  4.0,  1.0,  2.0],
                [ 0.0,  0.0,  0.0,  4.0,  1.0]]> : tensor<5x5xf32>
 
-    %diaB = arith.constant {metadata = {dia = true, lowerBw = 2 : i64, upperBw = 1 : i64, propertyDims = [0, 1]}} 
-        dense<[[ 0.0, 0.0, 6.0, 10.0, 14.0], // L2
-               [ 0.0, 3.0,  7.0, 11.0, 15.0], // L1
-               [ 1.0,  4.0,  8.0, 12.0, 16.0], // M0
-               [ 2.0,  5.0,  9.0, 13.0,  0.0]]> : tensor<4x5xf32> // U1
+    %denseB = arith.constant {metadata = {lowerBw = 2 : i64, upperBw = 1 : i64, propertyDims = [0, 1]}} 
+        dense<[[ 5.0,  6.0,  0.0,  0.0,  0.0],
+               [ 7.0,  5.0,  6.0,  0.0,  0.0],
+               [ 8.0,  7.0,  5.0,  6.0,  0.0],
+               [ 0.0,  8.0,  7.0,  5.0,  6.0],
+               [ 0.0,  0.0,  8.0,  7.0,  5.0]]> : tensor<5x5xf32>
 
     // CHECK:      Unranked Memref
     // CHECK-SAME: sizes = [5, 5]
     // CHECK-SAME: data =
-    // CHECK-NEXT: {{\[\[}}0, 0, -6, -10, -14],
-    // CHECK-NEXT:  [0, 1, -3, -7, -11],
-    // CHECK-NEXT:  [0, -3, -7, -11, -15],
-    // CHECK-NEXT:  [0, -3, -7, -11, 0],
+    // CHECK-NEXT: {{\[\[}}0, 0, -8, -8, -8],
+    // CHECK-NEXT:  [0, -3, -3, -3, -3],
+    // CHECK-NEXT:  [-4, -4, -4, -4, -4],
+    // CHECK-NEXT:  [-4, -4, -4, -4, 0],
     // CHECK-NEXT:  [3, 3, 3, 0, 0]]
-    %sub_res = dia.elementwise kind = <sub> ins(%denseA, %diaB : tensor<5x5xf32>, tensor<4x5xf32>) 
-                                            outs(%0 : tensor<5x5xf32>) -> tensor<5x5xf32>
+    %sub_res = dia.elementwise kind = <sub> ins(%denseA, %denseB : tensor<5x5xf32>, tensor<5x5xf32>) 
+                               outs(%0 : tensor<5x5xf32>) -> tensor<5x5xf32>
                                       
     %memref = memref.alloc() : memref<5x5xf32>
     bufferization.materialize_in_destination %sub_res in %memref {writable} : (tensor<5x5xf32>, memref<5x5xf32>) -> ()
@@ -94,20 +95,21 @@ module {
                [ 0.0,  0.0,  4.0,  1.0,  2.0],
                [ 0.0,  0.0,  0.0,  4.0,  1.0]]> : tensor<5x5xf32>
 
-    %diaB = arith.constant {metadata = {dia = true, lowerBw = 2 : i64, upperBw = 1 : i64, propertyDims = [0, 1]}} 
-        dense<[[ 0.0, 0.0, 6.0, 10.0, 14.0], // L2
-               [ 0.0, 3.0,  7.0, 11.0, 15.0], // L1
-               [ 1.0,  4.0,  8.0, 12.0, 16.0], // M0
-               [ 2.0,  5.0,  9.0, 13.0,  0.0]]> : tensor<4x5xf32> // U1
+    %denseB = arith.constant {metadata = {lowerBw = 2 : i64, upperBw = 1 : i64, propertyDims = [0, 1]}} 
+        dense<[[ 5.0,  6.0,  0.0,  0.0,  0.0],
+               [ 7.0,  5.0,  6.0,  0.0,  0.0],
+               [ 8.0,  7.0,  5.0,  6.0,  0.0],
+               [ 0.0,  8.0,  7.0,  5.0,  6.0],
+               [ 0.0,  0.0,  8.0,  7.0,  5.0]]> : tensor<5x5xf32>
 
     // CHECK:      Unranked Memref
     // CHECK-SAME: sizes = [3, 5]
     // CHECK-SAME: data =
-    // CHECK-NEXT: {{\[\[}}0, 12, 28, 44, 60],
-    // CHECK-NEXT:  [1, 4, 8, 12, 16],
-    // CHECK-NEXT:  [4, 10, 18, 26, 0]]
-    %mul_res = dia.elementwise kind = <mul> ins(%denseA, %diaB : tensor<5x5xf32>, tensor<4x5xf32>) 
-                                            outs(%0 : tensor<3x5xf32>) -> tensor<3x5xf32>
+    // CHECK-NEXT: {{\[\[}}0, 28, 28, 28, 28],
+    // CHECK-NEXT:  [5, 5, 5, 5, 5],
+    // CHECK-NEXT:  [12, 12, 12, 12, 0]]
+    %mul_res = dia.elementwise kind = <mul> ins(%denseA, %denseB : tensor<5x5xf32>, tensor<5x5xf32>) 
+                               outs(%0 : tensor<3x5xf32>) -> tensor<3x5xf32>
                                       
     %memref = memref.alloc() : memref<3x5xf32>
     bufferization.materialize_in_destination %mul_res in %memref {writable} : (tensor<3x5xf32>, memref<3x5xf32>) -> ()

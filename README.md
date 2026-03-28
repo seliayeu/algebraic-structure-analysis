@@ -55,7 +55,7 @@
 |`banded` | `transposition` | `dia`| ✅ |
 |`banded` | `elementwise` | `dia -> dia`| ✅ |
 |`banded` | `elementwise` | `dense,dense -> dense`| ✅ |
-|`banded` | `elementwise` | `dense,dense -> dia`| - |
+|`banded` | `elementwise` | `dense,dense -> dia`| ✅ |
 |`banded` | `elementwise` | `dia,dia -> dia`| ✅ |
 |`banded` | `elementwise` | `dense,dia -> dia`| ✅ |
 |`banded` | `elementwise` | `dense,dia -> dense`| ✅ |
