@@ -89,7 +89,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libcairo2 \
     && rm -rf /var/lib/apt/lists/*
 
-
 COPY --from=mlir-builder /opt/mlir /opt/mlir
 COPY --from=bpa-builder  /app/bpa  /app/bpa
 
@@ -100,10 +99,11 @@ ENV PATH="/opt/mlir/bin:$PATH"
 # ---------------------------------------------------------------------------
 RUN python3 -m venv /venv \
     && /venv/bin/pip install --upgrade pip \
-    && /venv/bin/pip install -r /app/bpa/benchmarking/scripts/requirements.txt
+    && /venv/bin/pip install kaleido \
+    && /venv/bin/pip install -r /app/bpa/benchmarking/scripts/requirements.txt \
+    && /venv/bin/kaleido_get_chrome
 
 ENV PATH="/venv/bin:/opt/mlir/bin:$PATH"
-
 # ---------------------------------------------------------------------------
 # Runtime env
 # ---------------------------------------------------------------------------
