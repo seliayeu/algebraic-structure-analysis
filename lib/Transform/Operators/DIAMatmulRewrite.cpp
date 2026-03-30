@@ -761,7 +761,6 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                                     kb, arith::AddIOp::create(
                                             kb, loc, arith::SubIOp::create(kb, loc, kI64, rowI64),
                                             cLAi64));
-
                                 Value aVal =
                                     tensor::ExtractOp::create(kb, loc, A, ValueRange{ dA, row });
                                 Value bVal =
@@ -842,7 +841,6 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
 
         const BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
         const BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
-
         // diagonal possible combinations
         if (resultBand.isDiagonal()) {
             if (!bandA.IsDia && !bandB.IsDia)
@@ -873,8 +871,10 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             } else if (!bandA.IsDia && !bandB.IsDia && !resultBand.IsDia) {
                 // this op is already implemented in the linalg lowering.
                 return denseTimesDenseToDenseMatmulToLinalg(op, rewriter, bandA, bandB);
-            }
-            return diaTimesDiaToDiaBandedMatmulToSCF(op, rewriter, resultBand);
+            } else if (bandA.IsDia && bandB.IsDia && resultBand.IsDia) {
+                return diaTimesDiaToDiaBandedMatmulToSCF(op, rewriter, resultBand);
+            } else
+                return failure();
         }
     }
 
