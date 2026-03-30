@@ -162,22 +162,22 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
     } else if (auto genericOp{ dyn_cast<linalg::GenericOp>(op) }) {
         return visitGeneric(&genericOp);
     } else if (auto diaMatmulOp{ dyn_cast<dia::MatmulOp>(op) }) {
-        return visitMatmul(&diaMatmulOp);
+        return visitDIAMatmul(&diaMatmulOp);
     } else if (auto diaFromDenseOp{ dyn_cast<dia::FromDenseOp>(op) }) {
-        return visitFromDense(&diaFromDenseOp);
+        return visitDIAFromDense(&diaFromDenseOp);
     } else if (auto diaBatchMatmulOp{ dyn_cast<dia::BatchMatmulOp>(op) }) {
         return visitDIABatchMatmul(&diaBatchMatmulOp);
     } else if (auto diaElementwiseOp{ dyn_cast<dia::ElementwiseOp>(op) }) {
         if (diaElementwiseOp.getKind() == dia::ElementwiseKind::mul) bwList.push_back(op);
         return visitDIAElementwise(&diaElementwiseOp);
     } else if (auto diaTransposeOp{ dyn_cast<dia::TransposeOp>(op) }) {
-        return visitTranspose(&diaTransposeOp);
+        return visitDIATranspose(&diaTransposeOp);
     }
 
     return success();
 }
 
-LogicalResult BandedStructureAnalysis::visitFromDense(dia::FromDenseOp* op) {
+LogicalResult BandedStructureAnalysis::visitDIAFromDense(dia::FromDenseOp* op) {
     auto input = op->getInput();
     auto result = op->getResult();
 
@@ -188,7 +188,7 @@ LogicalResult BandedStructureAnalysis::visitFromDense(dia::FromDenseOp* op) {
     return success();
 }
 
-LogicalResult BandedStructureAnalysis::visitMatmul(dia::MatmulOp* op) {
+LogicalResult BandedStructureAnalysis::visitDIAMatmul(dia::MatmulOp* op) {
     auto lhs = op->getLhs();
     auto rhs = op->getRhs();
     auto result = op->getResult();
@@ -356,7 +356,7 @@ LogicalResult BandedStructureAnalysis::visitMul(linalg::MulOp* op) {
     return success();
 }
 
-LogicalResult BandedStructureAnalysis::visitTranspose(dia::TransposeOp* op) {
+LogicalResult BandedStructureAnalysis::visitDIATranspose(dia::TransposeOp* op) {
     auto input = op->getInput();
     auto result = op->getResult();
 
