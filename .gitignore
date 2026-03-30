@@ -7,3 +7,7 @@ env/
 tests/.lit_test_times.txt
 tests/*/Output/
 .DS_Store
+*.csv
+*.png
+*.html
+*.svg

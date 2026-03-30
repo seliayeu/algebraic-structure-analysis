@@ -298,19 +298,18 @@ def bandwidth_plot(
         col=1,
     )
 
+    image_output = csv_path.split(".csv")[0]
+    print(image_output)
     fig.write_html(
-        f"{output_prefix}.html",
+        f"{image_output}.html",
         config={
             "displayModeBar": True,
             "modeBarButtonsToAdd": ["drawline", "drawrect", "eraseshape"],
             "displaylogo": False,
         },
     )
-
-    fig.write_image(f"{output_prefix}.svg", width=1200, height=900, engine="kaleido")
-    fig.write_image(
-        f"{output_prefix}.png", width=1200, height=900, scale=2, engine="kaleido"
-    )
+    fig.write_image(f"{image_output}.svg", width=1200, height=900)
+    fig.write_image(f"{image_output}.png", width=1200, height=900, scale=2)
 
     fig.show()
 
