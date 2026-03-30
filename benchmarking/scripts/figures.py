@@ -298,8 +298,7 @@ def bandwidth_plot(
         col=1,
     )
 
-    image_output = csv_path.split(".csv")[0]
-    print(image_output)
+    image_output = str(csv_path).split(".csv")[0]
     fig.write_html(
         f"{image_output}.html",
         config={
