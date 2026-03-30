@@ -38,7 +38,7 @@ def kalman_filter():
     ]
 
     result_path = bench.run(
-        benchmark_name=kalman_filter,
+        benchmark_name=benchmark_name,
         program_dir="./benchmarking/programs",
         configs=configs,
         bandwidths=bandwidths,
