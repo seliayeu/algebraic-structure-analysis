@@ -54,8 +54,7 @@ FROM base AS bpa-builder
 COPY --from=mlir-builder /opt/mlir /opt/mlir
 
 RUN git clone https://github.com/seliayeu/algebraic-structure-analysis /app/bpa \
-    && cd /app/bpa \
-    && git checkout chain-benchmark
+    && cd /app/bpa 
 
 RUN cmake -G Ninja \
         -S /app/bpa \
