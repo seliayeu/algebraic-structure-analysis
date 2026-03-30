@@ -307,8 +307,10 @@ def bandwidth_plot(
         },
     )
 
-    # fig.write_image(f"{output_prefix}.svg", width=1200, height=900)
-    # fig.write_image(f"{output_prefix}.png", width=1200, height=900, scale=2)
+    fig.write_image(f"{output_prefix}.svg", width=1200, height=900, engine="kaleido")
+    fig.write_image(
+        f"{output_prefix}.png", width=1200, height=900, scale=2, engine="kaleido"
+    )
 
     fig.show()
 
