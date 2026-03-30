@@ -4,8 +4,10 @@ from plotly.subplots import make_subplots
 import kaleido
 
 
-def create_performance_plot(
-    csv_path="./results/chain_matmul.csv", output_prefix="chain_matmul"
+def bandwidth_plot(
+    csv_path="./results/chain_matmul.csv",
+    output_prefix="chain_matmul",
+    figure_title: str = "Chain Matmul",
 ):
     """
     Create performance analysis plot for chain matrix multiplication.
@@ -23,17 +25,21 @@ def create_performance_plot(
 
     baseline = df[df["config"] == "baseline"]
     ar_dense = df[
-        (df["config"] == "AR") & (df["file_name"] == "chain_matmul_dense.mlir")
+        (df["config"] == "AR") & (df["file_name"].str.contains("dense", na=False))
     ]
-    ar_dia = df[(df["config"] == "AR") & (df["file_name"] == "chain_matmul_dia.mlir")]
-    ard_dia = df[(df["config"] == "ADR") & (df["file_name"] == "chain_matmul_dia.mlir")]
+    ar_dia = df[
+        (df["config"] == "AR") & (df["file_name"].str.contains("dia", na=False))
+    ]
+    ard_dia = df[
+        (df["config"] == "ADR") & (df["file_name"].str.contains("dia", na=False))
+    ]
 
     fig = make_subplots(
         rows=2,
         cols=1,
         subplot_titles=(
-            "<b>Execution Time vs Bandwidth</b>",
-            "<b>Memory Footprint vs Bandwidth</b>",
+            "<b>Execution Time vs Bands</b>",
+            "<b>Memory Footprint vs Bands</b>",
         ),
         vertical_spacing=0.12,
         specs=[[{"type": "scatter"}], [{"type": "scatter"}]],
@@ -76,7 +82,7 @@ def create_performance_plot(
             .reindex(ar_dense["bw"])["avg_time_s"]
             .values
             / ar_dense["avg_time_s"].values,
-            hovertemplate="<b>bpa-dense</b><br>Bandwidth: %{x}<br>Time: %{y:.4f} seconds<br>Speedup: %{customdata:.1f}x<br><extra></extra>",
+            hovertemplate="<b>bpa-dense</b><br>Bands: %{x}<br>Time: %{y:.4f} seconds<br>Speedup: %{customdata:.1f}x<br><extra></extra>",
         ),
         row=1,
         col=1,
@@ -96,7 +102,7 @@ def create_performance_plot(
                 color="#06B6D4",
                 line=dict(color="white", width=1.5),
             ),
-            hovertemplate="<b>bpa-dia</b><br>Bandwidth: %{x}<br>Time: %{y:.4f} seconds<br><extra></extra>",
+            hovertemplate="<b>bpa-dia</b><br>Bands: %{x}<br>Time: %{y:.4f} seconds<br><extra></extra>",
         ),
         row=1,
         col=1,
@@ -116,7 +122,7 @@ def create_performance_plot(
                 color="#00b200",
                 line=dict(color="white", width=1.5),
             ),
-            hovertemplate="<b>bpa-hybrid</b><br>Bandwidth: %{x}<br>Time: %{y:.4f} seconds<br><extra></extra>",
+            hovertemplate="<b>bpa-hybrid</b><br>Bands: %{x}<br>Time: %{y:.4f} seconds<br><extra></extra>",
         ),
         row=1,
         col=1,
@@ -159,7 +165,7 @@ def create_performance_plot(
             ),
             fill="tozeroy",
             fillcolor="rgba(249, 115, 22, 0.1)",
-            hovertemplate="<b>bpa-dense</b><br>Bandwidth: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
+            hovertemplate="<b>bpa-dense</b><br>Bands: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
         ),
         row=2,
         col=1,
@@ -180,7 +186,7 @@ def create_performance_plot(
                 color="#06B6D4",
                 line=dict(color="white", width=1.5),
             ),
-            hovertemplate="<b>bpa-dia</b><br>Bandwidth: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
+            hovertemplate="<b>bpa-dia</b><br>Bands: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
         ),
         row=2,
         col=1,
@@ -201,7 +207,7 @@ def create_performance_plot(
                 color="#00b200",
                 line=dict(color="white", width=1.5),
             ),
-            hovertemplate="<b>bpa-hybrid</b><br>Bandwidth: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
+            hovertemplate="<b>bpa-hybrid</b><br>Bands: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
         ),
         row=2,
         col=1,
@@ -209,7 +215,7 @@ def create_performance_plot(
 
     fig.update_layout(
         title={
-            "text": "Chain Matrix Multiplication Performance Analysis",
+            "text": figure_title,
             "font": {
                 "size": 20,
                 "family": "Inter, Arial, sans-serif",
@@ -247,7 +253,7 @@ def create_performance_plot(
     )
 
     fig.update_xaxes(
-        title_text="<b>Bandwidth (bw)</b>",
+        title_text="<b>Bands (bw)</b>",
         title_font=dict(size=13, family="Inter, Arial, sans-serif"),
         tickfont=dict(size=11),
         gridcolor="#E2E8F0",
@@ -301,8 +307,8 @@ def create_performance_plot(
         },
     )
 
-    fig.write_image(f"{output_prefix}.svg", width=1200, height=900)
-    fig.write_image(f"{output_prefix}.png", width=1200, height=900, scale=2)
+    # fig.write_image(f"{output_prefix}.svg", width=1200, height=900)
+    # fig.write_image(f"{output_prefix}.png", width=1200, height=900, scale=2)
 
     fig.show()
 
@@ -312,4 +318,4 @@ def create_performance_plot(
 
 
 if __name__ == "__main__":
-    create_performance_plot()
+    bandwidth_plot()

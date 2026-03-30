@@ -1,7 +1,9 @@
+import figures
 import bench
 
 
 def chain_matmul():
+    benchmark_name = "chain_matmul"
     bandwidths = [512, 409, 307, 256, 204, 153, 102, 51, 0]
 
     configs = [
@@ -11,17 +13,21 @@ def chain_matmul():
         ("chain_matmul_dia.mlir", "analysis-detect", "rewrite"),
     ]
 
-    bench.run(
-        benchmark_name="chain_matmul",
+    result_path = bench.run(
+        benchmark_name=benchmark_name,
         program_dir="./benchmarking/programs",
         configs=configs,
         bandwidths=bandwidths,
         warmup=1,
         runs_count=5,
     )
+    figures.bandwidth_plot(
+        result_path, benchmark_name, "Chain Matrix Multiply Benchmark"
+    )
 
 
 def kalman_filter():
+    benchmark_name = "kalman_filter"
     bandwidths = [512, 409, 307, 256, 204, 153, 102, 51, 0]
 
     configs = [
@@ -31,14 +37,15 @@ def kalman_filter():
         ("kalman_filter_dia.mlir", "analysis-detect", "rewrite"),
     ]
 
-    bench.run(
-        benchmark_name="kalman_filter",
+    result_path = bench.run(
+        benchmark_name=kalman_filter,
         program_dir="./benchmarking/programs",
         configs=configs,
         bandwidths=bandwidths,
         warmup=1,
         runs_count=5,
     )
+    figures.bandwidth_plot(result_path, benchmark_name, "Kalman Filter Benchmark")
 
 
 if __name__ == "__main__":
