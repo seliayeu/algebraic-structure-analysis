@@ -1,10 +1,50 @@
 import platform
 from pathlib import Path
-
-import re
 import subprocess
 import csv
 from typing import List, Tuple
+import logging
+from datetime import datetime
+
+
+class CustomFormatter(logging.Formatter):
+    grey = "\x1b[38;20m"
+    yellow = "\x1b[33;20m"
+    red = "\x1b[31;20m"
+    green = "\x1b[32;20m"
+    cyan = "\x1b[36;20m"
+    blue = "\x1b[34;20m"
+    magenta = "\x1b[35;20m"
+    bold = "\x1b[1m"
+    reset = "\x1b[0m"
+
+    def format(self, record):
+        if record.levelno == logging.INFO:
+            self._style._fmt = f"{self.green}[%(asctime)s]{self.reset} {self.blue}%(message)s{self.reset}"
+        elif record.levelno == logging.WARNING:
+            self._style._fmt = (
+                f"{self.yellow}[%(asctime)s] WARNING: %(message)s{self.reset}"
+            )
+        elif record.levelno == logging.ERROR:
+            self._style._fmt = f"{self.red}[%(asctime)s] ERROR: %(message)s{self.reset}"
+        elif record.levelno == logging.DEBUG:
+            self._style._fmt = (
+                f"{self.grey}[%(asctime)s] DEBUG: %(message)s{self.reset}"
+            )
+        else:
+            self._style._fmt = f"[%(asctime)s] %(message)s"
+
+        self._style._fmt = f"{self.bold}[%(levelname)s]{self.reset} " + self._style._fmt
+        return super().format(record)
+
+
+logging.basicConfig(
+    level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%H:%M:%S"
+)
+logger = logging.getLogger(__name__)
+
+for handler in logger.handlers:
+    handler.setFormatter(CustomFormatter())
 
 BUILD_DIR = Path("./build")
 TMP_DIR = Path("/tmp/mlir_bench")
@@ -12,7 +52,7 @@ RESULT_DIR = Path("./results")
 
 
 def run_benchmark_full(exe_path: Path, warmup: int, runs: int):
-    print(f"    running {exe_path}")
+    logger.debug(f"Executing benchmark: {exe_path.name}")
     system = platform.system()
 
     if system == "Darwin":
@@ -23,14 +63,14 @@ def run_benchmark_full(exe_path: Path, warmup: int, runs: int):
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     if result.returncode != 0:
-        print(result.stdout)
-        print(result.stderr)
+        logger.error(f"Benchmark failed for {exe_path.name}")
+        logger.error(f"STDOUT: {result.stdout}")
+        logger.error(f"STDERR: {result.stderr}")
         raise RuntimeError("Benchmark failed")
 
     out_lines = result.stdout.splitlines()
     err_lines = result.stderr.splitlines()
 
-    # ---- parse benchmark output ----
     total = float(
         next(l for l in out_lines if "total time:" in l).split(":")[1].split()[0]
     )
@@ -41,7 +81,6 @@ def run_benchmark_full(exe_path: Path, warmup: int, runs: int):
         "avg_time_s": avg,
     }
 
-    # ---- parse system stats ----
     for line in err_lines:
         line = line.strip()
 
@@ -59,7 +98,7 @@ def run_benchmark_full(exe_path: Path, warmup: int, runs: int):
             elif "cycles elapsed" in line:
                 stats["cycles"] = int(line.split()[0])
 
-        else:  # Linux
+        else:
             if "Maximum resident set size" in line:
                 stats["max_rss_mb"] = int(line.split()[-1]) / 1024
             elif "User time (seconds)" in line:
@@ -79,14 +118,17 @@ def run_benchmark_full(exe_path: Path, warmup: int, runs: int):
             elif "Involuntary context switches" in line:
                 stats["invol_ctx_switches"] = int(line.split()[-1])
 
+    logger.debug(f"Benchmark completed: {exe_path.name} - Avg time: {avg:.4f}s")
     return stats
 
 
 def run_cmd(cmd, input_text=None):
+    logger.debug(f"Running command: {' '.join(cmd[:3])}...")
     result = subprocess.run(cmd, input=input_text, capture_output=True, text=True)
     if result.returncode != 0:
-        print(result.stdout)
-        print(result.stderr)
+        logger.error(f"Command failed: {' '.join(cmd)}")
+        logger.error(f"STDOUT: {result.stdout}")
+        logger.error(f"STDERR: {result.stderr}")
         raise RuntimeError(f"Command failed: {' '.join(cmd)}")
     return result.stdout
 
@@ -114,7 +156,7 @@ def build_pipeline_flags(cfg):
 
 
 def lower_to_llvm(mlir_file: Path, flags: List[str]):
-    print(f"    lowering {mlir_file} to llvm")
+    logger.info(f"Lowering {mlir_file.name} to LLVM")
     cmd = (
         [f"{BUILD_DIR}/tools/alg-opt", str(mlir_file)]
         + flags
@@ -138,7 +180,7 @@ def lower_to_llvm(mlir_file: Path, flags: List[str]):
 
 
 def compile_kernel(ll_path: Path, obj_path: Path):
-    print(f"    compiling {ll_path}")
+    logger.info(f"Compiling {ll_path.name}")
     run_cmd(
         [
             "llc",
@@ -153,7 +195,7 @@ def compile_kernel(ll_path: Path, obj_path: Path):
 
 
 def build_executable(obj_path: Path, exe_path: Path):
-    print(f"    building executable file {obj_path}")
+    logger.info(f"Building executable {exe_path.name}")
     run_cmd(
         [
             "clang++",
@@ -167,7 +209,7 @@ def build_executable(obj_path: Path, exe_path: Path):
 
 
 def run_benchmark(exe_path: Path, warmup: int, runs: int):
-    print(f"    running {exe_path} benchmark with {warmup} warmups and {runs} runs")
+    logger.info(f"Running {exe_path.name} (warmup={warmup}, runs={runs})")
     out = run_cmd([str(exe_path), str(warmup), str(runs)])
     lines = out.splitlines()
 
@@ -193,7 +235,11 @@ def run(
     bandwidths: List[int],
     warmup: int,
     runs_count: int,
-):
+) -> str:
+    logger.info("=" * 80)
+    logger.info(f"STARTING BENCHMARK: {benchmark_name}")
+    logger.info("=" * 80)
+
     TMP_DIR.mkdir(parents=True, exist_ok=True)
     RESULT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -201,13 +247,25 @@ def run(
     csv_path.write_text("")
     header_written = False
 
+    total_configs = len(configs) * len(bandwidths)
+    current = 0
+
     for cfg in configs:
         file_name = cfg[0]
         src = Path(program_dir) / file_name
         flags, tag = build_pipeline_flags(cfg)
 
+        logger.info("")
+        logger.info(f"CONFIGURATION: {tag}")
+        logger.info(f"   File: {file_name}")
+        logger.info(f"   Flags: {' '.join(flags) if flags else 'none'}")
+        logger.info("-" * 60)
+
         for bw in bandwidths:
-            print(f"[start] config: {cfg} bandwidth: {bw}")
+            current += 1
+            logger.info("")
+            logger.info(f"[{current}/{total_configs}] Testing: {tag} @ bandwidth={bw}")
+
             name = f"{file_name.replace('.mlir', '')}_{tag}_{bw}"
 
             mlir_file = TMP_DIR / f"{name}.mlir"
@@ -216,6 +274,7 @@ def run(
             exe_file = TMP_DIR / f"{name}.out"
 
             replace_bandwidth(src, mlir_file, bw)
+            logger.debug(f"   Generated MLIR: {mlir_file.name}")
 
             llvm_ir = lower_to_llvm(mlir_file, flags)
             ll_file.write_text(llvm_ir)
@@ -223,11 +282,23 @@ def run(
             compile_kernel(ll_file, obj_file)
             build_executable(obj_file, exe_file)
 
-            stats = run_benchmark_full(exe_file, warmup, runs_count)  # called once now
+            stats = run_benchmark_full(exe_file, warmup, runs_count)
 
             row = {"file_name": file_name, "config": tag, "bw": bw, **stats}
             write_csv_row(csv_path, row, write_header=not header_written)
             header_written = True
+
+            logger.info(
+                f"[{current}/{total_configs}] Completed: {tag} @ bw={bw} (avg={stats['avg_time_s']:.4f}s)"
+            )
+
+    logger.info("")
+    logger.info("=" * 80)
+    logger.info(f"BENCHMARK COMPLETED: {benchmark_name}")
+    logger.info(f"Results saved to: {csv_path}")
+    logger.info("=" * 80)
+
+    return csv_path
 
 
 if __name__ == "__main__":

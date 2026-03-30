@@ -13,8 +13,7 @@ inline bool shouldCompressResult(Operation& op, const BandedSubMatrix& resultBan
                                  const uint64_t N) {
     const bool isAlreadyDIA = resultBand.IsDia;
     auto dialect = op.getDialect();
-    const bool isDialectSupported =
-        (dialect && (dialect->getNamespace() == "linalg" || dialect->getNamespace() == "dia"));
+    const bool isDialectSupported = (dialect && (dialect->getNamespace() == "dia"));
     const bool isOverheadSmaller =
         (resultBand.Property.LowerBandwidth + resultBand.Property.UpperBandwidth) < N - 1;
     return isAlreadyDIA || (isDialectSupported && isOverheadSmaller);
