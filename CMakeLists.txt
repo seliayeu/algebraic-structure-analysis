@@ -28,6 +28,12 @@ include_directories(${PROJECT_BINARY_DIR})
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_BINARY_DIR}/include)
 
+option(ENABLE_BENCHMARKING "Enable benchmarking logs" OFF)
+
+if(ENABLE_BENCHMARKING)
+    add_compile_definitions(ENABLE_BENCHMARKING=1)
+endif()
+
 add_subdirectory(tools)
 add_subdirectory(lib)
 add_subdirectory(tests)
