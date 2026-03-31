@@ -248,3 +248,20 @@ if __name__ == "__main__":
         warmup=1,
         runs_count=1,
     )
+
+    bandwidths = [1024, 512, 409, 307, 256, 204, 153, 102, 51, 0]
+    configs_bert = [
+        ("bertlike_dia.mlir", "analysis", "rewrite"),
+        ("bertlike_dia.mlir", "analysis-detect", "rewrite"),
+        ("bertlike_dense.mlir", "analysis", "rewrite"),
+        ("bertlike_dense.mlir", "analysis-detect", "rewrite"),
+    ]
+
+    run(
+        benchmark_name="bertlike",
+        program_dir="./benchmarking/programs",
+        configs=configs_bert,
+        bandwidths=bandwidths,
+        warmup=1,
+        runs_count=1,
+    )
