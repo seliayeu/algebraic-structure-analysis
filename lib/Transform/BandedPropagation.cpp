@@ -231,6 +231,9 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
     }
 
     void runOnOperation() override {
+#ifdef ENABLE_BENCHMARKING
+        auto start{ std::chrono::high_resolution_clock::now() };
+#endif
         auto funcOp{ getOperation() };
         auto* context{ funcOp->getContext() };
         BandedStructureAnalysis BSA(detectDIA);
@@ -303,6 +306,12 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
         auto& result = getAnalysis<BandedAnalysisResult>();
         result.detectDIA = detectDIA;
         markAnalysesPreserved<BandedAnalysisResult>();
+#ifdef ENABLE_BENCHMARKING
+        auto end{ std::chrono::high_resolution_clock::now() };
+        llvm::errs() << "BandedAnalysis time: "
+                     << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+                     << " ms\n";
+#endif
     }
 };
 
