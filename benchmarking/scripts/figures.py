@@ -54,7 +54,7 @@ def bandwidth_plot(
             legendgroup="baseline",
             line=dict(color="#94A3B8", width=2.5, dash="solid"),
             marker=dict(
-                size=10,
+                size=9,
                 symbol="circle",
                 color="#94A3B8",
                 line=dict(color="white", width=1.5),
@@ -73,7 +73,7 @@ def bandwidth_plot(
             legendgroup="bpa-dense",
             line=dict(color="#F97316", width=3, shape="spline"),
             marker=dict(
-                size=12,
+                size=9,
                 symbol="diamond",
                 color="#F97316",
                 line=dict(color="white", width=1.5),
@@ -97,7 +97,7 @@ def bandwidth_plot(
             legendgroup="bpa-dia",
             line=dict(color="#06B6D4", width=3, shape="spline"),
             marker=dict(
-                size=12,
+                size=11,
                 symbol="triangle-up",
                 color="#06B6D4",
                 line=dict(color="white", width=1.5),
@@ -117,7 +117,7 @@ def bandwidth_plot(
             legendgroup="bpa-hybrid",
             line=dict(color="#00b200", width=3, shape="spline"),
             marker=dict(
-                size=12,
+                size=9,
                 symbol="square",
                 color="#00b200",
                 line=dict(color="white", width=1.5),
@@ -138,7 +138,7 @@ def bandwidth_plot(
             showlegend=False,
             line=dict(color="#94A3B8", width=2.5),
             marker=dict(
-                size=10,
+                size=9,
                 symbol="circle",
                 color="#94A3B8",
                 line=dict(color="white", width=1.5),
@@ -158,13 +158,13 @@ def bandwidth_plot(
             showlegend=False,
             line=dict(color="#F97316", width=3),
             marker=dict(
-                size=12,
+                size=9,
                 symbol="diamond",
                 color="#F97316",
                 line=dict(color="white", width=1.5),
             ),
-            fill="tozeroy",
-            fillcolor="rgba(249, 115, 22, 0.1)",
+            # fill="tozeroy",
+            # fillcolor="rgba(249, 115, 22, 0.1)",
             hovertemplate="<b>bpa-dense</b><br>Bands: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
         ),
         row=2,
@@ -181,7 +181,7 @@ def bandwidth_plot(
             showlegend=False,
             line=dict(color="#06B6D4", width=3),
             marker=dict(
-                size=12,
+                size=11,
                 symbol="triangle-up",
                 color="#06B6D4",
                 line=dict(color="white", width=1.5),
@@ -202,7 +202,7 @@ def bandwidth_plot(
             showlegend=False,
             line=dict(color="#00b200", width=3, shape="spline"),
             marker=dict(
-                size=12,
+                size=9,
                 symbol="square",
                 color="#00b200",
                 line=dict(color="white", width=1.5),
@@ -226,7 +226,6 @@ def bandwidth_plot(
         },
         showlegend=True,
         legend={
-            "title": {"text": "Configuration", "font": {"size": 12}},
             "orientation": "h",
             "yanchor": "top",
             "y": -0.12,
@@ -244,7 +243,7 @@ def bandwidth_plot(
             font_family="Inter, monospace",
             bordercolor="#CBD5E1",
         ),
-        width=1200,
+        width=900,
         height=900,
         template="plotly_white",
         margin=dict(t=100, l=80, r=60, b=120),
