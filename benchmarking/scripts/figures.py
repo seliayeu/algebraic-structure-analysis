@@ -311,7 +311,7 @@ def bandwidth_plot(
     fig.write_image(f"{image_output}.svg", width=1200, height=900)
     fig.write_image(f"{image_output}.png", width=1200, height=900, scale=2)
 
-    # fig.show()
+    fig.show()
 
     print(f"Saved: {output_prefix}.html, {output_prefix}.svg, {output_prefix}.png")
 
@@ -490,6 +490,6 @@ def compare_symbolic_chained(
     return fig
 
 if __name__ == "__main__":
-    # bandwidth_plot(csv_path="./results/chain_matmul.csv", output_prefix="chain_matmul", figure_title="Chain Matmul")
+    bandwidth_plot(csv_path="./results/chain_matmul.csv", output_prefix="chain_matmul", figure_title="Chain Matmul")
     # bandwidth_plot(csv_path="./results/bertlike.csv", output_prefix="bertlike", figure_title="BERT-like")
-    compare_symbolic_chained()
+    # compare_symbolic_chained()
