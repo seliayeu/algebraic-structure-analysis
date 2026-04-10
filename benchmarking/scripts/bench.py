@@ -324,8 +324,8 @@ if __name__ == "__main__":
     configs_bert = [
         ("bertlike_dia.mlir", "analysis", "rewrite"),
         ("bertlike_dia.mlir", "analysis-detect", "rewrite"),
+        ("bertlike_dense.mlir", None),
         ("bertlike_dense.mlir", "analysis", "rewrite"),
-        ("bertlike_dense.mlir", "analysis-detect", "rewrite"),
     ]
 
     run(
@@ -334,5 +334,5 @@ if __name__ == "__main__":
         configs=configs_bert,
         bandwidths=bandwidths,
         warmup=1,
-        runs_count=1,
+        runs_count=5,
     )

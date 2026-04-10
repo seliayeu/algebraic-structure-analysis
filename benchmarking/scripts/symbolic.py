@@ -73,7 +73,7 @@ def run_benchmark():
                     
                     try:
                         output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode()
-                        match = re.search(r"BandedAnalysis time: ([\d.]+) ms", output)
+                        match = re.search(r"BandedAnalysis time: ([\d.eE+-]+) ms", output)
                         
                         if match:
                             trials.append(float(match.group(1)))

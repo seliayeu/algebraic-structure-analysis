@@ -309,7 +309,9 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
 #ifdef ENABLE_BENCHMARKING
         auto end{ std::chrono::high_resolution_clock::now() };
         llvm::errs() << "BandedAnalysis time: "
-                     << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+                     << std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(end -
+                                                                                              start)
+                            .count()
                      << " ms\n";
 #endif
     }

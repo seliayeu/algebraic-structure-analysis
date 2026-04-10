@@ -408,20 +408,23 @@ def compare_symbolic_chained(
     results_dir="./results",
     output_prefix="symbolic_chained_comparison",
     figure_title: str = "Symbolic Analysis Time vs Number of Matmuls",
+    log = False,
 ):
     """
-    Create performance analysis plot comparing DIA, Linalg, and STUR
+    Create performance analysis plot comparing DIA, Linalg, STUR, and TeSA
     symbolic execution times for chained matmuls.
     """
 
     dia_path = os.path.join(results_dir, "symbolic_chained_dia.csv")
     linalg_path = os.path.join(results_dir, "symbolic_chained_linalg.csv")
     stur_path = os.path.join(results_dir, "symbolic_chained_stur.csv")
+    tesa_path = os.path.join(results_dir, "symbolic_chained_tesa.csv")
 
     try:
         df_dia = pd.read_csv(dia_path)
         df_linalg = pd.read_csv(linalg_path)
         df_stur = pd.read_csv(stur_path)
+        df_tesa = pd.read_csv(tesa_path)
     except FileNotFoundError as e:
         print(f"Error loading CSVs: {e}")
         return
@@ -429,6 +432,7 @@ def compare_symbolic_chained(
     df_dia["k"] = pd.to_numeric(df_dia["k"])
     df_linalg["k"] = pd.to_numeric(df_linalg["k"])
     df_stur["k"] = pd.to_numeric(df_stur["k"])
+    df_tesa["k"] = pd.to_numeric(df_tesa["k"])
 
     fig = go.Figure()
 
@@ -437,7 +441,7 @@ def compare_symbolic_chained(
             x=df_linalg["k"],
             y=df_linalg["avg_time_ms"],
             mode="lines+markers",
-            name="MLIR Linalg (Dense)",
+            name="BPA Linalg",
             legendgroup="linalg",
             line=dict(color="#94A3B8", width=2.5, dash="solid"),
             marker=dict(
@@ -446,7 +450,7 @@ def compare_symbolic_chained(
                 color="#94A3B8",
                 line=dict(color="white", width=1.5),
             ),
-            hovertemplate="<b>MLIR Linalg</b><br>K (Number of Matmuls): %{x}<br>Time: %{y:.2f} ms<br><extra></extra>",
+            hovertemplate="<b>BPA Linalg</b><br># Matmuls: %{x}<br>Time: %{y:.2f} ms<br><extra></extra>",
         )
     )
 
@@ -460,7 +464,7 @@ def compare_symbolic_chained(
             x=df_dia["k"],
             y=df_dia["avg_time_ms"],
             mode="lines+markers",
-            name="MLIR DIA (Banded)",
+            name="BPA DIA",
             legendgroup="dia",
             line=dict(color="#F97316", width=3, shape="spline"),
             marker=dict(
@@ -470,7 +474,7 @@ def compare_symbolic_chained(
                 line=dict(color="white", width=1.5),
             ),
             customdata=speedup_dia,
-            hovertemplate="<b>MLIR DIA</b><br>K (# Matmuls): %{x}<br>Time: %{y:.2f} ms<br>Speedup (vs Linalg): %{customdata:.1f}x<br><extra></extra>",
+            hovertemplate="<b>BPA DIA</b><br># Matmuls: %{x}<br>Time: %{y:.2f} ms<br>Speedup (vs Linalg): %{customdata:.1f}x<br><extra></extra>",
         )
     )
 
@@ -484,7 +488,7 @@ def compare_symbolic_chained(
             x=df_stur["k"],
             y=df_stur["avg_time_ms"],
             mode="lines+markers",
-            name="STUR (Scala)",
+            name="STUR",
             legendgroup="stur",
             line=dict(color="#06B6D4", width=3, shape="spline"),
             marker=dict(
@@ -494,7 +498,28 @@ def compare_symbolic_chained(
                 line=dict(color="white", width=1.5),
             ),
             customdata=speedup_stur,
-            hovertemplate="<b>STUR</b><br>K (# Matmuls): %{x}<br>Time: %{y:.2f} ms<br>Speedup (vs Linalg): %{customdata:.1f}x<br><extra></extra>",
+            hovertemplate="<b>STUR</b><br># Matmuls: %{x}<br>Time: %{y:.2f} ms<br>Speedup (vs Linalg): %{customdata:.1f}x<br><extra></extra>",
+        )
+    )
+
+    speedup_tesa = df_linalg.set_index("k").reindex(df_tesa["k"])["avg_time_ms"].values / df_tesa["avg_time_ms"].values
+
+    fig.add_trace(
+        go.Scatter(
+            x=df_tesa["k"],
+            y=df_tesa["avg_time_ms"],
+            mode="lines+markers",
+            name="TeSA (1024x1024)",
+            legendgroup="tesa",
+            line=dict(color="#8B5CF6", width=3, shape="spline"),  # Using Purple to distinguish from others
+            marker=dict(
+                size=12,
+                symbol="square",
+                color="#8B5CF6",
+                line=dict(color="white", width=1.5),
+            ),
+            customdata=speedup_tesa,
+            hovertemplate="<b>TeSA</b><br># Matmuls: %{x}<br>Time: %{y:.2f} ms<br>Speedup (vs Linalg): %{customdata:.1f}x<br><extra></extra>",
         )
     )
 
@@ -538,7 +563,7 @@ def compare_symbolic_chained(
     )
 
     fig.update_xaxes(
-        title_text="<b>Number of Matmuls (K)</b>",
+        title_text="<b>Number of Matmuls</b>",
         title_font=dict(size=13, family="Inter, Arial, sans-serif"),
         tickfont=dict(size=11),
         gridcolor="#E2E8F0",
@@ -562,6 +587,7 @@ def compare_symbolic_chained(
         showline=True,
         linecolor="#CBD5E1",
         linewidth=1,
+        type="log" if log else "linear",
         mirror=True,
     )
 
@@ -584,19 +610,6 @@ def compare_symbolic_chained(
 
 
 if __name__ == "__main__":
-    bandwidth_plot(
-        csv_path="./results/kalman_filter.csv",
-        output_prefix="kalman_filter",
-        figure_title="Kalman Filter",
-        show_title=False,
-        save_png_and_svg=True,
-    )
-    # bandwidth_plot(
-    #     csv_path="./results/chain_matmul.csv",
-    #     output_prefix="chain_matmul",
-    #     figure_title="Chain Matmul",
-    #     show_title=False,
-    #     save_png_and_svg=False,
-    # )
-    # bandwidth_plot(csv_path="./results/bertlike.csv", output_prefix="bertlike", figure_title="BERT-like")
-    # compare_symbolic_chained()
+    bandwidth_plot(csv_path="./results/chain_matmul.csv", output_prefix="chain_matmul", figure_title="Chain Matmul")
+    bandwidth_plot(csv_path="./results/bertlike.csv", output_prefix="bertlike", figure_title="BERT-like")
+    compare_symbolic_chained(log=True)
