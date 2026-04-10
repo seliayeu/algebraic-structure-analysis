@@ -139,12 +139,12 @@ def create_time_plot(
         width=700,
         height=500,
         template="plotly_white",
-        margin=dict(t=0, b=0, l=0, r=0),
+        margin=dict(t=0, b=0, l=0, r=20),
         plot_bgcolor="white",
     )
 
     fig.update_xaxes(
-        title_text="<b>Bands (bw)</b>",
+        title_text="<b>Bandwidth</b>",
         title_font=dict(size=13, family="Inter, Arial, sans-serif"),
         tickfont=dict(size=11),
         gridcolor="#E2E8F0",
@@ -323,12 +323,12 @@ def create_memory_plot(
         width=700,
         height=500,
         template="plotly_white",
-        margin=dict(t=0, b=0, l=0, r=0),
+        margin=dict(t=0, b=0, l=0, r=20),
         plot_bgcolor="white",
     )
 
     fig.update_xaxes(
-        title_text="<b>Bands (bw)</b>",
+        title_text="<b>Bandwidth</b>",
         title_font=dict(size=13, family="Inter, Arial, sans-serif"),
         tickfont=dict(size=11),
         gridcolor="#E2E8F0",
@@ -408,7 +408,7 @@ def compare_symbolic_chained(
     results_dir="./results",
     output_prefix="symbolic_chained_comparison",
     figure_title: str = "Symbolic Analysis Time vs Number of Matmuls",
-    log = False,
+    log=False,
 ):
     """
     Create performance analysis plot comparing DIA, Linalg, STUR, and TeSA
@@ -502,7 +502,10 @@ def compare_symbolic_chained(
         )
     )
 
-    speedup_tesa = df_linalg.set_index("k").reindex(df_tesa["k"])["avg_time_ms"].values / df_tesa["avg_time_ms"].values
+    speedup_tesa = (
+        df_linalg.set_index("k").reindex(df_tesa["k"])["avg_time_ms"].values
+        / df_tesa["avg_time_ms"].values
+    )
 
     fig.add_trace(
         go.Scatter(
@@ -511,7 +514,9 @@ def compare_symbolic_chained(
             mode="lines+markers",
             name="TeSA (1024x1024)",
             legendgroup="tesa",
-            line=dict(color="#8B5CF6", width=3, shape="spline"),  # Using Purple to distinguish from others
+            line=dict(
+                color="#8B5CF6", width=3, shape="spline"
+            ),  # Using Purple to distinguish from others
             marker=dict(
                 size=12,
                 symbol="square",
@@ -610,6 +615,15 @@ def compare_symbolic_chained(
 
 
 if __name__ == "__main__":
-    bandwidth_plot(csv_path="./results/chain_matmul.csv", output_prefix="chain_matmul", figure_title="Chain Matmul")
-    bandwidth_plot(csv_path="./results/bertlike.csv", output_prefix="bertlike", figure_title="BERT-like")
-    compare_symbolic_chained(log=True)
+    bandwidth_plot(
+        csv_path="./results/kalman_filter.csv",
+        output_prefix="kalman_filter",
+        figure_title="Kalman Filter",
+        show_title=False,
+    )
+    # bandwidth_plot(
+    #     csv_path="./results/bertlike.csv",
+    #     output_prefix="bertlike",
+    #     figure_title="BERT-like",
+    # )
+    # compare_symbolic_chained(log=True)
