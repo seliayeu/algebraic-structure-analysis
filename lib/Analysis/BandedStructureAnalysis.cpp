@@ -365,6 +365,7 @@ LogicalResult BandedStructureAnalysis::visitDIATranspose(dia::TransposeOp* op) {
     const BandedSubMatrix inputBand = propertyMap[input];
     const BandedProperty newProperty(inputBand.Property.LowerBandwidth,
                                      inputBand.Property.UpperBandwidth);
+    // doesn't currently support higher dims
     propertyMap[result] = BandedSubMatrix{ newProperty, { 0, 1 }, true };
 
     return success();

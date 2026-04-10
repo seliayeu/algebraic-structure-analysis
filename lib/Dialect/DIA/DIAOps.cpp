@@ -104,8 +104,10 @@ LogicalResult dia::ElementwiseOp::verify() {
     if (op2Type.isDynamicDim(1))
         return emitOpError("second operand column dimension must be static");
 
-    if (op1Type.getDimSize(1) != op2Type.getDimSize(1))
+    auto rank{ outputType.getRank() };
+    if (op1Type.getDimSize(rank - 1) != op2Type.getDimSize(rank - 1))
         return emitOpError("number of columns must match: first operand has ")
-               << op1Type.getDimSize(1) << " but second oeprand has " << op2Type.getDimSize(1);
+               << op1Type.getDimSize(rank - 1) << " but second oeprand has "
+               << op2Type.getDimSize(rank - 1);
     return success();
 }
