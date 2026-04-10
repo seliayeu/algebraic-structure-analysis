@@ -705,6 +705,40 @@ struct DIABatchMatMulPattern : public OpRewritePattern<dia::BatchMatmulOp> {
         return success();
     }
 
+    LogicalResult denseTimesDenseToDenseBatchMatmulToLinalg(dia::BatchMatmulOp op,
+                                                            PatternRewriter& rewriter,
+                                                            const BandedSubMatrix& bandA,
+                                                            const BandedSubMatrix& bandB) const {
+        auto A = op.getLhs();
+        auto B = op.getRhs();
+        auto C = op.getOutput();
+        auto loc = op->getLoc();
+
+        auto aType = cast<RankedTensorType>(A.getType());
+        auto bType = cast<RankedTensorType>(B.getType());
+        auto cType = cast<RankedTensorType>(C.getType());
+        auto elementType = aType.getElementType();
+
+        auto staticAType = RankedTensorType::get(aType.getShape(), elementType);
+        auto staticBType = RankedTensorType::get(bType.getShape(), elementType);
+        auto staticCType = RankedTensorType::get(cType.getShape(), elementType);
+
+        Value castA = tensor::CastOp::create(rewriter, loc, staticAType, A).getResult();
+        Value castB = tensor::CastOp::create(rewriter, loc, staticBType, B).getResult();
+        Value castC = tensor::CastOp::create(rewriter, loc, staticCType, C).getResult();
+
+        castA.getDefiningOp()->setAttr("metadata", bandA.toAttribute(rewriter));
+        castB.getDefiningOp()->setAttr("metadata", bandB.toAttribute(rewriter));
+
+        auto newOp = linalg::BatchMatmulOp::create(rewriter, loc, TypeRange{ staticCType },
+                                                   ValueRange{ castA, castB }, ValueRange{ castC });
+
+        if (auto metadata = op->getAttr("metadata")) newOp->setAttr("metadata", metadata);
+
+        rewriter.replaceOp(op, newOp);
+        return success();
+    }
+
     LogicalResult matchAndRewrite(dia::BatchMatmulOp op, PatternRewriter& rewriter) const override {
         auto dict = op->getAttrDictionary();
         if (!dict) dict = DictionaryAttr();
@@ -734,6 +768,8 @@ struct DIABatchMatMulPattern : public OpRewritePattern<dia::BatchMatmulOp> {
             return denseTimesDiaToDenseBandedBatchMatmulToSCF(op, rewriter, bandA, bandB);
         } else if (bandA.IsDia && !bandB.IsDia && opBandInfo.IsDia) {
             return diaTimesDenseToDiaBandedBatchMatmulToSCF(op, rewriter, bandA, bandB);
+        } else if (!bandA.IsDia && !bandB.IsDia && !opBandInfo.IsDia) {
+            return denseTimesDenseToDenseBatchMatmulToLinalg(op, rewriter, bandA, bandB);
         } else
             return diaTimesDiaToDiaBandedBatchMatmulToSCF(op, rewriter, opBandInfo);
     }
