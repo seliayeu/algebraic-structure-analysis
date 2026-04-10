@@ -118,10 +118,63 @@ module {
     return
   }
 
+  func.func @test_batch() {
+    %0 = tensor.empty() : tensor<2x5x5xf32>
+    
+    // Batch 0: Original values. Batch 1: Original values * 2.
+    // Note: propertyDims updated to [1, 2] to account for the leading batch dimension.
+    %denseA = arith.constant {metadata = {lowerBw = 1 : i64, upperBw = 2 : i64, propertyDims = [1, 2]}} 
+        dense<[[[ 1.0,  2.0,  3.0,  0.0,  0.0],
+                [ 4.0,  1.0,  2.0,  3.0,  0.0],
+                [ 0.0,  4.0,  1.0,  2.0,  3.0],
+                [ 0.0,  0.0,  4.0,  1.0,  2.0],
+                [ 0.0,  0.0,  0.0,  4.0,  1.0]],
+               [[ 2.0,  4.0,  6.0,  0.0,  0.0],
+                [ 8.0,  2.0,  4.0,  6.0,  0.0],
+                [ 0.0,  8.0,  2.0,  4.0,  6.0],
+                [ 0.0,  0.0,  8.0,  2.0,  4.0],
+                [ 0.0,  0.0,  0.0,  8.0,  2.0]]]> : tensor<2x5x5xf32>
+
+    %diaB = arith.constant {metadata = {dia = true, lowerBw = 2 : i64, upperBw = 1 : i64, propertyDims = [1, 2]}} 
+        dense<[[[ 0.0,  0.0,  6.0, 10.0, 14.0],
+                [ 0.0,  3.0,  7.0, 11.0, 15.0],
+                [ 1.0,  4.0,  8.0, 12.0, 16.0],
+                [ 2.0,  5.0,  9.0, 13.0,  0.0]],
+               [[ 0.0,  0.0, 12.0, 20.0, 28.0],
+                [ 0.0,  6.0, 14.0, 22.0, 30.0],
+                [ 2.0,  8.0, 16.0, 24.0, 32.0],
+                [ 4.0, 10.0, 18.0, 26.0,  0.0]]]> : tensor<2x4x5xf32>
+
+    // CHECK:      Unranked Memref
+    // CHECK-SAME: sizes = [2, 5, 5]
+    // CHECK-SAME: data =
+    // CHECK-NEXT: {{\[\[\[}}0, 0, 6, 10, 14],
+    // CHECK-NEXT:  [0, 7, 11, 15, 19],
+    // CHECK-NEXT:  [2, 5, 9, 13, 17],
+    // CHECK-NEXT:  [4, 7, 11, 15, 0],
+    // CHECK-NEXT:  [3, 3, 3, 0, 0]],
+    // CHECK-NEXT:  {{\[\[}}0, 0, 12, 20, 28],
+    // CHECK-NEXT:  [0, 14, 22, 30, 38],
+    // CHECK-NEXT:  [4, 10, 18, 26, 34],
+    // CHECK-NEXT:  [8, 14, 22, 30, 0],
+    // CHECK-NEXT:  [6, 6, 6, 0, 0]]]
+    %add_res = dia.elementwise kind = <add> ins(%denseA, %diaB : tensor<2x5x5xf32>, tensor<2x4x5xf32>) 
+                               outs(%0 : tensor<2x5x5xf32>) -> tensor<2x5x5xf32>
+                                      
+    %memref_add = memref.alloc() : memref<2x5x5xf32>
+    bufferization.materialize_in_destination %add_res in %memref_add {writable} : (tensor<2x5x5xf32>, memref<2x5x5xf32>) -> ()
+    %cast_add = memref.cast %memref_add : memref<2x5x5xf32> to memref<*xf32>
+    call @printMemrefF32(%cast_add) : (memref<*xf32>) -> ()
+    memref.dealloc %memref_add : memref<2x5x5xf32>
+
+    return
+  }
+
   func.func @main() {
     call @test_add() : () -> ()
     call @test_sub() : () -> ()
     call @test_mul() : () -> ()
+    call @test_batch() : () -> ()
     return
   }
 }
