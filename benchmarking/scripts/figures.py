@@ -1,28 +1,23 @@
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import kaleido
 import os
 
 
-def bandwidth_plot(
+def create_time_plot(
     csv_path="./results/chain_matmul.csv",
-    output_prefix="chain_matmul",
-    figure_title: str = "Chain Matmul",
+    output_prefix="chain_matmul_time",
+    figure_title: str = "Chain Matmul - Execution Time",
+    show_title: bool = True,
 ):
     """
-    Create performance analysis plot for chain matrix multiplication.
-
-    Parameters:
-    -----------
-    csv_path : str
-        Path to the CSV file containing the data
-    output_prefix : str
-        Prefix for output files (will create {prefix}.html and {prefix}.svg)
+    Create execution time plot for chain matrix multiplication.
     """
-
     df = pd.read_csv(csv_path)
     df["bw"] = pd.to_numeric(df["bw"])
+
+    max_bw = df["bw"].max()
+    x_max = max_bw + 10
 
     baseline = df[df["config"] == "baseline"]
     ar_dense = df[
@@ -34,17 +29,8 @@ def bandwidth_plot(
     ard_dia = df[
         (df["config"] == "ADR") & (df["file_name"].str.contains("dia", na=False))
     ]
-
-    fig = make_subplots(
-        rows=2,
-        cols=1,
-        subplot_titles=(
-            "<b>Execution Time vs Bands</b>",
-            "<b>Memory Footprint vs Bands</b>",
-        ),
-        vertical_spacing=0.12,
-        specs=[[{"type": "scatter"}], [{"type": "scatter"}]],
-    )
+    x_range = [-10, x_max]
+    fig = go.Figure()
 
     fig.add_trace(
         go.Scatter(
@@ -53,16 +39,14 @@ def bandwidth_plot(
             mode="lines+markers",
             name="baseline",
             legendgroup="baseline",
-            line=dict(color="#94A3B8", width=2.5, dash="solid"),
+            line=dict(color="#94A3B8", width=2, dash="solid"),
             marker=dict(
-                size=9,
+                size=6,
                 symbol="circle",
                 color="#94A3B8",
                 line=dict(color="white", width=1.5),
             ),
-        ),
-        row=1,
-        col=1,
+        )
     )
 
     fig.add_trace(
@@ -72,9 +56,9 @@ def bandwidth_plot(
             mode="lines+markers",
             name="bpa-dense",
             legendgroup="bpa-dense",
-            line=dict(color="#F97316", width=3, shape="spline"),
+            line=dict(color="#F97316", width=2, shape="spline"),
             marker=dict(
-                size=9,
+                size=6,
                 symbol="diamond",
                 color="#F97316",
                 line=dict(color="white", width=1.5),
@@ -84,9 +68,7 @@ def bandwidth_plot(
             .values
             / ar_dense["avg_time_s"].values,
             hovertemplate="<b>bpa-dense</b><br>Bands: %{x}<br>Time: %{y:.4f} seconds<br>Speedup: %{customdata:.1f}x<br><extra></extra>",
-        ),
-        row=1,
-        col=1,
+        )
     )
 
     fig.add_trace(
@@ -96,17 +78,15 @@ def bandwidth_plot(
             mode="lines+markers",
             name="bpa-dia",
             legendgroup="bpa-dia",
-            line=dict(color="#06B6D4", width=3, shape="spline"),
+            line=dict(color="#06B6D4", width=2, shape="spline"),
             marker=dict(
-                size=11,
+                size=9,
                 symbol="triangle-up",
                 color="#06B6D4",
                 line=dict(color="white", width=1.5),
             ),
             hovertemplate="<b>bpa-dia</b><br>Bands: %{x}<br>Time: %{y:.4f} seconds<br><extra></extra>",
-        ),
-        row=1,
-        col=1,
+        )
     )
 
     fig.add_trace(
@@ -116,107 +96,20 @@ def bandwidth_plot(
             mode="lines+markers",
             name="bpa-hybrid",
             legendgroup="bpa-hybrid",
-            line=dict(color="#00b200", width=3, shape="spline"),
+            line=dict(color="#00b200", width=2, shape="spline"),
             marker=dict(
-                size=9,
+                size=6,
                 symbol="square",
                 color="#00b200",
                 line=dict(color="white", width=1.5),
             ),
             hovertemplate="<b>bpa-hybrid</b><br>Bands: %{x}<br>Time: %{y:.4f} seconds<br><extra></extra>",
-        ),
-        row=1,
-        col=1,
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=baseline["bw"],
-            y=baseline["max_rss_mb"],
-            mode="lines+markers",
-            name="baseline",
-            legendgroup="baseline",
-            showlegend=False,
-            line=dict(color="#94A3B8", width=2.5),
-            marker=dict(
-                size=9,
-                symbol="circle",
-                color="#94A3B8",
-                line=dict(color="white", width=1.5),
-            ),
-        ),
-        row=2,
-        col=1,
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=ar_dense["bw"],
-            y=ar_dense["max_rss_mb"],
-            mode="lines+markers",
-            name="bpa-dense",
-            legendgroup="bpa-dense",
-            showlegend=False,
-            line=dict(color="#F97316", width=3),
-            marker=dict(
-                size=9,
-                symbol="diamond",
-                color="#F97316",
-                line=dict(color="white", width=1.5),
-            ),
-            # fill="tozeroy",
-            # fillcolor="rgba(249, 115, 22, 0.1)",
-            hovertemplate="<b>bpa-dense</b><br>Bands: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
-        ),
-        row=2,
-        col=1,
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=ar_dia["bw"],
-            y=ar_dia["max_rss_mb"],
-            mode="lines+markers",
-            name="bpa-dia",
-            legendgroup="bpa-dia",
-            showlegend=False,
-            line=dict(color="#06B6D4", width=3),
-            marker=dict(
-                size=11,
-                symbol="triangle-up",
-                color="#06B6D4",
-                line=dict(color="white", width=1.5),
-            ),
-            hovertemplate="<b>bpa-dia</b><br>Bands: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
-        ),
-        row=2,
-        col=1,
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=ard_dia["bw"],
-            y=ard_dia["max_rss_mb"],
-            mode="lines+markers",
-            name="bpa-hybrid",
-            legendgroup="bpa-hybrid",
-            showlegend=False,
-            line=dict(color="#00b200", width=3, shape="spline"),
-            marker=dict(
-                size=9,
-                symbol="square",
-                color="#00b200",
-                line=dict(color="white", width=1.5),
-            ),
-            hovertemplate="<b>bpa-hybrid</b><br>Bands: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
-        ),
-        row=2,
-        col=1,
+        )
     )
 
     fig.update_layout(
         title={
-            "text": figure_title,
+            "text": figure_title if show_title else "",
             "font": {
                 "size": 20,
                 "family": "Inter, Arial, sans-serif",
@@ -229,7 +122,7 @@ def bandwidth_plot(
         legend={
             "orientation": "h",
             "yanchor": "top",
-            "y": -0.12,
+            "y": -0.17,
             "xanchor": "center",
             "x": 0.5,
             "bgcolor": "rgba(255, 255, 255, 0.95)",
@@ -244,8 +137,8 @@ def bandwidth_plot(
             font_family="Inter, monospace",
             bordercolor="#CBD5E1",
         ),
-        width=900,
-        height=900,
+        width=700,
+        height=500,
         template="plotly_white",
         margin=dict(t=100, l=80, r=60, b=120),
         paper_bgcolor="#F8FAFC",
@@ -264,10 +157,12 @@ def bandwidth_plot(
         linecolor="#CBD5E1",
         linewidth=1,
         mirror=True,
+        range=x_range,
     )
 
     fig.update_yaxes(
-        title_text="<b>Average Time (seconds)</b>",
+        type="log",
+        title_text="<b>Avg. Time (s) - Log Scale</b>",
         title_font=dict(size=13, family="Inter, Arial, sans-serif"),
         tickfont=dict(size=11),
         gridcolor="#E2E8F0",
@@ -278,8 +173,176 @@ def bandwidth_plot(
         linecolor="#CBD5E1",
         linewidth=1,
         mirror=True,
-        row=1,
-        col=1,
+    )
+
+    output_path = str(csv_path).split(".csv")[0] + "_time"
+    fig.write_html(
+        f"{output_path}.html",
+        config={
+            "displayModeBar": True,
+            "modeBarButtonsToAdd": ["drawline", "drawrect", "eraseshape"],
+            "displaylogo": False,
+        },
+    )
+    fig.write_image(f"{output_path}.svg", width=700, height=500)
+    fig.write_image(f"{output_path}.png", width=700, height=500, scale=2)
+
+    fig.show()
+    print(f"Saved time plot: {output_path}.html, .svg, .png")
+    return fig
+
+
+def create_memory_plot(
+    csv_path="./results/chain_matmul.csv",
+    output_prefix="chain_matmul_memory",
+    figure_title: str = "Chain Matmul - Memory Footprint",
+    show_title: bool = True,
+):
+    """
+    Create memory footprint plot for chain matrix multiplication.
+    """
+    df = pd.read_csv(csv_path)
+    df["bw"] = pd.to_numeric(df["bw"])
+
+    baseline = df[df["config"] == "baseline"]
+    ar_dense = df[
+        (df["config"] == "AR") & (df["file_name"].str.contains("dense", na=False))
+    ]
+    ar_dia = df[
+        (df["config"] == "AR") & (df["file_name"].str.contains("dia", na=False))
+    ]
+    ard_dia = df[
+        (df["config"] == "ADR") & (df["file_name"].str.contains("dia", na=False))
+    ]
+
+    max_bw = df["bw"].max()
+    x_max = max_bw + 10
+
+    x_range = [-10, x_max]
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=baseline["bw"],
+            y=baseline["max_rss_mb"],
+            mode="lines+markers",
+            name="baseline",
+            legendgroup="baseline",
+            line=dict(color="#94A3B8", width=2, dash="solid"),
+            marker=dict(
+                size=6,
+                symbol="circle",
+                color="#94A3B8",
+                line=dict(color="white", width=1.5),
+            ),
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=ar_dense["bw"],
+            y=ar_dense["max_rss_mb"],
+            mode="lines+markers",
+            name="bpa-dense",
+            legendgroup="bpa-dense",
+            line=dict(color="#F97316", width=2, shape="spline"),
+            marker=dict(
+                size=6,
+                symbol="diamond",
+                color="#F97316",
+                line=dict(color="white", width=1.5),
+            ),
+            hovertemplate="<b>bpa-dense</b><br>Bands: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=ar_dia["bw"],
+            y=ar_dia["max_rss_mb"],
+            mode="lines+markers",
+            name="bpa-dia",
+            legendgroup="bpa-dia",
+            line=dict(color="#06B6D4", width=2, shape="spline"),
+            marker=dict(
+                size=9,
+                symbol="triangle-up",
+                color="#06B6D4",
+                line=dict(color="white", width=1.5),
+            ),
+            hovertemplate="<b>bpa-dia</b><br>Bands: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=ard_dia["bw"],
+            y=ard_dia["max_rss_mb"],
+            mode="lines+markers",
+            name="bpa-hybrid",
+            legendgroup="bpa-hybrid",
+            line=dict(color="#00b200", width=2, shape="spline"),
+            marker=dict(
+                size=6,
+                symbol="square",
+                color="#00b200",
+                line=dict(color="white", width=1.5),
+            ),
+            hovertemplate="<b>bpa-hybrid</b><br>Bands: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
+        )
+    )
+
+    fig.update_layout(
+        title={
+            "text": figure_title if show_title else "",
+            "font": {
+                "size": 20,
+                "family": "Inter, Arial, sans-serif",
+                "weight": "bold",
+            },
+            "x": 0.5,
+            "xanchor": "center",
+        },
+        showlegend=True,
+        legend={
+            "orientation": "h",
+            "yanchor": "top",
+            "y": -0.17,
+            "xanchor": "center",
+            "x": 0.5,
+            "bgcolor": "rgba(255, 255, 255, 0.95)",
+            "bordercolor": "#E2E8F0",
+            "borderwidth": 1,
+            "font": {"size": 11},
+        },
+        hovermode="closest",
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=12,
+            font_family="Inter, monospace",
+            bordercolor="#CBD5E1",
+        ),
+        width=700,
+        height=500,
+        template="plotly_white",
+        margin=dict(t=100, l=80, r=60, b=120),
+        paper_bgcolor="#F8FAFC",
+        plot_bgcolor="white",
+    )
+
+    fig.update_xaxes(
+        title_text="<b>Bands (bw)</b>",
+        title_font=dict(size=13, family="Inter, Arial, sans-serif"),
+        tickfont=dict(size=11),
+        gridcolor="#E2E8F0",
+        gridwidth=1,
+        showgrid=True,
+        zeroline=False,
+        showline=True,
+        linecolor="#CBD5E1",
+        linewidth=1,
+        mirror=True,
+        range=x_range,
     )
 
     fig.update_yaxes(
@@ -294,27 +357,45 @@ def bandwidth_plot(
         linecolor="#CBD5E1",
         linewidth=1,
         mirror=True,
-        row=2,
-        col=1,
     )
 
-    image_output = str(csv_path).split(".csv")[0]
+    output_path = str(csv_path).split(".csv")[0] + "_memory"
     fig.write_html(
-        f"{image_output}.html",
+        f"{output_path}.html",
         config={
             "displayModeBar": True,
             "modeBarButtonsToAdd": ["drawline", "drawrect", "eraseshape"],
             "displaylogo": False,
         },
     )
-    fig.write_image(f"{image_output}.svg", width=1200, height=900)
-    fig.write_image(f"{image_output}.png", width=1200, height=900, scale=2)
+    fig.write_image(f"{output_path}.svg", width=700, height=500)
+    fig.write_image(f"{output_path}.png", width=700, height=500, scale=2)
 
-    # fig.show()
-
-    print(f"Saved: {output_prefix}.html, {output_prefix}.svg, {output_prefix}.png")
-
+    fig.show()
+    print(f"Saved memory plot: {output_path}.html, .svg, .png")
     return fig
+
+
+def bandwidth_plot(
+    csv_path="./results/chain_matmul.csv",
+    output_prefix="chain_matmul",
+    figure_title: str = "Chain Matmul",
+    show_title: bool = True,
+):
+    """
+    Create performance analysis plots for chain matrix multiplication.
+    Creates two separate figures: one for execution time and one for memory footprint.
+    """
+    # Create both plots
+    time_fig = create_time_plot(
+        csv_path, output_prefix, f"{figure_title} - Execution Time", show_title
+    )
+    memory_fig = create_memory_plot(
+        csv_path, output_prefix, f"{figure_title} - Memory Footprint", show_title
+    )
+
+    return time_fig, memory_fig
+
 
 def compare_symbolic_chained(
     results_dir="./results",
@@ -326,7 +407,7 @@ def compare_symbolic_chained(
     Create performance analysis plot comparing DIA, Linalg, STUR, and TeSA
     symbolic execution times for chained matmuls.
     """
-    
+
     dia_path = os.path.join(results_dir, "symbolic_chained_dia.csv")
     linalg_path = os.path.join(results_dir, "symbolic_chained_linalg.csv")
     stur_path = os.path.join(results_dir, "symbolic_chained_stur.csv")
@@ -366,7 +447,10 @@ def compare_symbolic_chained(
         )
     )
 
-    speedup_dia = df_linalg.set_index("k").reindex(df_dia["k"])["avg_time_ms"].values / df_dia["avg_time_ms"].values
+    speedup_dia = (
+        df_linalg.set_index("k").reindex(df_dia["k"])["avg_time_ms"].values
+        / df_dia["avg_time_ms"].values
+    )
 
     fig.add_trace(
         go.Scatter(
@@ -387,7 +471,10 @@ def compare_symbolic_chained(
         )
     )
 
-    speedup_stur = df_linalg.set_index("k").reindex(df_stur["k"])["avg_time_ms"].values / df_stur["avg_time_ms"].values
+    speedup_stur = (
+        df_linalg.set_index("k").reindex(df_stur["k"])["avg_time_ms"].values
+        / df_stur["avg_time_ms"].values
+    )
 
     fig.add_trace(
         go.Scatter(
@@ -498,7 +585,7 @@ def compare_symbolic_chained(
     )
 
     output_path = os.path.join(results_dir, output_prefix)
-    
+
     fig.write_html(
         f"{output_path}.html",
         config={
@@ -513,6 +600,7 @@ def compare_symbolic_chained(
     print(f"Saved: {output_path}.html, .svg, .png")
 
     return fig
+
 
 if __name__ == "__main__":
     bandwidth_plot(csv_path="./results/chain_matmul.csv", output_prefix="chain_matmul", figure_title="Chain Matmul")
