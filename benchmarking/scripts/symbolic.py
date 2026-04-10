@@ -47,7 +47,7 @@ def generate_mlir(k, filename, mode="dia"):
 
 def run_benchmark():
     ks = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
-    REPETITIONS = 3
+    REPETITIONS = 10
     modes = ["linalg", "dia"]
     
     os.makedirs("results", exist_ok=True)
@@ -61,16 +61,22 @@ def run_benchmark():
         
         with open(csv_filename, 'w', newline='') as csvfile:
             csv_writer = csv.writer(csvfile)
-            csv_writer.writerow(['k', 'avg_time_ms', 'trial_1', 'trial_2', 'trial_3'])
+            csv_writer.writerow(['k', 'avg_time_ms'] + [f'trial_{i+1}' for i in range(REPETITIONS)])
             
             for k in ks:
                 filename = f"benchmarking/programs/chained_{k}_{mode}.mlir"
                 generate_mlir(k, filename, mode)
                 
+                cmd = ["build/tools/alg-opt", filename, "--banded-analysis"]
+                
+                try:
+                    subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                except subprocess.CalledProcessError as e:
+                    print(f"Error during warmup for k={k}:\n{e.output.decode()}")
+                
                 trials = []
+
                 for i in range(REPETITIONS):
-                    cmd = ["build/tools/alg-opt", filename, "--banded-analysis"]
-                    
                     try:
                         output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode()
                         match = re.search(r"BandedAnalysis time: ([\d.eE+-]+) ms", output)
@@ -90,8 +96,8 @@ def run_benchmark():
                     csv_writer.writerow([k, avg_time] + trials)
                     csvfile.flush()
 
-                # if os.path.exists(filename):
-                #     os.remove(filename)
+                if os.path.exists(filename):
+                    os.remove(filename)
                 
         print(f"Results saved to {csv_filename}")
 
