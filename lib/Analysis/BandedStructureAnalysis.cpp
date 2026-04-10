@@ -278,6 +278,7 @@ LogicalResult BandedStructureAnalysis::visitDIABatchMatmul(dia::BatchMatmulOp* o
     newProperty.LowerBandwidth = std::min<uint64_t>(newProperty.LowerBandwidth, lhsShape[2] - 1);
 
     propertyMap[result] = BandedSubMatrix{ newProperty, { 1, 2 }, true };
+    propertyMap[result].IsDia = detectDIA ? false : true;
 
     return success();
 }
