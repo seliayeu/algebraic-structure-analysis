@@ -34,12 +34,12 @@ module {
       [[0.0, 0.0, 1.0, 1.0], [0.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 0.0]]
     ]> : tensor<2x4x4xf32> 
     %zeroes = arith.constant dense<0.0> : tensor<2x4x4xf32>
-    
+
     %R = dia.batch_matmul ins(%A, %B : tensor<2x4x4xf32>, tensor<2x4x4xf32>) outs(%zeroes : tensor<2x4x4xf32>) -> tensor<2x4x4xf32>
-    
+
     %memref = memref.alloc() : memref<2x4x4xf32>
     bufferization.materialize_in_destination %R in writable %memref : (tensor<2x4x4xf32>, memref<2x4x4xf32>) -> ()
-    
+
     %cast = memref.cast %memref : memref<2x4x4xf32> to memref<*xf32>
     call @printMemrefF32(%cast) : (memref<*xf32>) -> ()
     memref.dealloc %memref : memref<2x4x4xf32>
@@ -69,12 +69,12 @@ module {
       [[0.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 0.0], [1.0, 1.0, 0.0, 0.0]]
     ]> : tensor<2x4x4xf32> 
     %zeroes = arith.constant dense<0.0> : tensor<2x4x4xf32>
-    
+
     %R = dia.batch_matmul ins(%A, %B : tensor<2x4x4xf32>, tensor<2x4x4xf32>) outs(%zeroes : tensor<2x4x4xf32>) -> tensor<2x4x4xf32>
-    
+
     %memref = memref.alloc() : memref<2x4x4xf32>
     bufferization.materialize_in_destination %R in writable %memref : (tensor<2x4x4xf32>, memref<2x4x4xf32>) -> ()
-    
+
     %cast = memref.cast %memref : memref<2x4x4xf32> to memref<*xf32>
     call @printMemrefF32(%cast) : (memref<*xf32>) -> ()
     memref.dealloc %memref : memref<2x4x4xf32>
@@ -104,12 +104,12 @@ module {
       [[0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 1.0, 1.0], [0.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0]]
     ]> : tensor<2x4x4xf32> 
     %zeroes = arith.constant dense<0.0> : tensor<2x4x4xf32>
-    
+
     %R = dia.batch_matmul ins(%A, %B : tensor<2x4x4xf32>, tensor<2x4x4xf32>) outs(%zeroes : tensor<2x4x4xf32>) -> tensor<2x4x4xf32>
-    
+
     %memref = memref.alloc() : memref<2x4x4xf32>
     bufferization.materialize_in_destination %R in writable %memref : (tensor<2x4x4xf32>, memref<2x4x4xf32>) -> ()
-    
+
     %cast = memref.cast %memref : memref<2x4x4xf32> to memref<*xf32>
     call @printMemrefF32(%cast) : (memref<*xf32>) -> ()
     memref.dealloc %memref : memref<2x4x4xf32>
@@ -139,12 +139,12 @@ module {
       [[0.0, 0.0, 1.0, 1.0], [0.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 0.0], [1.0, 1.0, 0.0, 0.0]]
     ]> : tensor<2x5x4xf32> 
     %zeroes = arith.constant dense<0.0> : tensor<2x4x4xf32>
-    
+
     %R = dia.batch_matmul ins(%A, %B : tensor<2x4x4xf32>, tensor<2x5x4xf32>) outs(%zeroes : tensor<2x4x4xf32>) -> tensor<2x4x4xf32>
-    
+
     %memref = memref.alloc() : memref<2x4x4xf32>
     bufferization.materialize_in_destination %R in writable %memref : (tensor<2x4x4xf32>, memref<2x4x4xf32>) -> ()
-    
+
     %cast = memref.cast %memref : memref<2x4x4xf32> to memref<*xf32>
     call @printMemrefF32(%cast) : (memref<*xf32>) -> ()
     memref.dealloc %memref : memref<2x4x4xf32>
@@ -174,12 +174,12 @@ module {
       [[1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 0.0], [1.0, 1.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]]
     ]> : tensor<2x4x4xf32> 
     %zeroes = arith.constant dense<0.0> : tensor<2x4x4xf32>
-    
+
     %R = dia.batch_matmul ins(%A, %B : tensor<2x4x4xf32>, tensor<2x4x4xf32>) outs(%zeroes : tensor<2x4x4xf32>) -> tensor<2x4x4xf32>
-    
+
     %memref = memref.alloc() : memref<2x4x4xf32>
     bufferization.materialize_in_destination %R in writable %memref : (tensor<2x4x4xf32>, memref<2x4x4xf32>) -> ()
-    
+
     %cast = memref.cast %memref : memref<2x4x4xf32> to memref<*xf32>
     call @printMemrefF32(%cast) : (memref<*xf32>) -> ()
     memref.dealloc %memref : memref<2x4x4xf32>

@@ -599,6 +599,112 @@ struct DIABatchMatMulPattern : public OpRewritePattern<dia::BatchMatmulOp> {
         return success();
     }
 
+    LogicalResult diaTimesDenseToDenseBandedBatchMatmulToSCF(dia::BatchMatmulOp op,
+                                                             PatternRewriter& rewriter,
+                                                             const BandedSubMatrix& bandA,
+                                                             const BandedSubMatrix& bandB) const {
+        Location loc = op->getLoc();
+        Value A = op.getLhs();
+        Value B = op.getRhs();
+        Value C = op.getOutput();
+
+        auto resultType = cast<RankedTensorType>(C.getType());
+        const int64_t batchSize = resultType.getDimSize(0);
+        const int64_t N = resultType.getDimSize(1);
+
+        Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
+        Value c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
+        Value cBatch = arith::ConstantIndexOp::create(rewriter, loc, batchSize);
+        Value cN = arith::ConstantIndexOp::create(rewriter, loc, N);
+        Value cLA = arith::ConstantIndexOp::create(rewriter, loc, bandA.Property.LowerBandwidth);
+        Value cUA = arith::ConstantIndexOp::create(rewriter, loc, bandA.Property.UpperBandwidth);
+        Value cLB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.LowerBandwidth);
+        Value cUB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.UpperBandwidth);
+        Value cLAi64 =
+            arith::ConstantIntOp::create(rewriter, loc, bandA.Property.LowerBandwidth, 64);
+
+        auto elementType = resultType.getElementType();
+        Value zero = arith::ConstantOp::create(rewriter, loc, elementType,
+                                               rewriter.getZeroAttr(elementType));
+        Value zeroedC =
+            linalg::FillOp::create(rewriter, loc, ValueRange{ zero }, ValueRange{ C }).getResult(0);
+
+        auto toIndex = [&](OpBuilder& b, Value v) {
+            return arith::IndexCastOp::create(b, loc, b.getIndexType(), v);
+        };
+        auto toI64 = [&](OpBuilder& b, Value v) {
+            return arith::IndexCastOp::create(b, loc, b.getI64Type(), v);
+        };
+
+        auto bLoop = scf::ForOp::create(
+            rewriter, loc, c0, cBatch, c1, ValueRange{ zeroedC },
+            [&](OpBuilder& bb, Location loc, Value b, ValueRange bArgs) {
+                Value cB_out = bArgs[0];
+
+                auto rowLoop = scf::ForOp::create(
+                    bb, loc, c0, cN, c1, ValueRange{ cB_out },
+                    [&](OpBuilder& ob, Location loc, Value row, ValueRange rowArgs) {
+                        Value cRow = rowArgs[0];
+
+                        auto colLoop = scf::ForOp::create(
+                            ob, loc, c0, cN, c1, ValueRange{ cRow },
+                            [&](OpBuilder& cb, Location loc, Value col, ValueRange colArgs) {
+                                Value cCol = colArgs[0];
+
+                                // kstart = max(0, row - lA, col - uB)
+                                Value rowMinusLA = arith::SubIOp::create(cb, loc, row, cLA);
+                                Value colMinusUB = arith::SubIOp::create(cb, loc, col, cUB);
+                                Value ks0 = arith::MaxSIOp::create(cb, loc, c0, rowMinusLA);
+                                Value kstart = arith::MaxSIOp::create(cb, loc, ks0, colMinusUB);
+
+                                // kend = min(N, row + uA + 1, col + lB + 1)
+                                Value rowPlusUA1 = arith::AddIOp::create(
+                                    cb, loc, arith::AddIOp::create(cb, loc, row, cUA), c1);
+                                Value colPlusLB1 = arith::AddIOp::create(
+                                    cb, loc, arith::AddIOp::create(cb, loc, col, cLB), c1);
+                                Value ke0 = arith::MinSIOp::create(cb, loc, cN, rowPlusUA1);
+                                Value kend = arith::MinSIOp::create(cb, loc, ke0, colPlusLB1);
+
+                                auto kLoop = scf::ForOp::create(
+                                    cb, loc, kstart, kend, c1, ValueRange{ cCol },
+                                    [&](OpBuilder& kb, Location loc, Value k, ValueRange kArgs) {
+                                        Value cK = kArgs[0];
+
+                                        // d_A = (k - row) + lA
+                                        Value kI64 = toI64(kb, k);
+                                        Value rowI64 = toI64(kb, row);
+                                        Value dA = toIndex(
+                                            kb, arith::AddIOp::create(
+                                                    kb, loc,
+                                                    arith::SubIOp::create(kb, loc, kI64, rowI64),
+                                                    cLAi64));
+
+                                        Value aVal = tensor::ExtractOp::create(
+                                            kb, loc, A, ValueRange{ b, dA, row });
+                                        Value bVal = tensor::ExtractOp::create(
+                                            kb, loc, B, ValueRange{ b, k, col });
+                                        Value cVal = tensor::ExtractOp::create(
+                                            kb, loc, cK, ValueRange{ b, row, col });
+
+                                        Value mul = arith::MulFOp::create(kb, loc, aVal, bVal);
+                                        Value acc = arith::AddFOp::create(kb, loc, cVal, mul);
+
+                                        Value updated = tensor::InsertOp::create(
+                                            kb, loc, acc, cK, ValueRange{ b, row, col });
+                                        scf::YieldOp::create(kb, loc, ValueRange{ updated });
+                                    });
+                                scf::YieldOp::create(cb, loc, kLoop.getResults());
+                            });
+                        scf::YieldOp::create(ob, loc, colLoop.getResults());
+                    });
+                scf::YieldOp::create(bb, loc, rowLoop.getResults());
+            });
+
+        if (auto metadata = op->getAttr("metadata")) bLoop->setAttr("metadata", metadata);
+        rewriter.replaceOp(op, bLoop.getResult(0));
+        return success();
+    }
+
     LogicalResult matchAndRewrite(dia::BatchMatmulOp op, PatternRewriter& rewriter) const override {
         auto dict = op->getAttrDictionary();
         if (!dict) dict = DictionaryAttr();
@@ -622,13 +728,12 @@ struct DIABatchMatMulPattern : public OpRewritePattern<dia::BatchMatmulOp> {
         if (!bandA.IsDia && !bandB.IsDia && opBandInfo.IsDia) {
             return denseTimesDenseToDiaBandedBatchMatmulToSCF(op, rewriter, bandA, bandB,
                                                               opBandInfo);
+        } else if (bandA.IsDia && !bandB.IsDia && !opBandInfo.IsDia) {
+            return diaTimesDenseToDenseBandedBatchMatmulToSCF(op, rewriter, bandA, bandB);
         } else if (!bandA.IsDia && bandB.IsDia && !opBandInfo.IsDia) {
             return denseTimesDiaToDenseBandedBatchMatmulToSCF(op, rewriter, bandA, bandB);
         } else if (bandA.IsDia && !bandB.IsDia && opBandInfo.IsDia) {
             return diaTimesDenseToDiaBandedBatchMatmulToSCF(op, rewriter, bandA, bandB);
-            // } else if (bandA.IsDia && bandB.IsDia && !opBandInfo.IsDia) {
-            //     return diaTimesDiaToDenseBandedBatchMatmulToSCF(op, rewriter, bandA, bandB,
-            //     opBandInfo);
         } else
             return diaTimesDiaToDiaBandedBatchMatmulToSCF(op, rewriter, opBandInfo);
     }
