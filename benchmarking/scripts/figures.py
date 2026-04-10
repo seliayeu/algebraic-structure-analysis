@@ -9,6 +9,7 @@ def create_time_plot(
     output_prefix="chain_matmul_time",
     figure_title: str = "Chain Matmul - Execution Time",
     show_title: bool = True,
+    save_png_and_svg: bool = True,
 ):
     """
     Create execution time plot for chain matrix multiplication.
@@ -122,12 +123,10 @@ def create_time_plot(
         legend={
             "orientation": "h",
             "yanchor": "top",
-            "y": -0.17,
+            "y": -0.13,
             "xanchor": "center",
             "x": 0.5,
             "bgcolor": "rgba(255, 255, 255, 0.95)",
-            "bordercolor": "#E2E8F0",
-            "borderwidth": 1,
             "font": {"size": 11},
         },
         hovermode="closest",
@@ -140,8 +139,7 @@ def create_time_plot(
         width=700,
         height=500,
         template="plotly_white",
-        margin=dict(t=100, l=80, r=60, b=120),
-        paper_bgcolor="#F8FAFC",
+        margin=dict(t=0, b=0, l=0, r=0),
         plot_bgcolor="white",
     )
 
@@ -184,8 +182,9 @@ def create_time_plot(
             "displaylogo": False,
         },
     )
-    fig.write_image(f"{output_path}.svg", width=700, height=500)
-    fig.write_image(f"{output_path}.png", width=700, height=500, scale=2)
+    if save_png_and_svg:
+        fig.write_image(f"{output_path}.svg", width=550, height=410)
+        fig.write_image(f"{output_path}.png", width=550, height=410, scale=2)
 
     fig.show()
     print(f"Saved time plot: {output_path}.html, .svg, .png")
@@ -197,6 +196,7 @@ def create_memory_plot(
     output_prefix="chain_matmul_memory",
     figure_title: str = "Chain Matmul - Memory Footprint",
     show_title: bool = True,
+    save_png_and_svg: bool = True,
 ):
     """
     Create memory footprint plot for chain matrix multiplication.
@@ -307,12 +307,10 @@ def create_memory_plot(
         legend={
             "orientation": "h",
             "yanchor": "top",
-            "y": -0.17,
+            "y": -0.13,
             "xanchor": "center",
             "x": 0.5,
             "bgcolor": "rgba(255, 255, 255, 0.95)",
-            "bordercolor": "#E2E8F0",
-            "borderwidth": 1,
             "font": {"size": 11},
         },
         hovermode="closest",
@@ -325,8 +323,7 @@ def create_memory_plot(
         width=700,
         height=500,
         template="plotly_white",
-        margin=dict(t=100, l=80, r=60, b=120),
-        paper_bgcolor="#F8FAFC",
+        margin=dict(t=0, b=0, l=0, r=0),
         plot_bgcolor="white",
     )
 
@@ -368,8 +365,9 @@ def create_memory_plot(
             "displaylogo": False,
         },
     )
-    fig.write_image(f"{output_path}.svg", width=700, height=500)
-    fig.write_image(f"{output_path}.png", width=700, height=500, scale=2)
+    if save_png_and_svg:
+        fig.write_image(f"{output_path}.svg", width=550, height=430)
+        fig.write_image(f"{output_path}.png", width=550, height=430, scale=2)
 
     fig.show()
     print(f"Saved memory plot: {output_path}.html, .svg, .png")
@@ -381,6 +379,7 @@ def bandwidth_plot(
     output_prefix="chain_matmul",
     figure_title: str = "Chain Matmul",
     show_title: bool = True,
+    save_png_and_svg: bool = True,
 ):
     """
     Create performance analysis plots for chain matrix multiplication.
@@ -388,10 +387,18 @@ def bandwidth_plot(
     """
     # Create both plots
     time_fig = create_time_plot(
-        csv_path, output_prefix, f"{figure_title} - Execution Time", show_title
+        csv_path,
+        output_prefix,
+        f"{figure_title} - Execution Time",
+        show_title,
+        save_png_and_svg,
     )
     memory_fig = create_memory_plot(
-        csv_path, output_prefix, f"{figure_title} - Memory Footprint", show_title
+        csv_path,
+        output_prefix,
+        f"{figure_title} - Memory Footprint",
+        show_title,
+        save_png_and_svg,
     )
 
     return time_fig, memory_fig
