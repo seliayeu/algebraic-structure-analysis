@@ -139,12 +139,12 @@ def create_time_plot(
         width=700,
         height=500,
         template="plotly_white",
-        margin=dict(t=0, b=0, l=0, r=0),
+        margin=dict(t=0, b=0, l=0, r=20),
         plot_bgcolor="white",
     )
 
     fig.update_xaxes(
-        title_text="<b>Bands (bw)</b>",
+        title_text="<b>Bandwidth</b>",
         title_font=dict(size=13, family="Inter, Arial, sans-serif"),
         tickfont=dict(size=11),
         gridcolor="#E2E8F0",
@@ -323,12 +323,12 @@ def create_memory_plot(
         width=700,
         height=500,
         template="plotly_white",
-        margin=dict(t=0, b=0, l=0, r=0),
+        margin=dict(t=0, b=0, l=0, r=20),
         plot_bgcolor="white",
     )
 
     fig.update_xaxes(
-        title_text="<b>Bands (bw)</b>",
+        title_text="<b>Bandwidth</b>",
         title_font=dict(size=13, family="Inter, Arial, sans-serif"),
         tickfont=dict(size=11),
         gridcolor="#E2E8F0",
