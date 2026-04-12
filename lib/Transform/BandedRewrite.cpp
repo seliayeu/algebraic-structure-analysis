@@ -11,6 +11,7 @@
 #include "Transform/Operators/DIATransposeRewrite.h"
 #include "Utils/TransformUtils.h"
 #include "llvm/ADT/SmallVector.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -441,6 +442,14 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
         int64_t rank = resultType.getRank();
 
         Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
+        Type elementType = resultType.getElementType();
+        auto zeroAttr = cast<TypedAttr>(rewriter.getZeroAttr(elementType));
+        Value zeroConst = arith::ConstantOp::create(rewriter, loc, elementType, zeroAttr);
+        auto fillOp =
+            linalg::FillOp::create(rewriter, loc, ValueRange{ zeroConst }, ValueRange{ C });
+
+        Value filledC = fillOp.getResult(0);
+
         Value c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
 
         Value dimN = arith::ConstantIndexOp::create(rewriter, loc, resultType.getDimSize(rank - 2));
@@ -454,13 +463,11 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
                 builder, loc, c0, dimN, c1, ValueRange{ cInOut },
                 [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
                     Value cOut = iArgs[0];
-
                     Value iMinusLower = arith::SubIOp::create(ob, loc, i, lowerBW);
                     Value jStart = arith::MaxSIOp::create(ob, loc, c0, iMinusLower);
                     Value iPlusUpper = arith::AddIOp::create(ob, loc, i, upperBW);
                     Value iPlusUpperP1 = arith::AddIOp::create(ob, loc, iPlusUpper, c1);
                     Value jEnd = arith::MinSIOp::create(ob, loc, dimM, iPlusUpperP1);
-
                     auto jLoop = scf::ForOp::create(
                         ob, loc, jStart, jEnd, c1, ValueRange{ cOut },
                         [&](OpBuilder& ib, Location loc, Value j, ValueRange jArgs) {
@@ -485,7 +492,7 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
         };
 
         if (rank == 2) {
-            Value result = buildInnerBandedLoops(rewriter, loc, C, std::nullopt);
+            Value result = buildInnerBandedLoops(rewriter, loc, filledC, std::nullopt);
             if (auto metadataAttr = op->getAttr("metadata")) {
                 result.getDefiningOp()->setAttr("metadata", metadataAttr);
             }
@@ -494,7 +501,7 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
             Value dimBatch =
                 arith::ConstantIndexOp::create(rewriter, loc, resultType.getDimSize(0));
             auto bLoop = scf::ForOp::create(
-                rewriter, loc, c0, dimBatch, c1, ValueRange{ C },
+                rewriter, loc, c0, dimBatch, c1, ValueRange{ filledC },
                 [&](OpBuilder& batchBuilder, Location loc, Value b, ValueRange bArgs) {
                     Value result = buildInnerBandedLoops(batchBuilder, loc, bArgs[0], b);
                     scf::YieldOp::create(batchBuilder, loc, result);
