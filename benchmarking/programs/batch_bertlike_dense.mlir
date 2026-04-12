@@ -10,13 +10,13 @@ func.func @kernel() -> f32 {
   %e9 = arith.constant dense<0.0> : tensor<4x2048x2048xf32>
   %e10 = arith.constant dense<0.0> : tensor<4x2048x2048xf32>
 
-  %input = arith.constant {metadata = {lowerBw = 1 : i64, upperBw = 1 : i64, propertyDims = [1, 2]}} dense<1.0> : tensor<4x2048x2048xf32>
-  %W1 = arith.constant {metadata = {lowerBw = 1 : i64, upperBw = 1 : i64, propertyDims = [1, 2]}} dense<1.0> : tensor<4x2048x2048xf32>
-  %W2 = arith.constant {metadata = {lowerBw = 1 : i64, upperBw = 1 : i64, propertyDims = [1, 2]}} dense<1.0> : tensor<4x2048x2048xf32>
-  %W3 = arith.constant {metadata = {lowerBw = 1 : i64, upperBw = 1 : i64, propertyDims = [1, 2]}} dense<1.0> : tensor<4x2048x2048xf32>
-  %W4 = arith.constant {metadata = {lowerBw = 1 : i64, upperBw = 1 : i64, propertyDims = [1, 2]}} dense<1.0> : tensor<4x2048x2048xf32>
-  %W5 = arith.constant {metadata = {lowerBw = 1 : i64, upperBw = 1 : i64, propertyDims = [1, 2]}} dense<1.0> : tensor<4x2048x2048xf32>
-  %W6 = arith.constant {metadata = {lowerBw = 1 : i64, upperBw = 1 : i64, propertyDims = [1, 2]}} dense<1.0> : tensor<4x2048x2048xf32>
+  %input = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} dense<1.0> : tensor<4x2048x2048xf32>
+  %W1 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} dense<1.0> : tensor<4x2048x2048xf32>
+  %W2 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} dense<1.0> : tensor<4x2048x2048xf32>
+  %W3 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} dense<1.0> : tensor<4x2048x2048xf32>
+  %W4 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} dense<1.0> : tensor<4x2048x2048xf32>
+  %W5 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} dense<1.0> : tensor<4x2048x2048xf32>
+  %W6 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} dense<1.0> : tensor<4x2048x2048xf32>
 
   %m1 = linalg.batch_matmul ins(%input, %W1 : tensor<4x2048x2048xf32>, tensor<4x2048x2048xf32>) outs(%e1 : tensor<4x2048x2048xf32>) -> tensor<4x2048x2048xf32>
   %m2 = linalg.batch_matmul ins(%input, %W2 : tensor<4x2048x2048xf32>, tensor<4x2048x2048xf32>) outs(%e2 : tensor<4x2048x2048xf32>) -> tensor<4x2048x2048xf32>
@@ -38,4 +38,3 @@ func.func @kernel() -> f32 {
 
   return %result : f32
 }
-
