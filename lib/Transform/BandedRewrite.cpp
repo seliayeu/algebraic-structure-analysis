@@ -369,9 +369,6 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
         if (!dict) dict = DictionaryAttr();
 
         BandedSubMatrix opBandInfo = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
-
-        auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
-        uint64_t n = resultType.getDimSize(0);
         if (opBandInfo.isDiagonal())
             return denseTimesDenseToDenseDiagElementwiseToLinalg(op, rewriter);
         else
@@ -386,17 +383,27 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
         Value C = op.getOutputs()[0];
         MLIRContext* context = rewriter.getContext();
 
-        AffineExpr d0 = rewriter.getAffineDimExpr(0);
+        auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
+        int64_t rank = resultType.getRank();
 
-        AffineMap diagMap = AffineMap::get(1, 0, { d0, d0 }, context);
+        SmallVector<AffineExpr> exprs;
+        SmallVector<utils::IteratorType> iteratorTypes;
 
-        SmallVector<AffineMap, 3> indexingMaps = {
-            diagMap,
-            diagMap,
-            diagMap,
-        };
+        if (rank == 2) {
+            AffineExpr d0 = rewriter.getAffineDimExpr(0);
+            exprs = { d0, d0 };
+            iteratorTypes = { utils::IteratorType::parallel };
+        } else if (rank == 3) {
+            AffineExpr d0 = rewriter.getAffineDimExpr(0);
+            AffineExpr d1 = rewriter.getAffineDimExpr(1);
+            exprs = { d0, d1, d1 };
+            iteratorTypes = { utils::IteratorType::parallel, utils::IteratorType::parallel };
+        } else {
+            return failure();
+        }
 
-        llvm::SmallVector<utils::IteratorType, 1> iteratorTypes = { utils::IteratorType::parallel };
+        AffineMap diagMap = AffineMap::get(iteratorTypes.size(), 0, exprs, context);
+        SmallVector<AffineMap, 3> indexingMaps = { diagMap, diagMap, diagMap };
 
         auto genericOp = linalg::GenericOp::create(
             rewriter, loc, TypeRange{ op.getResult(0).getType() }, ValueRange{ A, B },
@@ -404,9 +411,11 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
             [&](OpBuilder& b, Location loc, ValueRange args) {
                 auto lhs = args[0];
                 auto rhs = args[1];
+
                 Value opResult = getInnerArithOp(op, b, loc, lhs, rhs);
                 linalg::YieldOp::create(b, loc, ValueRange{ opResult });
             });
+
         genericOp->setAttr("metadata", op->getAttr("metadata"));
         rewriter.replaceOp(op, genericOp);
         return success();
@@ -418,71 +427,83 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
         Value C = op.getOutputs()[0];
-
         Operation* defOpA = A.getDefiningOp();
         Operation* defOpB = B.getDefiningOp();
-
         auto dictA = defOpA->getAttrDictionary();
         auto dictB = defOpB->getAttrDictionary();
-
         if (!dictA || !dictB) return failure();
-
         BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
         BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
 
-        auto lowerA = bandA.Property.LowerBandwidth;
-        auto upperA = bandA.Property.UpperBandwidth;
-        auto upperB = bandB.Property.UpperBandwidth;
-        auto lowerB = bandB.Property.LowerBandwidth;
-
-        // takes only the intersection
         uint64_t lower = std::min(bandA.Property.LowerBandwidth, bandB.Property.LowerBandwidth);
-        uint64_t upper = std::min(bandB.Property.UpperBandwidth, bandB.Property.UpperBandwidth);
-
+        uint64_t upper = std::min(bandA.Property.UpperBandwidth, bandB.Property.UpperBandwidth);
         auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
-        const int64_t N = resultType.getDimSize(0);
-        const int64_t M = resultType.getDimSize(1);
+        int64_t rank = resultType.getRank();
 
         Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
         Value c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
-        Value dimN = arith::ConstantIndexOp::create(rewriter, loc, N);
+
+        Value dimN = arith::ConstantIndexOp::create(rewriter, loc, resultType.getDimSize(rank - 2));
+        Value dimM = arith::ConstantIndexOp::create(rewriter, loc, resultType.getDimSize(rank - 1));
         Value lowerBW = arith::ConstantIndexOp::create(rewriter, loc, (int64_t)lower);
         Value upperBW = arith::ConstantIndexOp::create(rewriter, loc, (int64_t)upper);
 
-        auto iLoop = scf::ForOp::create(
-            rewriter, loc, c0, dimN, c1, ValueRange{ C },
-            [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
-                Value cOut = iArgs[0];
+        auto buildInnerBandedLoops = [&](OpBuilder& builder, Location loc, Value cInOut,
+                                         std::optional<Value> batchIndex) -> Value {
+            auto iLoop = scf::ForOp::create(
+                builder, loc, c0, dimN, c1, ValueRange{ cInOut },
+                [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
+                    Value cOut = iArgs[0];
 
-                // j start = max(0, i - lower)
-                Value iMinusLower = arith::SubIOp::create(ob, loc, i, lowerBW);
-                Value jStart = arith::MaxSIOp::create(ob, loc, c0, iMinusLower);
+                    Value iMinusLower = arith::SubIOp::create(ob, loc, i, lowerBW);
+                    Value jStart = arith::MaxSIOp::create(ob, loc, c0, iMinusLower);
+                    Value iPlusUpper = arith::AddIOp::create(ob, loc, i, upperBW);
+                    Value iPlusUpperP1 = arith::AddIOp::create(ob, loc, iPlusUpper, c1);
+                    Value jEnd = arith::MinSIOp::create(ob, loc, dimM, iPlusUpperP1);
 
-                // j end = min(M, i + upper + 1)
-                Value iPlusUpper = arith::AddIOp::create(ob, loc, i, upperBW);
-                Value iPlusUpperP1 = arith::AddIOp::create(ob, loc, iPlusUpper, c1);
-                Value jEnd = arith::MinSIOp::create(
-                    ob, loc, arith::ConstantIndexOp::create(ob, loc, M), iPlusUpperP1);
+                    auto jLoop = scf::ForOp::create(
+                        ob, loc, jStart, jEnd, c1, ValueRange{ cOut },
+                        [&](OpBuilder& ib, Location loc, Value j, ValueRange jArgs) {
+                            Value cInner = jArgs[0];
 
-                auto jLoop = scf::ForOp::create(
-                    ob, loc, jStart, jEnd, c1, ValueRange{ cOut },
-                    [&](OpBuilder& ib, Location loc, Value j, ValueRange jArgs) {
-                        Value cInner = jArgs[0];
+                            SmallVector<Value> indices;
+                            if (batchIndex) indices.push_back(*batchIndex);
+                            indices.push_back(i);
+                            indices.push_back(j);
 
-                        Value aij = tensor::ExtractOp::create(ib, loc, A, ValueRange{ i, j });
-                        Value bij = tensor::ExtractOp::create(ib, loc, B, ValueRange{ i, j });
-                        Value mul = arith::MulFOp::create(ib, loc, aij, bij);
-                        Value opResult = getInnerArithOp(op, ib, loc, aij, bij);
-                        Value updated =
-                            tensor::InsertOp::create(ib, loc, opResult, cInner, ValueRange{ i, j });
-                        scf::YieldOp::create(ib, loc, ValueRange{ updated });
-                    });
+                            Value aij = tensor::ExtractOp::create(ib, loc, A, indices);
+                            Value bij = tensor::ExtractOp::create(ib, loc, B, indices);
+                            Value opResult = getInnerArithOp(op, ib, loc, aij, bij);
+                            Value updated =
+                                tensor::InsertOp::create(ib, loc, opResult, cInner, indices);
 
-                scf::YieldOp::create(ob, loc, jLoop.getResults());
-            });
+                            scf::YieldOp::create(ib, loc, ValueRange{ updated });
+                        });
+                    scf::YieldOp::create(ob, loc, jLoop.getResults());
+                });
+            return iLoop.getResult(0);
+        };
 
-        iLoop->setAttr("metadata", op->getAttr("metadata"));
-        rewriter.replaceOp(op, iLoop.getResult(0));
+        if (rank == 2) {
+            Value result = buildInnerBandedLoops(rewriter, loc, C, std::nullopt);
+            if (auto metadataAttr = op->getAttr("metadata")) {
+                result.getDefiningOp()->setAttr("metadata", metadataAttr);
+            }
+            rewriter.replaceOp(op, result);
+        } else if (rank == 3) {
+            Value dimBatch =
+                arith::ConstantIndexOp::create(rewriter, loc, resultType.getDimSize(0));
+            auto bLoop = scf::ForOp::create(
+                rewriter, loc, c0, dimBatch, c1, ValueRange{ C },
+                [&](OpBuilder& batchBuilder, Location loc, Value b, ValueRange bArgs) {
+                    Value result = buildInnerBandedLoops(batchBuilder, loc, bArgs[0], b);
+                    scf::YieldOp::create(batchBuilder, loc, result);
+                });
+            bLoop->setAttr("metadata", op->getAttr("metadata"));
+            rewriter.replaceOp(op, bLoop.getResult(0));
+        } else {
+            return failure();
+        }
         return success();
     }
 
