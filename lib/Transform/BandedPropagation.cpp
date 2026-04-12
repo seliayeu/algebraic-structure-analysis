@@ -252,7 +252,8 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
             auto resultType = dyn_cast<RankedTensorType>(results[0].getType());
             if (!resultType) return;
 
-            const uint64_t N = resultType.getDimSize(1);
+            const intptr_t rank = resultType.getRank();
+            const uint64_t N = rank == 3 ? resultType.getDimSize(2) : resultType.getDimSize(1);
 
             auto upperAttr{ builder.getNamedAttr(
                 "upperBw", builder.getI64IntegerAttr(property.UpperBandwidth)) };
