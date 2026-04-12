@@ -3,6 +3,7 @@ __pycache__/
 build/
 results/
 venv/
+.venv/
 env/
 tests/.lit_test_times.txt
 tests/*/Output/
@@ -11,3 +12,6 @@ tests/*/Output/
 *.png
 *.html
 *.svg
+tests/*/*/Output/
+
+

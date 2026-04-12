@@ -10,7 +10,7 @@
 
 module {
     func.func private @printMemrefF32(memref<*xf32>)
-    
+
     func.func @main() {
         %0 = tensor.empty() : tensor<2x3x3xf32>
 
