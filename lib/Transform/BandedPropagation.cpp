@@ -1,7 +1,6 @@
 #include "Transform/BandedPropagation.h"
 
 #include <cstdint>
-#include <iostream>
 #include <vector>
 
 #include "Analysis/BandedStructureAnalysis.h"
@@ -67,8 +66,8 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
         if (!analysisResult.IsDia)
             M = N;
         else {
-            int64_t lC = static_cast<int64_t>(analysisResult.Property.UpperBandwidth);
-            int64_t uC = static_cast<int64_t>(analysisResult.Property.LowerBandwidth);
+            const int64_t lC = static_cast<int64_t>(analysisResult.Property.UpperBandwidth);
+            const int64_t uC = static_cast<int64_t>(analysisResult.Property.LowerBandwidth);
             M = std::min(2 * N - 1, lC + uC + 1);
         }
 

@@ -35,7 +35,7 @@ func.func @kernel() -> f32 {
 
   %a2 = dia.elementwise kind = <add> ins(%m8, %input : tensor<4x?x2048xf32>, tensor<4x2048x2048xf32>) outs(%e10 : tensor<4x?x2048xf32>) -> tensor<4x?x2048xf32>
 
-  %index = arith.constant 5: index
-  %result = tensor.extract %a2[%index, %index] : tensor<4x?x2048xf32>
+  %index = arith.constant 0: index
+  %result = tensor.extract %a2[%index, %index, %index] : tensor<4x?x2048xf32>
   return %result : f32
 }
