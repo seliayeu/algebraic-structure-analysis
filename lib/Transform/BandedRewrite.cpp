@@ -403,12 +403,19 @@ struct GenericElementWisePattern : public OpRewritePattern<linalg::ElementwiseOp
             return failure();
         }
 
+        Type elementType = resultType.getElementType();
+        auto zeroAttr = cast<TypedAttr>(rewriter.getZeroAttr(elementType));
+        Value zeroConst = arith::ConstantOp::create(rewriter, loc, elementType, zeroAttr);
+        auto fillOp =
+            linalg::FillOp::create(rewriter, loc, ValueRange{ zeroConst }, ValueRange{ C });
+
+        Value filledC = fillOp.getResult(0);
         AffineMap diagMap = AffineMap::get(iteratorTypes.size(), 0, exprs, context);
         SmallVector<AffineMap, 3> indexingMaps = { diagMap, diagMap, diagMap };
 
         auto genericOp = linalg::GenericOp::create(
             rewriter, loc, TypeRange{ op.getResult(0).getType() }, ValueRange{ A, B },
-            ValueRange{ C }, indexingMaps, iteratorTypes,
+            ValueRange{ filledC }, indexingMaps, iteratorTypes,
             [&](OpBuilder& b, Location loc, ValueRange args) {
                 auto lhs = args[0];
                 auto rhs = args[1];
