@@ -770,8 +770,9 @@ struct DIABatchMatMulPattern : public OpRewritePattern<dia::BatchMatmulOp> {
             return diaTimesDenseToDiaBandedBatchMatmulToSCF(op, rewriter, bandA, bandB);
         } else if (!bandA.IsDia && !bandB.IsDia && !opBandInfo.IsDia) {
             return denseTimesDenseToDenseBatchMatmulToLinalg(op, rewriter, bandA, bandB);
-        } else
+        } else {
             return diaTimesDiaToDiaBandedBatchMatmulToSCF(op, rewriter, opBandInfo);
+        }
     }
 };
 
