@@ -1,8 +1,9 @@
+import argparse
 import figures
 import bench
 
 
-def chain_matmul():
+def chain_matmul(runs_count: int = 5):
     benchmark_name = "chain_matmul"
     bandwidths = [512, 409, 307, 256, 204, 153, 102, 51, 0]
 
@@ -19,14 +20,14 @@ def chain_matmul():
         configs=configs,
         bandwidths=bandwidths,
         warmup=1,
-        runs_count=5,
+        runs_count=runs_count,
     )
     figures.bandwidth_plot(
         result_path, benchmark_name, "Chain Matrix Multiply Benchmark"
     )
 
 
-def kalman_filter():
+def kalman_filter(runs_count: int = 5):
     benchmark_name = "kalman_filter"
     bandwidths = [512, 409, 307, 256, 204, 153, 102, 51, 0]
 
@@ -43,12 +44,12 @@ def kalman_filter():
         configs=configs,
         bandwidths=bandwidths,
         warmup=1,
-        runs_count=5,
+        runs_count=runs_count,
     )
     figures.bandwidth_plot(result_path, benchmark_name, "Kalman Filter Benchmark")
 
 
-def batch_bertlike():
+def batch_bertlike(runs_count: int = 5):
     benchmark_name = "batch_bertlike"
     bandwidths = [512, 409, 307, 256, 204, 153, 102, 51, 0]
 
@@ -65,12 +66,40 @@ def batch_bertlike():
         configs=configs,
         bandwidths=bandwidths,
         warmup=1,
-        runs_count=5,
+        runs_count=runs_count,
     )
     figures.bandwidth_plot(result_path, benchmark_name, "Batch Bert-Like Benchmark")
 
 
 if __name__ == "__main__":
-    chain_matmul()
-    kalman_filter()
-    batch_bertlike()
+    dispatch = {
+        "chain": chain_matmul,
+        "kalman_filter": kalman_filter,
+        "batch_bertlike": batch_bertlike,
+    }
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--benchmark",
+        type=str,
+        help="Comma-separated list of figures",
+        # default="7,8,9,10,11,12",
+        default="kalman_filter,batch_bertlike",
+    )
+
+    parser.add_argument(
+        "--repeat",
+        type=int,
+        help="Number of executions for each benchmark",
+        default=5,
+    )
+
+    args = parser.parse_args()
+
+    benchmarks = [x.strip() for x in args.benchmark.split(",")]
+    for benchmark in benchmarks:
+        try:
+            func = dispatch[benchmark]
+            func(args.repeat)
+        except KeyError as e:
+            print(f"error: invalid benchmark option {str(e)}")

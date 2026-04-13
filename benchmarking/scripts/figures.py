@@ -151,7 +151,7 @@ def create_time_plot(
         gridwidth=1,
         showgrid=True,
         zeroline=False,
-        showline=True,
+        showline=False,
         linecolor="#CBD5E1",
         linewidth=1,
         mirror=True,
@@ -167,10 +167,7 @@ def create_time_plot(
         gridwidth=1,
         showgrid=True,
         zeroline=False,
-        showline=True,
-        linecolor="#CBD5E1",
-        linewidth=1,
-        mirror=True,
+        showline=False,
     )
 
     output_path = str(csv_path).split(".csv")[0] + "_time"
@@ -318,7 +315,7 @@ def create_memory_plot(
             bgcolor="white",
             font_size=12,
             font_family="Inter, monospace",
-            bordercolor="#CBD5E1",
+            # bordercolor="#CBD5E1",
         ),
         width=700,
         height=500,
@@ -335,7 +332,7 @@ def create_memory_plot(
         gridwidth=1,
         showgrid=True,
         zeroline=False,
-        showline=True,
+        showline=False,
         linecolor="#CBD5E1",
         linewidth=1,
         mirror=True,
@@ -350,10 +347,7 @@ def create_memory_plot(
         gridwidth=1,
         showgrid=True,
         zeroline=False,
-        showline=True,
-        linecolor="#CBD5E1",
-        linewidth=1,
-        mirror=True,
+        showline=False,
     )
 
     output_path = str(csv_path).split(".csv")[0] + "_memory"
@@ -403,6 +397,7 @@ def bandwidth_plot(
 
     return time_fig, memory_fig
 
+
 def compare_symbolic_chained(
     results_dir="./results",
     output_prefix="symbolic_chained_comparison",
@@ -436,12 +431,14 @@ def compare_symbolic_chained(
     df_tesa["k"] = pd.to_numeric(df_tesa["k"])
 
     df_bpa = pd.merge(
-        df_dia[["k", "avg_time_ms"]], 
-        df_linalg[["k", "avg_time_ms"]], 
-        on="k", 
-        suffixes=("_dia", "_linalg")
+        df_dia[["k", "avg_time_ms"]],
+        df_linalg[["k", "avg_time_ms"]],
+        on="k",
+        suffixes=("_dia", "_linalg"),
     )
-    df_bpa["avg_time_ms"] = (df_bpa["avg_time_ms_dia"] + df_bpa["avg_time_ms_linalg"]) / 2
+    df_bpa["avg_time_ms"] = (
+        df_bpa["avg_time_ms_dia"] + df_bpa["avg_time_ms_linalg"]
+    ) / 2
 
     fig = go.Figure()
 
@@ -488,7 +485,7 @@ def compare_symbolic_chained(
     )
 
     speedup_tesa = (
-        df_bpa.set_index("k").reindex(df_tesa["k"])["avg_time_ms"].values 
+        df_bpa.set_index("k").reindex(df_tesa["k"])["avg_time_ms"].values
         / df_tesa["avg_time_ms"].values
     )
 
@@ -554,7 +551,7 @@ def compare_symbolic_chained(
         gridwidth=1,
         showgrid=True,
         zeroline=False,
-        showline=True,
+        showline=False,
         linecolor="#CBD5E1",
         linewidth=1,
         mirror=True,
@@ -568,11 +565,8 @@ def compare_symbolic_chained(
         gridwidth=1,
         showgrid=True,
         zeroline=False,
-        showline=True,
-        linecolor="#CBD5E1",
-        linewidth=1,
+        showline=False,
         type="log" if log else "linear",
-        mirror=True,
     )
 
     output_path = os.path.join(results_dir, output_prefix)
@@ -590,11 +584,20 @@ def compare_symbolic_chained(
         fig.write_image(f"{output_path}.png", width=550, height=410, scale=2)
 
     fig.show()
-    print(f"Saved analysis plot: {output_path}.html" + (", .svg, .png" if save_png_and_svg else ""))
+    print(
+        f"Saved analysis plot: {output_path}.html"
+        + (", .svg, .png" if save_png_and_svg else "")
+    )
 
     return fig
 
+
 if __name__ == "__main__":
-    bandwidth_plot(csv_path="./results/chain_matmul.csv", output_prefix="chain_matmul", figure_title="Chain Matmul")
-    bandwidth_plot(csv_path="./results/bertlike.csv", output_prefix="bertlike", figure_title="BERT-like")
+    bandwidth_plot(
+        csv_path="./results/kalman_filter.csv",
+        output_prefix="kalman_filter",
+        figure_title="Kalman Filter",
+        show_title=False,
+    )
+    # bandwidth_plot(csv_path="./results/bertlike.csv", output_prefix="bertlike", figure_title="BERT-like")
     # compare_symbolic_chained(log=True, show_title=False)
