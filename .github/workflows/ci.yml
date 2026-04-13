@@ -25,4 +25,4 @@ jobs:
 
       # Run tests
       - name: Run Tests
-        run: ninja -C build check-bpa
+        run: ninja -C build check-bpa -j1 -v
