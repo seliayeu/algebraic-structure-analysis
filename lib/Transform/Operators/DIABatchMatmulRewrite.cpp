@@ -860,6 +860,7 @@ struct DIABatchMatMulPattern : public OpRewritePattern<dia::BatchMatmulOp> {
                 scf::YieldOp::create(bb, loc, iLoop.getResults());
             });
 
+        if (auto metadata = op->getAttr("metadata")) bLoop->setAttr("metadata", metadata);
         rewriter.replaceOp(op, bLoop.getResult(0));
         return success();
     }
