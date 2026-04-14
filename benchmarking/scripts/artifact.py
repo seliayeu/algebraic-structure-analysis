@@ -51,12 +51,12 @@ def kalman_filter(runs_count: int = 5):
 
 def batch_bertlike(runs_count: int = 5):
     benchmark_name = "batch_bertlike"
-    bandwidths = [512, 409, 307, 256, 204, 153, 102, 51, 0]
+    bandwidths = [409, 307, 256, 204, 153, 102, 51, 0]
 
     configs = [
-        ("batch_bertlike_dense.mlir", None),
-        ("batch_bertlike_dense.mlir", "analysis", "rewrite"),
-        ("batch_bertlike_dia.mlir", "analysis", "rewrite"),
+        #("batch_bertlike_dense.mlir", None),
+        #("batch_bertlike_dense.mlir", "analysis", "rewrite"),
+        #("batch_bertlike_dia.mlir", "analysis", "rewrite"),
         ("batch_bertlike_dia.mlir", "analysis-detect", "rewrite"),
     ]
 
