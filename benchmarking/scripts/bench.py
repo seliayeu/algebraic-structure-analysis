@@ -4,7 +4,6 @@ import subprocess
 import csv
 from typing import List, Tuple
 import logging
-from datetime import datetime
 
 
 class CustomFormatter(logging.Formatter):
