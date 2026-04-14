@@ -7,6 +7,7 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     container:
       image: ghcr.io/andradekaio/mlir-base:104e82b
 
@@ -19,10 +20,11 @@ jobs:
             -G Ninja \
             -DLLVM_DIR=$LLVM_DIR \
             -DMLIR_DIR=$MLIR_DIR
-      # Build
+
       - name: Build ASP
         run: ninja -C build
 
-      # Run tests
       - name: Run Tests
-        run: ninja -C build check-bpa -j1 -v
+        env:
+          LIT_OPTS: "-v -j1"
+        run: ninja -C build check-bpa
