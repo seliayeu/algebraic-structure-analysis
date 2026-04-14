@@ -145,7 +145,7 @@ struct BatchMatmulPattern : public OpRewritePattern<linalg::BatchMatmulOp> {
                                 Value kPlusLb = arith::AddIOp::create(mb, loc, k, lowerB);
                                 Value jEndInner = arith::MinSIOp::create(mb, loc, iPlusUa, kPlusLb);
                                 Value jEndRaw = arith::AddIOp::create(mb, loc, jEndInner, c1);
-                                Value jEnd = arith::MinSIOp::create(mb, loc, dimN, jEndRaw);
+                                Value jEnd = arith::MinSIOp::create(mb, loc, dimM, jEndRaw);
 
                                 auto jLoop = scf::ForOp::create(
                                     mb, loc, jStart, jEnd, c1, ValueRange{ cInner },
