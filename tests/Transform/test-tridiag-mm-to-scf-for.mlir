@@ -8,11 +8,11 @@
 
 // CHECK: scf.for
 // CHECK-SAME: iter_args
+// CHECK: tensor.extract
 
 // CHECK: scf.for
 // CHECK-SAME: iter_args
 
-// CHECK: tensor.extract
 // CHECK: tensor.extract
 // CHECK: tensor.extract
 // CHECK: arith.mulf
