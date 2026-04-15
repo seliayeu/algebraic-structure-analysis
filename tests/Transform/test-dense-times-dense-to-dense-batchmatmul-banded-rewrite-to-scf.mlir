@@ -10,9 +10,9 @@
 // CHECK:         scf.for %[[B:.*]] = %[[C0]] to %[[C2]] step %[[C1]] iter_args(%{{.*}} = %[[EMPTY]])
 // CHECK:           scf.for %[[I:.*]] = %[[C0]] to %[[C3]] step %[[C1]]
 // CHECK:             scf.for {{.*}}
+// CHECK:               tensor.extract %[[CST]][%[[B]], %{{.*}}, %{{.*}}]
 // CHECK:               scf.for {{.*}}
 // CHECK:                 tensor.extract %{{.*}}[%[[B]], %{{.*}}, %{{.*}}]
-// CHECK:                 tensor.extract %[[CST]][%[[B]], %{{.*}}, %{{.*}}]
 // CHECK:                 tensor.extract %[[CST]][%[[B]], %{{.*}}, %{{.*}}]
 // CHECK:                 arith.mulf
 // CHECK:                 arith.addf

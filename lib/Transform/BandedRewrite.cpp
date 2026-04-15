@@ -110,63 +110,109 @@ struct BatchMatmulPattern : public OpRewritePattern<linalg::BatchMatmulOp> {
         auto bLoop = scf::ForOp::create(
             rewriter, loc, c0, dimK, c1, ValueRange{ C },
             [&](OpBuilder& bb, Location loc, Value b, ValueRange bArgs) {
-                Value cOut = bArgs[0];
-
+                Value cBatch = bArgs[0];
                 auto iLoop = scf::ForOp::create(
-                    bb, loc, c0, dimN, c1, ValueRange{ cOut },
+                    rewriter, loc, c0, dimN, c1, ValueRange{ cBatch },
                     [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
-                        Value cMid = iArgs[0];
+                        Value cOut = iArgs[0];
 
-                        // k start = max(0, i - (lA + lB))
-                        Value lAplB = arith::AddIOp::create(ob, loc, lowerA, lowerB);
-                        Value iMinusLALB = arith::SubIOp::create(ob, loc, i, lAplB);
-                        Value kStart = arith::MaxSIOp::create(ob, loc, c0, iMinusLALB);
+                        Value iMinusLa = arith::SubIOp::create(ob, loc, i, lowerA);
+                        Value jStart = arith::MaxSIOp::create(ob, loc, c0, iMinusLa);
 
-                        // k end = min(M, i + (uA + uB) + 1)
-                        Value uApuB = arith::AddIOp::create(ob, loc, upperA, upperB);
-                        Value iPlusuAuB = arith::AddIOp::create(ob, loc, i, uApuB);
-                        Value kEndRaw = arith::AddIOp::create(ob, loc, iPlusuAuB, c1);
-                        Value kEnd = arith::MinSIOp::create(ob, loc, dimM, kEndRaw);
+                        Value iPlusUa = arith::AddIOp::create(ob, loc, i, upperA);
+                        Value iPlusUaP1 = arith::AddIOp::create(ob, loc, iPlusUa, c1);
+                        Value jEnd = arith::MinSIOp::create(ob, loc, dimN, iPlusUaP1);
 
-                        auto kLoop = scf::ForOp::create(
-                            ob, loc, kStart, kEnd, c1, ValueRange{ cMid },
-                            [&](OpBuilder& mb, Location loc, Value k, ValueRange kArgs) {
-                                Value cInner = kArgs[0];
+                        auto jLoop = scf::ForOp::create(
+                            ob, loc, jStart, jEnd, c1, ValueRange{ cOut },
+                            [&](OpBuilder& mb, Location loc, Value j, ValueRange jArgs) {
+                                Value cMid = jArgs[0];
 
-                                // j start = max(0, max(i - lA, k - uB))
-                                Value iMinusLa = arith::SubIOp::create(mb, loc, i, lowerA);
-                                Value kMinusUb = arith::SubIOp::create(mb, loc, k, upperB);
-                                Value jStartInner =
-                                    arith::MaxSIOp::create(mb, loc, iMinusLa, kMinusUb);
-                                Value jStart = arith::MaxSIOp::create(mb, loc, c0, jStartInner);
+                                Value aij =
+                                    tensor::ExtractOp::create(mb, loc, A, ValueRange{ b, i, j });
 
-                                // j end = min(N, min(i + uA, k + lB) + 1)
-                                Value iPlusUa = arith::AddIOp::create(mb, loc, i, upperA);
-                                Value kPlusLb = arith::AddIOp::create(mb, loc, k, lowerB);
-                                Value jEndInner = arith::MinSIOp::create(mb, loc, iPlusUa, kPlusLb);
-                                Value jEndRaw = arith::AddIOp::create(mb, loc, jEndInner, c1);
-                                Value jEnd = arith::MinSIOp::create(mb, loc, dimM, jEndRaw);
+                                Value jMinusLb = arith::SubIOp::create(mb, loc, j, lowerB);
+                                Value kStart = arith::MaxSIOp::create(mb, loc, c0, jMinusLb);
 
-                                auto jLoop = scf::ForOp::create(
-                                    mb, loc, jStart, jEnd, c1, ValueRange{ cInner },
-                                    [&](OpBuilder& ib, Location loc, Value j, ValueRange jArgs) {
-                                        Value cInnest = jArgs[0];
-                                        Value cbik = tensor::ExtractOp::create(
-                                            ib, loc, cInnest, ValueRange{ b, i, k });
-                                        Value abij = tensor::ExtractOp::create(
-                                            ib, loc, A, ValueRange{ b, i, j });
-                                        Value bbjk = tensor::ExtractOp::create(
+                                Value jPlusUb = arith::AddIOp::create(mb, loc, j, upperB);
+                                Value jPlusUbP1 = arith::AddIOp::create(mb, loc, jPlusUb, c1);
+                                Value kEnd = arith::MinSIOp::create(mb, loc, dimM, jPlusUbP1);
+
+                                auto kLoop = scf::ForOp::create(
+                                    mb, loc, kStart, kEnd, c1, ValueRange{ cMid },
+                                    [&](OpBuilder& ib, Location loc, Value k, ValueRange kArgs) {
+                                        Value cInner = kArgs[0];
+                                        Value cik = tensor::ExtractOp::create(
+                                            ib, loc, cInner, ValueRange{ b, i, k });
+                                        Value bjk = tensor::ExtractOp::create(
                                             ib, loc, B, ValueRange{ b, j, k });
-                                        Value mul = arith::MulFOp::create(ib, loc, abij, bbjk);
-                                        Value add = arith::AddFOp::create(ib, loc, cbik, mul);
+                                        Value mul = arith::MulFOp::create(ib, loc, aij, bjk);
+                                        Value add = arith::AddFOp::create(ib, loc, cik, mul);
                                         Value updated = tensor::InsertOp::create(
-                                            ib, loc, add, cInnest, ValueRange{ b, i, k });
+                                            ib, loc, add, cInner, ValueRange{ b, i, k });
                                         scf::YieldOp::create(ib, loc, ValueRange{ updated });
                                     });
-                                scf::YieldOp::create(mb, loc, jLoop.getResults());
+                                scf::YieldOp::create(mb, loc, kLoop.getResults());
                             });
-                        scf::YieldOp::create(ob, loc, kLoop.getResults());
+                        scf::YieldOp::create(ob, loc, jLoop.getResults());
                     });
+                iLoop->setAttr("metadata", op->getAttr("metadata"));
+
+                // auto iLoop = scf::ForOp::create(
+                //     bb, loc, c0, dimN, c1, ValueRange{ cOut },
+                //     [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
+                //         Value cMid = iArgs[0];
+                //
+                //         // k start = max(0, i - (lA + lB))
+                //         Value lAplB = arith::AddIOp::create(ob, loc, lowerA, lowerB);
+                //         Value iMinusLALB = arith::SubIOp::create(ob, loc, i, lAplB);
+                //         Value kStart = arith::MaxSIOp::create(ob, loc, c0, iMinusLALB);
+                //
+                //         // k end = min(M, i + (uA + uB) + 1)
+                //         Value uApuB = arith::AddIOp::create(ob, loc, upperA, upperB);
+                //         Value iPlusuAuB = arith::AddIOp::create(ob, loc, i, uApuB);
+                //         Value kEndRaw = arith::AddIOp::create(ob, loc, iPlusuAuB, c1);
+                //         Value kEnd = arith::MinSIOp::create(ob, loc, dimM, kEndRaw);
+                //
+                //         auto kLoop = scf::ForOp::create(
+                //             ob, loc, kStart, kEnd, c1, ValueRange{ cMid },
+                //             [&](OpBuilder& mb, Location loc, Value k, ValueRange kArgs) {
+                //                 Value cInner = kArgs[0];
+                //
+                //                 // j start = max(0, max(i - lA, k - uB))
+                //                 Value iMinusLa = arith::SubIOp::create(mb, loc, i, lowerA);
+                //                 Value kMinusUb = arith::SubIOp::create(mb, loc, k, upperB);
+                //                 Value jStartInner =
+                //                 arith::MaxSIOp::create(mb, loc, iMinusLa, kMinusUb);
+                //             Value jStart = arith::MaxSIOp::create(mb, loc, c0, jStartInner);
+                //
+                //             // j end = min(N, min(i + uA, k + lB) + 1)
+                //             Value iPlusUa = arith::AddIOp::create(mb, loc, i, upperA);
+                //             Value kPlusLb = arith::AddIOp::create(mb, loc, k, lowerB);
+                //             Value jEndInner = arith::MinSIOp::create(mb, loc, iPlusUa, kPlusLb);
+                //             Value jEndRaw = arith::AddIOp::create(mb, loc, jEndInner, c1);
+                //             Value jEnd = arith::MinSIOp::create(mb, loc, dimM, jEndRaw);
+                //
+                //             auto jLoop = scf::ForOp::create(
+                //                 mb, loc, jStart, jEnd, c1, ValueRange{ cInner },
+                //                 [&](OpBuilder& ib, Location loc, Value j, ValueRange jArgs) {
+                //                     Value cInnest = jArgs[0];
+                //                     Value cbik = tensor::ExtractOp::create(
+                //                         ib, loc, cInnest, ValueRange{ b, i, k });
+                //                     Value abij = tensor::ExtractOp::create(
+                //                         ib, loc, A, ValueRange{ b, i, j });
+                //                     Value bbjk = tensor::ExtractOp::create(
+                //                         ib, loc, B, ValueRange{ b, j, k });
+                //                     Value mul = arith::MulFOp::create(ib, loc, abij, bbjk);
+                //                     Value add = arith::AddFOp::create(ib, loc, cbik, mul);
+                //                     Value updated = tensor::InsertOp::create(
+                //                         ib, loc, add, cInnest, ValueRange{ b, i, k });
+                //                     scf::YieldOp::create(ib, loc, ValueRange{ updated });
+                //                 });
+                //             scf::YieldOp::create(mb, loc, jLoop.getResults());
+                //         });
+                //     scf::YieldOp::create(ob, loc, kLoop.getResults());
+                // });
                 scf::YieldOp::create(bb, loc, iLoop.getResults());
             });
 
