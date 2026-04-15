@@ -299,12 +299,12 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
 
                         Value aij = tensor::ExtractOp::create(mb, loc, A, ValueRange{ i, j });
 
-                        Value jMinusUb = arith::SubIOp::create(mb, loc, j, upperB);
-                        Value kStart = arith::MaxSIOp::create(mb, loc, c0, jMinusUb);
+                        Value jMinusLb = arith::SubIOp::create(mb, loc, j, lowerB);
+                        Value kStart = arith::MaxSIOp::create(mb, loc, c0, jMinusLb);
 
-                        Value jPlusLb = arith::AddIOp::create(mb, loc, j, lowerB);
-                        Value jPlusLbP1 = arith::AddIOp::create(mb, loc, jPlusLb, c1);
-                        Value kEnd = arith::MinSIOp::create(mb, loc, dimM, jPlusLbP1);
+                        Value jPlusUb = arith::AddIOp::create(mb, loc, j, upperB);
+                        Value jPlusUbP1 = arith::AddIOp::create(mb, loc, jPlusUb, c1);
+                        Value kEnd = arith::MinSIOp::create(mb, loc, dimM, jPlusUbP1);
 
                         auto kLoop = scf::ForOp::create(
                             mb, loc, kStart, kEnd, c1, ValueRange{ cMid },
