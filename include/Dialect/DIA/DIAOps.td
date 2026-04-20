@@ -12,6 +12,17 @@ include "mlir/IR/CommonTypeConstraints.td"
 class DIA_Op<string mnemonic, list<Trait> traits = []>
     : Op<DIA_Dialect, mnemonic, traits>;
 
+def DIA_SoftmaxOp: DIA_Op<"softmax", [Pure]> {
+  let summary = "Banded-aware all-in-one softmax";
+  let arguments = (ins
+      2DTensorOf<[AnyType]>:$input
+  );
+  let results = (outs 2DTensorOf<[AnyType]>:$output);
+  let assemblyFormat = [{
+    $input attr-dict `:` type($input) `->` type($output)
+  }];
+}
+
 def DIA_MatmulOp : DIA_Op<"matmul", [Pure]> {
     let summary = "DIA matrix multiplication with heterogeneous layouts";
     let arguments = (ins
