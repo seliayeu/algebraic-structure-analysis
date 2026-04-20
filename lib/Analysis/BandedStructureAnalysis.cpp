@@ -172,6 +172,8 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
         return visitDIAElementwise(&diaElementwiseOp);
     } else if (auto diaTransposeOp{ dyn_cast<dia::TransposeOp>(op) }) {
         return visitDIATranspose(&diaTransposeOp);
+    } else if (auto diaSoftmaxOp{ dyn_cast<dia::SoftmaxOp>(op) }) {
+        return visitDIASoftmax(&diaSoftmaxOp);
     }
 
     return success();
@@ -354,6 +356,18 @@ LogicalResult BandedStructureAnalysis::visitMul(linalg::MulOp* op) {
     auto newProperty{ binaryElementwiseProduct(lhsMat.Property, rhsMat.Property) };
     propertyMap[result] = { join(propertyMap[result].Property, newProperty),
                             propertyMap[operands[0]].Dims };
+    return success();
+}
+
+LogicalResult BandedStructureAnalysis::visitDIASoftmax(dia::SoftmaxOp* op) {
+    auto input = op->getInput();
+    auto result = op->getResult();
+
+    if (!propertyMap.contains(input)) return failure();
+
+    const BandedSubMatrix inputBand = propertyMap[input];
+    propertyMap[result] = inputBand;
+
     return success();
 }
 

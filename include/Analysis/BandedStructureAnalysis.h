@@ -8,6 +8,7 @@
 #include "Analysis/BandedProperty.h"
 #include "Dialect/DIA/DIAOps.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Operation.h"
@@ -90,6 +91,7 @@ class BandedStructureAnalysis {
     LogicalResult visitDIABatchMatmul(dia::BatchMatmulOp* op);
     LogicalResult visitDIAElementwise(dia::ElementwiseOp* op);
     LogicalResult visitDIATranspose(dia::TransposeOp* op);
+    LogicalResult visitDIASoftmax(dia::SoftmaxOp* op);
 
     // Linalg ops
     LogicalResult visitOperation(Operation* op);
