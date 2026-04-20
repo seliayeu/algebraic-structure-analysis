@@ -19,7 +19,7 @@ def DIA_SoftmaxOp: DIA_Op<"softmax", [Pure]> {
   );
   let results = (outs 2DTensorOf<[AnyType]>:$output);
   let assemblyFormat = [{
-    `(` $input attr-dict `:` type($input) `)` `->` type($output)
+    `(` $input `:` type($input) `)` `->` type($output) attr-dict 
   }];
 }
 

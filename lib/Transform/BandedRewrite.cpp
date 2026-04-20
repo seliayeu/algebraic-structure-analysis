@@ -8,6 +8,7 @@
 #include "Transform/Operators/DIABatchMatmulRewrite.h"
 #include "Transform/Operators/DIAElementwiseRewrite.h"
 #include "Transform/Operators/DIAMatmulRewrite.h"
+#include "Transform/Operators/DIASoftmaxRewrite.h"
 #include "Transform/Operators/DIATransposeRewrite.h"
 #include "Utils/TransformUtils.h"
 #include "llvm/ADT/SmallVector.h"
@@ -158,61 +159,6 @@ struct BatchMatmulPattern : public OpRewritePattern<linalg::BatchMatmulOp> {
                     });
                 iLoop->setAttr("metadata", op->getAttr("metadata"));
 
-                // auto iLoop = scf::ForOp::create(
-                //     bb, loc, c0, dimN, c1, ValueRange{ cOut },
-                //     [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
-                //         Value cMid = iArgs[0];
-                //
-                //         // k start = max(0, i - (lA + lB))
-                //         Value lAplB = arith::AddIOp::create(ob, loc, lowerA, lowerB);
-                //         Value iMinusLALB = arith::SubIOp::create(ob, loc, i, lAplB);
-                //         Value kStart = arith::MaxSIOp::create(ob, loc, c0, iMinusLALB);
-                //
-                //         // k end = min(M, i + (uA + uB) + 1)
-                //         Value uApuB = arith::AddIOp::create(ob, loc, upperA, upperB);
-                //         Value iPlusuAuB = arith::AddIOp::create(ob, loc, i, uApuB);
-                //         Value kEndRaw = arith::AddIOp::create(ob, loc, iPlusuAuB, c1);
-                //         Value kEnd = arith::MinSIOp::create(ob, loc, dimM, kEndRaw);
-                //
-                //         auto kLoop = scf::ForOp::create(
-                //             ob, loc, kStart, kEnd, c1, ValueRange{ cMid },
-                //             [&](OpBuilder& mb, Location loc, Value k, ValueRange kArgs) {
-                //                 Value cInner = kArgs[0];
-                //
-                //                 // j start = max(0, max(i - lA, k - uB))
-                //                 Value iMinusLa = arith::SubIOp::create(mb, loc, i, lowerA);
-                //                 Value kMinusUb = arith::SubIOp::create(mb, loc, k, upperB);
-                //                 Value jStartInner =
-                //                 arith::MaxSIOp::create(mb, loc, iMinusLa, kMinusUb);
-                //             Value jStart = arith::MaxSIOp::create(mb, loc, c0, jStartInner);
-                //
-                //             // j end = min(N, min(i + uA, k + lB) + 1)
-                //             Value iPlusUa = arith::AddIOp::create(mb, loc, i, upperA);
-                //             Value kPlusLb = arith::AddIOp::create(mb, loc, k, lowerB);
-                //             Value jEndInner = arith::MinSIOp::create(mb, loc, iPlusUa, kPlusLb);
-                //             Value jEndRaw = arith::AddIOp::create(mb, loc, jEndInner, c1);
-                //             Value jEnd = arith::MinSIOp::create(mb, loc, dimM, jEndRaw);
-                //
-                //             auto jLoop = scf::ForOp::create(
-                //                 mb, loc, jStart, jEnd, c1, ValueRange{ cInner },
-                //                 [&](OpBuilder& ib, Location loc, Value j, ValueRange jArgs) {
-                //                     Value cInnest = jArgs[0];
-                //                     Value cbik = tensor::ExtractOp::create(
-                //                         ib, loc, cInnest, ValueRange{ b, i, k });
-                //                     Value abij = tensor::ExtractOp::create(
-                //                         ib, loc, A, ValueRange{ b, i, j });
-                //                     Value bbjk = tensor::ExtractOp::create(
-                //                         ib, loc, B, ValueRange{ b, j, k });
-                //                     Value mul = arith::MulFOp::create(ib, loc, abij, bbjk);
-                //                     Value add = arith::AddFOp::create(ib, loc, cbik, mul);
-                //                     Value updated = tensor::InsertOp::create(
-                //                         ib, loc, add, cInnest, ValueRange{ b, i, k });
-                //                     scf::YieldOp::create(ib, loc, ValueRange{ updated });
-                //                 });
-                //             scf::YieldOp::create(mb, loc, jLoop.getResults());
-                //         });
-                //     scf::YieldOp::create(ob, loc, kLoop.getResults());
-                // });
                 scf::YieldOp::create(bb, loc, iLoop.getResults());
             });
 
@@ -667,6 +613,7 @@ struct BandedRewrite : public impl::BandedRewriteBase<BandedRewrite> {
         addDIABatchMatmulPatterns(patterns);
         addDIAMatmulPatterns(patterns, detectDIA);
         addDIATransposePatterns(patterns);
+        addDIASoftmaxPatterns(patterns);
 
         GreedyRewriteConfig config;
         config.setMaxIterations(1);
