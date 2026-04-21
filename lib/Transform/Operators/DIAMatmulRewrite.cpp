@@ -259,7 +259,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
 
     LogicalResult diaTimesDiaToDenseBandedMatmulToSCF(dia::MatmulOp op, PatternRewriter& rewriter,
                                                       const BandedSubMatrix& bandA,
-                                                      const BandedSubMatrix& bandB) const {
+                                                      const BandedSubMatrix& bandB,
+                                                      const BandedSubMatrix& resultBand) const {
         Location loc = op->getLoc();
         Value A = op.getLhs();
         Value B = op.getRhs();
@@ -274,6 +275,9 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         const uint64_t upperB = bandB.Property.UpperBandwidth;
         const uint64_t lowerB = bandB.Property.LowerBandwidth;
 
+        const uint64_t upperC = resultBand.Property.UpperBandwidth;
+        const uint64_t lowerC = resultBand.Property.LowerBandwidth;
+
         Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
         Value c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
         Value cN = arith::ConstantIndexOp::create(rewriter, loc, N);
@@ -283,6 +287,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         Value cUB = arith::ConstantIndexOp::create(rewriter, loc, upperB);
         Value cLAi64 = arith::ConstantIntOp::create(rewriter, loc, lowerA, 64);
         Value cLBi64 = arith::ConstantIntOp::create(rewriter, loc, lowerB, 64);
+        Value cLC = arith::ConstantIndexOp::create(rewriter, loc, lowerC);
+        Value cUC = arith::ConstantIndexOp::create(rewriter, loc, upperC);
 
         auto elementType = resultType.getElementType();
         Value zero = arith::ConstantOp::create(rewriter, loc, elementType,
@@ -301,9 +307,27 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             rewriter, loc, c0, cN, c1, ValueRange{ zeroedC },
             [&](OpBuilder& ob, Location loc, Value row, ValueRange rowArgs) {
                 Value cRow = rowArgs[0];
+                // col >= max(0, row - (lA + lB), row - lC)
+                Value lAPlusLB = arith::AddIOp::create(ob, loc, cLA, cLB);
+                Value rowMinusLALB = arith::SubIOp::create(ob, loc, row, lAPlusLB);
+                Value rowMinusLC = arith::SubIOp::create(ob, loc, row, cLC);
+
+                Value maxLowerBounds = arith::MaxSIOp::create(ob, loc, rowMinusLALB, rowMinusLC);
+                Value jStart = arith::MaxSIOp::create(ob, loc, c0, maxLowerBounds);
+
+                // col <= min(N, row + (uA + uB), row + uC)
+                Value uAPlusUB = arith::AddIOp::create(ob, loc, cUA, cUB);
+                Value rowPlusUAUB = arith::AddIOp::create(ob, loc, row, uAPlusUB);
+                Value rowPlusUC = arith::AddIOp::create(ob, loc, row, cUC);
+
+                Value minUpperBounds = arith::MinSIOp::create(ob, loc, rowPlusUAUB, rowPlusUC);
+
+                // Add 1 for the exclusive loop bound
+                Value minUpperBoundsP1 = arith::AddIOp::create(ob, loc, minUpperBounds, c1);
+                Value jEnd = arith::MinSIOp::create(ob, loc, cN, minUpperBoundsP1);
 
                 auto jLoop = scf::ForOp::create(
-                    ob, loc, c0, cN, c1, ValueRange{ cRow },
+                    ob, loc, jStart, jEnd, c1, ValueRange{ cRow },
                     [&](OpBuilder& cb, Location loc, Value col, ValueRange colArgs) {
                         Value cCol = colArgs[0];
 
@@ -955,10 +979,11 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             // the `detect-dia` flag is `true`
             if (bandA.IsDia && bandB.IsDia && !resultBand.IsDia && detectDIA) {
                 // TODO: NOT UPDATED YET
-                return diaTimesDiaToDenseBandedMatmulToSCF(op, rewriter, bandA, bandB);
+                return diaTimesDiaToDenseBandedMatmulToSCF(op, rewriter, bandA, bandB, resultBand);
             } else if (bandA.IsDia && !bandB.IsDia && resultBand.IsDia) {
                 return diaTimesDenseToDiaBandedMatmulToSCF(op, rewriter, bandA, bandB);
             } else if (!bandA.IsDia && !bandB.IsDia && resultBand.IsDia) {
+                // NOTE: OK
                 return denseTimesDenseToDiaBandedMatmulToSCF(op, rewriter, bandA, bandB,
                                                              resultBand);
             } else if (!bandA.IsDia && bandB.IsDia && !resultBand.IsDia) {
