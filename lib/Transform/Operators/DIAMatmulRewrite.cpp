@@ -257,8 +257,9 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         return success();
     }
 
-    LogicalResult diaTimesDiaToDenseBandedMatmulToSCF(dia::MatmulOp op,
-                                                      PatternRewriter& rewriter) const {
+    LogicalResult diaTimesDiaToDenseBandedMatmulToSCF(dia::MatmulOp op, PatternRewriter& rewriter,
+                                                      const BandedSubMatrix& bandA,
+                                                      const BandedSubMatrix& bandB) const {
         Location loc = op->getLoc();
         Value A = op.getLhs();
         Value B = op.getRhs();
@@ -267,16 +268,6 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         auto resultType = cast<RankedTensorType>(C.getType());
         const int64_t N = resultType.getDimSize(1);
 
-        Operation* defOpA = A.getDefiningOp();
-        Operation* defOpB = B.getDefiningOp();
-
-        auto dictA = defOpA->getAttrDictionary();
-        auto dictB = defOpB->getAttrDictionary();
-
-        if (!dictA || !dictB) return failure();
-
-        const BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
-        const BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
         const uint64_t upperA = bandA.Property.UpperBandwidth;
         const uint64_t lowerA = bandA.Property.LowerBandwidth;
 
@@ -528,22 +519,13 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
     /// computes only the entries within the intersection.
     /// The result is materialized in the DIA format.
     LogicalResult denseTimesDenseToDiaBandedMatmulToSCF(dia::MatmulOp op, PatternRewriter& rewriter,
+                                                        const BandedSubMatrix& bandA,
+                                                        const BandedSubMatrix& bandB,
                                                         const BandedSubMatrix& outputBand) const {
         Location loc = op.getLoc();
         Value A = op.getLhs();
         Value B = op.getRhs();
         Value C = op.getOutput();
-
-        Operation* defOpA = A.getDefiningOp();
-        Operation* defOpB = B.getDefiningOp();
-
-        auto dictA = defOpA->getAttrDictionary();
-        auto dictB = defOpB->getAttrDictionary();
-
-        if (!dictA || !dictB) return failure();
-
-        const BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
-        const BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
 
         auto resultType = cast<RankedTensorType>(op.getResult().getType());
         auto inputType = cast<RankedTensorType>(A.getType());
@@ -560,6 +542,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         Value upperA = arith::ConstantIndexOp::create(rewriter, loc, bandA.Property.UpperBandwidth);
         Value lowerB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.LowerBandwidth);
         Value upperB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.UpperBandwidth);
+        Value upperC =
+            arith::ConstantIndexOp::create(rewriter, loc, outputBand.Property.UpperBandwidth);
         Value lowerC =
             arith::ConstantIndexOp::create(rewriter, loc, outputBand.Property.LowerBandwidth);
 
@@ -584,17 +568,23 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             rewriter, loc, c0, dimN, c1, ValueRange{ zeroedDia },
             [&](OpBuilder& ob, Location loc, Value i, ValueRange outerArgs) {
                 Value cOuter = outerArgs[0];
-
-                // j start = max(0, i - (La + Lb))
                 Value lAPlusLb = arith::AddIOp::create(ob, loc, lowerA, lowerB);
-                Value iMinusLower = arith::SubIOp::create(ob, loc, i, lAPlusLb);
-                Value jStart = arith::MaxSIOp::create(ob, loc, c0, iMinusLower);
+                Value iMinusLowerAB = arith::SubIOp::create(ob, loc, i, lAPlusLb);
+                Value iMinusLc = arith::SubIOp::create(ob, loc, i, lowerC);
 
-                // j end = min(M, i + (Ua + Ub))
+                // j >= max(i - (La + Lb), i - Lc)
+                Value maxLowerBounds = arith::MaxSIOp::create(ob, loc, iMinusLowerAB, iMinusLc);
+                Value jStart = arith::MaxSIOp::create(ob, loc, c0, maxLowerBounds);
+
                 Value uAPlusUb = arith::AddIOp::create(ob, loc, upperA, upperB);
-                Value iPlusUpper = arith::AddIOp::create(ob, loc, i, uAPlusUb);
-                Value iPlusUpperP1 = arith::AddIOp::create(ob, loc, iPlusUpper, c1);
-                Value jEnd = arith::MinSIOp::create(ob, loc, dimM, iPlusUpperP1);
+                Value iPlusUpperAB = arith::AddIOp::create(ob, loc, i, uAPlusUb);
+                Value iPlusUc = arith::AddIOp::create(ob, loc, i, upperC);
+
+                // j <= min(i + (Ua + Ub), i + Uc)
+                Value minUpperBounds = arith::MinSIOp::create(ob, loc, iPlusUpperAB, iPlusUc);
+
+                Value minUpperBoundsP1 = arith::AddIOp::create(ob, loc, minUpperBounds, c1);
+                Value jEnd = arith::MinSIOp::create(ob, loc, dimM, minUpperBoundsP1);
 
                 auto jLoop = scf::ForOp::create(
                     ob, loc, jStart, jEnd, c1, ValueRange{ cOuter },
@@ -948,7 +938,7 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         const BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
         const BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
         // diagonal possible combinations
-        if (resultBand.isDiagonal()) {
+        if (bandA.isDiagonal() && bandB.isDiagonal() && resultBand.isDiagonal()) {
             if (!bandA.IsDia && !bandB.IsDia)
                 return denseTimesDenseToDiaDiagMatmulToLinalg(op, rewriter);
             else if (bandA.IsDia && !bandB.IsDia)
@@ -957,8 +947,6 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                 return failure();
             else if (!bandA.IsDia && !bandB.IsDia && !resultBand.IsDia)
                 return denseTimesDenseToDenseMatmulToLinalg(op, rewriter, bandA, bandB);
-            // TODO: implement function below
-            //  return denseTimesDiaToDiaDiagMatmulToLinalg(op, rewriter);
             else
                 return diaTimesDiaToDiaDiagMatmulToLinalg(op, rewriter);
         } else {
@@ -966,11 +954,13 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             // inputs are in DIA, the analysis concluded that the result is not DIA
             // the `detect-dia` flag is `true`
             if (bandA.IsDia && bandB.IsDia && !resultBand.IsDia && detectDIA) {
-                return diaTimesDiaToDenseBandedMatmulToSCF(op, rewriter);
+                // TODO: NOT UPDATED YET
+                return diaTimesDiaToDenseBandedMatmulToSCF(op, rewriter, bandA, bandB);
             } else if (bandA.IsDia && !bandB.IsDia && resultBand.IsDia) {
                 return diaTimesDenseToDiaBandedMatmulToSCF(op, rewriter, bandA, bandB);
             } else if (!bandA.IsDia && !bandB.IsDia && resultBand.IsDia) {
-                return denseTimesDenseToDiaBandedMatmulToSCF(op, rewriter, resultBand);
+                return denseTimesDenseToDiaBandedMatmulToSCF(op, rewriter, bandA, bandB,
+                                                             resultBand);
             } else if (!bandA.IsDia && bandB.IsDia && !resultBand.IsDia) {
                 // DENSE * DIA = DENSE
                 return denseTimesDiaToDenseBandedMatmulToSCF(op, rewriter, bandA, bandB);
