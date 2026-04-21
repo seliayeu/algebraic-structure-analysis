@@ -965,7 +965,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             // Output should be mapped to dense when:
             // inputs are in DIA, the analysis concluded that the result is not DIA
             // the `detect-dia` flag is `true`
-            if (bandA.IsDia && bandB.IsDia && !resultBand.IsDia && detectDIA) {
+
+            if (bandA.IsDia && bandB.IsDia && !resultBand.IsDia) {
                 return diaTimesDiaToDenseBandedMatmulToSCF(op, rewriter);
             } else if (bandA.IsDia && !bandB.IsDia && resultBand.IsDia) {
                 return diaTimesDenseToDiaBandedMatmulToSCF(op, rewriter, bandA, bandB);
