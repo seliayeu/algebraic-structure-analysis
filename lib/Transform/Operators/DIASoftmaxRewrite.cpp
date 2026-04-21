@@ -227,6 +227,7 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
             scf::YieldOp::create(rewriter, loc, ValueRange{ updatedOut });
         }
 
+        rowLoop->setAttr("metadata", op->getAttr("metadata"));
         rewriter.replaceOp(op, rowLoop.getResult(0));
         return success();
     }
