@@ -195,10 +195,23 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
 
         const BandedSubMatrix opBandInfo = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
 
-        if (opBandInfo.isDiagonal()) return denseTimesDenseToDenseDiagMatmulToLinalg(op, rewriter);
+        Value A = op.getInputs()[0];
+        Value B = op.getInputs()[1];
+        Operation* defOpA = A.getDefiningOp();
+        Operation* defOpB = B.getDefiningOp();
+
+        auto dictA = defOpA->getAttrDictionary();
+        auto dictB = defOpB->getAttrDictionary();
+
+        if (!dictA || !dictB) return failure();
+
+        const BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
+        const BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
+        if (bandA.isDiagonal() && bandB.isDiagonal() && opBandInfo.isDiagonal())
+            return denseTimesDenseToDenseDiagMatmulToLinalg(op, rewriter);
         // banded
         else
-            return denseTimesDenseToDenseBandedMatmulToSCF(op, rewriter);
+            return denseTimesDenseToDenseBandedMatmulToSCF(op, rewriter, bandA, bandB, opBandInfo);
         return failure();
     }
 
@@ -235,22 +248,14 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
     }
 
     LogicalResult denseTimesDenseToDenseBandedMatmulToSCF(linalg::MatmulOp op,
-                                                          PatternRewriter& rewriter) const {
+                                                          PatternRewriter& rewriter,
+                                                          const BandedSubMatrix& bandA,
+                                                          const BandedSubMatrix& bandB,
+                                                          const BandedSubMatrix& resultBand) const {
         Location loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
         Value C = op.getOutputs()[0];
-
-        Operation* defOpA = A.getDefiningOp();
-        Operation* defOpB = B.getDefiningOp();
-
-        auto dictA = defOpA->getAttrDictionary();
-        auto dictB = defOpB->getAttrDictionary();
-
-        if (!dictA || !dictB) return failure();
-
-        const BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
-        const BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
 
         auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
         const uint64_t N = resultType.getDimSize(0);
@@ -265,6 +270,10 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
         Value upperA = arith::ConstantIndexOp::create(rewriter, loc, bandA.Property.UpperBandwidth);
         Value lowerB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.LowerBandwidth);
         Value upperB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.UpperBandwidth);
+        Value lowerC =
+            arith::ConstantIndexOp::create(rewriter, loc, resultBand.Property.LowerBandwidth);
+        Value upperC =
+            arith::ConstantIndexOp::create(rewriter, loc, resultBand.Property.UpperBandwidth);
 
         auto elementType = resultType.getElementType();
         Value zero = arith::ConstantOp::create(rewriter, loc, elementType,
@@ -292,11 +301,19 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
                         Value aij = tensor::ExtractOp::create(mb, loc, A, ValueRange{ i, j });
 
                         Value jMinusLb = arith::SubIOp::create(mb, loc, j, lowerB);
-                        Value kStart = arith::MaxSIOp::create(mb, loc, c0, jMinusLb);
+                        Value iMinusLc = arith::SubIOp::create(mb, loc, i, lowerC);
+
+                        Value maxJB_IC = arith::MaxSIOp::create(mb, loc, jMinusLb, iMinusLc);
+                        Value kStart = arith::MaxSIOp::create(mb, loc, c0, maxJB_IC);
 
                         Value jPlusUb = arith::AddIOp::create(mb, loc, j, upperB);
+                        Value iPlusUc = arith::AddIOp::create(mb, loc, i, upperC);
+
                         Value jPlusUbP1 = arith::AddIOp::create(mb, loc, jPlusUb, c1);
-                        Value kEnd = arith::MinSIOp::create(mb, loc, dimM, jPlusUbP1);
+                        Value iPlusUcP1 = arith::AddIOp::create(mb, loc, iPlusUc, c1);
+
+                        Value minJB_IC = arith::MinSIOp::create(mb, loc, jPlusUbP1, iPlusUcP1);
+                        Value kEnd = arith::MinSIOp::create(mb, loc, dimM, minJB_IC);
 
                         auto kLoop = scf::ForOp::create(
                             mb, loc, kStart, kEnd, c1, ValueRange{ cMid },
