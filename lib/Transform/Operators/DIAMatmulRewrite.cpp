@@ -830,7 +830,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
 
     LogicalResult denseTimesDiaToDenseBandedMatmulToSCF(dia::MatmulOp op, PatternRewriter& rewriter,
                                                         const BandedSubMatrix& bandA,
-                                                        const BandedSubMatrix& bandB) const {
+                                                        const BandedSubMatrix& bandB,
+                                                        const BandedSubMatrix& resultBand) const {
         Location loc = op->getLoc();
         Value A = op.getLhs();
         Value B = op.getRhs();
@@ -840,6 +841,9 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         const int64_t uA = bandA.Property.UpperBandwidth;
         const int64_t lB = bandB.Property.LowerBandwidth;
         const int64_t uB = bandB.Property.UpperBandwidth;
+
+        int64_t effLowerC = std::min<int64_t>(lA + lB, resultBand.Property.LowerBandwidth);
+        int64_t effUpperC = std::min<int64_t>(uA + uB, resultBand.Property.UpperBandwidth);
 
         auto resultType = cast<RankedTensorType>(C.getType());
         const int64_t N = resultType.getDimSize(1);
@@ -852,6 +856,9 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         Value cLB = arith::ConstantIndexOp::create(rewriter, loc, lB);
         Value cUB = arith::ConstantIndexOp::create(rewriter, loc, uB);
         Value cLBi64 = arith::ConstantIntOp::create(rewriter, loc, lB, 64);
+
+        Value cLC = arith::ConstantIndexOp::create(rewriter, loc, effLowerC);
+        Value cUC = arith::ConstantIndexOp::create(rewriter, loc, effUpperC);
 
         auto elementType = resultType.getElementType();
         Value zero = arith::ConstantOp::create(rewriter, loc, elementType,
@@ -867,27 +874,24 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         };
 
         // Outer product: for k in range(N)
-        //   A column k is A[i][k] for i in [max(0,k-lA), min(N,k+uA+1))
-        //   B row k is B[k][j] stored as B_dia[j-k+lB][k]
-        //             for j in [max(0,k-lB), min(N,k+uB+1))
         auto kLoop = scf::ForOp::create(
             rewriter, loc, c0, cN, c1, ValueRange{ zeroedC },
             [&](OpBuilder& kb, Location loc, Value k, ValueRange kArgs) {
                 Value cK = kArgs[0];
 
                 // i range: max(0, k-lA) to min(N, k+uA+1)
-                Value kMinusLA = arith::SubIOp::create(kb, loc, k, cLA);
-                Value iStart = arith::MaxSIOp::create(kb, loc, c0, kMinusLA);
-                Value kPlusUA1 =
-                    arith::AddIOp::create(kb, loc, arith::AddIOp::create(kb, loc, k, cUA), c1);
-                Value iEnd = arith::MinSIOp::create(kb, loc, cN, kPlusUA1);
+                Value kMinusUA = arith::SubIOp::create(kb, loc, k, cUA);
+                Value iStart = arith::MaxSIOp::create(kb, loc, c0, kMinusUA);
+                Value kPlusLA1 =
+                    arith::AddIOp::create(kb, loc, arith::AddIOp::create(kb, loc, k, cLA), c1);
+                Value iEnd = arith::MinSIOp::create(kb, loc, cN, kPlusLA1);
 
-                // j range: max(0, k-lB) to min(N, k+uB+1)
+                // j range constraint from B: max(0, k-lB) to min(N, k+uB+1)
                 Value kMinusLB = arith::SubIOp::create(kb, loc, k, cLB);
-                Value jStart = arith::MaxSIOp::create(kb, loc, c0, kMinusLB);
+                Value jStartB = arith::MaxSIOp::create(kb, loc, c0, kMinusLB);
                 Value kPlusUB1 =
                     arith::AddIOp::create(kb, loc, arith::AddIOp::create(kb, loc, k, cUB), c1);
-                Value jEnd = arith::MinSIOp::create(kb, loc, cN, kPlusUB1);
+                Value jEndB = arith::MinSIOp::create(kb, loc, cN, kPlusUB1);
 
                 auto iLoop = scf::ForOp::create(
                     kb, loc, iStart, iEnd, c1, ValueRange{ cK },
@@ -895,6 +899,15 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                         Value cI = iArgs[0];
 
                         Value aVal = tensor::ExtractOp::create(ib, loc, A, ValueRange{ i, k });
+
+                        // jStart = max(jStartB, i - effLowerC)
+                        Value iMinusLC = arith::SubIOp::create(ib, loc, i, cLC);
+                        Value jStart = arith::MaxSIOp::create(ib, loc, jStartB, iMinusLC);
+
+                        // jEnd = min(jEndB, i + effUpperC + 1)
+                        Value iPlusUC = arith::AddIOp::create(ib, loc, i, cUC);
+                        Value iPlusUC1 = arith::AddIOp::create(ib, loc, iPlusUC, c1);
+                        Value jEnd = arith::MinSIOp::create(ib, loc, jEndB, iPlusUC1);
 
                         auto jLoop = scf::ForOp::create(
                             ib, loc, jStart, jEnd, c1, ValueRange{ cI },
@@ -1017,7 +1030,9 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                 return denseTimesDenseToDiaBandedMatmulToSCF(op, rewriter, bandA, bandB,
                                                              resultBand);
             } else if (!bandA.IsDia && bandB.IsDia && !resultBand.IsDia) {
-                return denseTimesDiaToDenseBandedMatmulToSCF(op, rewriter, bandA, bandB);
+                // NOTE: OK
+                return denseTimesDiaToDenseBandedMatmulToSCF(op, rewriter, bandA, bandB,
+                                                             resultBand);
             } else if (bandA.IsDia && !bandB.IsDia && !resultBand.IsDia) {
                 // NOTE: OK
                 return diaTimesDenseToDenseBandedMatmulToSCF(op, rewriter, bandA, bandB,
