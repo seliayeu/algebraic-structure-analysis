@@ -1,10 +1,10 @@
+import os
 import platform
 from pathlib import Path
 import subprocess
 import csv
 from typing import List, Tuple
 import logging
-from datetime import datetime
 
 
 class CustomFormatter(logging.Formatter):
@@ -165,6 +165,8 @@ def lower_to_llvm(mlir_file: Path, flags: List[str]):
             "-one-shot-bufferize=bufferize-function-boundaries",
             "-convert-linalg-to-loops",
             "-convert-scf-to-cf",
+            "-convert-math-to-llvm",
+            "-convert-math-to-libm",
             "-expand-strided-metadata",
             "-lower-affine",
             "-convert-arith-to-llvm",
@@ -196,12 +198,23 @@ def compile_kernel(ll_path: Path, obj_path: Path):
 
 def build_executable(obj_path: Path, exe_path: Path):
     logger.info(f"Building executable {exe_path.name}")
+
+    mlir_lib_dir = os.environ.get("MLIR_LIB_DIR")
+
+    if not mlir_lib_dir:
+        raise RuntimeError("MLIR_LIB_DIR environment variable not set")
+
     run_cmd(
         [
             "clang++",
             "-O3",
             "benchmarking/scripts/bench.cpp",
             str(obj_path),
+            "-L",
+            mlir_lib_dir,
+            "-Wl,-rpath," + mlir_lib_dir,
+            "-lmlir_runner_utils",
+            "-lmlir_c_runner_utils",
             "-o",
             str(exe_path),
         ]
@@ -261,7 +274,10 @@ def run(
         logger.info(f"   Flags: {' '.join(flags) if flags else 'none'}")
         logger.info("-" * 60)
 
-        for bw in bandwidths:
+        # No need to run for all bands
+        bw_list = [0] if tag == "baseline" else bandwidths
+
+        for bw in bw_list:
             current += 1
             logger.info("")
             logger.info(f"[{current}/{total_configs}] Testing: {tag} @ bandwidth={bw}")
