@@ -1,3 +1,4 @@
+from typing import List
 import pandas as pd
 import plotly.graph_objects as go
 import kaleido
@@ -10,6 +11,7 @@ def create_time_plot(
     figure_title: str = "Chain Matmul - Execution Time",
     show_title: bool = True,
     save_png_and_svg: bool = True,
+    color_palette: List[str] = None,
 ):
     """
     Create execution time plot for chain matrix multiplication.
@@ -40,11 +42,11 @@ def create_time_plot(
             mode="lines+markers",
             name="baseline",
             legendgroup="baseline",
-            line=dict(color="#94A3B8", width=2, dash="solid"),
+            line=dict(color=color_palette[0], width=2, dash="solid"),
             marker=dict(
                 size=6,
                 symbol="circle",
-                color="#94A3B8",
+                color=color_palette[0],
                 line=dict(color="white", width=1.5),
             ),
         )
@@ -57,11 +59,11 @@ def create_time_plot(
             mode="lines+markers",
             name="bpa-dense",
             legendgroup="bpa-dense",
-            line=dict(color="#F97316", width=2, shape="spline"),
+            line=dict(color=color_palette[1], width=2, shape="spline"),
             marker=dict(
                 size=6,
                 symbol="diamond",
-                color="#F97316",
+                color=color_palette[1],
                 line=dict(color="white", width=1.5),
             ),
             customdata=baseline.set_index("bw")
@@ -79,11 +81,11 @@ def create_time_plot(
             mode="lines+markers",
             name="bpa-dia",
             legendgroup="bpa-dia",
-            line=dict(color="#06B6D4", width=2, shape="spline"),
+            line=dict(color=color_palette[2], width=2, shape="spline"),
             marker=dict(
                 size=9,
                 symbol="triangle-up",
-                color="#06B6D4",
+                color=color_palette[2],
                 line=dict(color="white", width=1.5),
             ),
             hovertemplate="<b>bpa-dia</b><br>Bands: %{x}<br>Time: %{y:.4f} seconds<br><extra></extra>",
@@ -97,11 +99,11 @@ def create_time_plot(
             mode="lines+markers",
             name="bpa-hybrid",
             legendgroup="bpa-hybrid",
-            line=dict(color="#00b200", width=2, shape="spline"),
+            line=dict(color=color_palette[3], width=2, shape="spline"),
             marker=dict(
                 size=6,
                 symbol="square",
-                color="#00b200",
+                color=color_palette[3],
                 line=dict(color="white", width=1.5),
             ),
             hovertemplate="<b>bpa-hybrid</b><br>Bands: %{x}<br>Time: %{y:.4f} seconds<br><extra></extra>",
@@ -194,6 +196,7 @@ def create_memory_plot(
     figure_title: str = "Chain Matmul - Memory Footprint",
     show_title: bool = True,
     save_png_and_svg: bool = True,
+    color_palette: List[str] = None,
 ):
     """
     Create memory footprint plot for chain matrix multiplication.
@@ -225,7 +228,7 @@ def create_memory_plot(
             mode="lines+markers",
             name="baseline",
             legendgroup="baseline",
-            line=dict(color="#94A3B8", width=2, dash="solid"),
+            line=dict(color=color_palette[0], width=2, dash="solid"),
             marker=dict(
                 size=6,
                 symbol="circle",
@@ -242,11 +245,11 @@ def create_memory_plot(
             mode="lines+markers",
             name="bpa-dense",
             legendgroup="bpa-dense",
-            line=dict(color="#F97316", width=2, shape="spline"),
+            line=dict(color=color_palette[1], width=2, shape="spline"),
             marker=dict(
                 size=6,
                 symbol="diamond",
-                color="#F97316",
+                color=color_palette[1],
                 line=dict(color="white", width=1.5),
             ),
             hovertemplate="<b>bpa-dense</b><br>Bands: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
@@ -260,11 +263,11 @@ def create_memory_plot(
             mode="lines+markers",
             name="bpa-dia",
             legendgroup="bpa-dia",
-            line=dict(color="#06B6D4", width=2, shape="spline"),
+            line=dict(color=color_palette[2], width=2, shape="spline"),
             marker=dict(
                 size=9,
                 symbol="triangle-up",
-                color="#06B6D4",
+                color=color_palette[2],
                 line=dict(color="white", width=1.5),
             ),
             hovertemplate="<b>bpa-dia</b><br>Bands: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
@@ -278,11 +281,11 @@ def create_memory_plot(
             mode="lines+markers",
             name="bpa-hybrid",
             legendgroup="bpa-hybrid",
-            line=dict(color="#00b200", width=2, shape="spline"),
+            line=dict(color=color_palette[3], width=2, shape="spline"),
             marker=dict(
                 size=6,
                 symbol="square",
-                color="#00b200",
+                color=color_palette[3],
                 line=dict(color="white", width=1.5),
             ),
             hovertemplate="<b>bpa-hybrid</b><br>Bands: %{x}<br>Memory: %{y:.1f} MB<br><extra></extra>",
@@ -315,7 +318,6 @@ def create_memory_plot(
             bgcolor="white",
             font_size=12,
             font_family="Inter, monospace",
-            # bordercolor="#CBD5E1",
         ),
         width=700,
         height=500,
@@ -374,18 +376,20 @@ def bandwidth_plot(
     figure_title: str = "Chain Matmul",
     show_title: bool = True,
     save_png_and_svg: bool = True,
+    color_palette: List[str] = ["#94A3B8", "#8B5CF6", "#EC4899", "#3B82F6"],
 ):
     """
     Create performance analysis plots for chain matrix multiplication.
     Creates two separate figures: one for execution time and one for memory footprint.
     """
-    # Create both plots
+
     time_fig = create_time_plot(
         csv_path,
         output_prefix,
         f"{figure_title} - Execution Time",
         show_title,
         save_png_and_svg,
+        color_palette,
     )
     memory_fig = create_memory_plot(
         csv_path,
@@ -393,6 +397,7 @@ def bandwidth_plot(
         f"{figure_title} - Memory Footprint",
         show_title,
         save_png_and_svg,
+        color_palette,
     )
 
     return time_fig, memory_fig
@@ -594,9 +599,9 @@ def compare_symbolic_chained(
 
 if __name__ == "__main__":
     bandwidth_plot(
-        csv_path="./results/kalman_filter.csv",
-        output_prefix="kalman_filter",
-        figure_title="Kalman Filter",
+        csv_path="./results/batch_bertlike.csv",
+        output_prefix="batch_bertlike",
+        figure_title="BERT-like",
         show_title=False,
     )
     # bandwidth_plot(csv_path="./results/bertlike.csv", output_prefix="bertlike", figure_title="BERT-like")

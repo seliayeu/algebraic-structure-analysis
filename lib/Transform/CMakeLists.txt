@@ -9,6 +9,7 @@ add_mlir_library(BandedStructurePasses
     Operators/DIATransposeRewrite.cpp
     Operators/DIAElementwiseRewrite.cpp
     Operators/DIABatchMatmulRewrite.cpp
+    Operators/DIASoftmaxRewrite.cpp
     DEPENDS
     MLIRDIADialectIncGen
     LINK_LIBS PUBLIC

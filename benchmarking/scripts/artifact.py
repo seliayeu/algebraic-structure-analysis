@@ -3,30 +3,6 @@ import figures
 import bench
 
 
-def chain_matmul(runs_count: int = 5):
-    benchmark_name = "chain_matmul"
-    bandwidths = [512, 409, 307, 256, 204, 153, 102, 51, 0]
-
-    configs = [
-        ("chain_matmul_dense.mlir", None),
-        ("chain_matmul_dense.mlir", "analysis", "rewrite"),
-        ("chain_matmul_dia.mlir", "analysis", "rewrite"),
-        ("chain_matmul_dia.mlir", "analysis-detect", "rewrite"),
-    ]
-
-    result_path = bench.run(
-        benchmark_name=benchmark_name,
-        program_dir="./benchmarking/programs",
-        configs=configs,
-        bandwidths=bandwidths,
-        warmup=1,
-        runs_count=runs_count,
-    )
-    figures.bandwidth_plot(
-        result_path, benchmark_name, "Chain Matrix Multiply Benchmark"
-    )
-
-
 def kalman_filter(runs_count: int = 5):
     benchmark_name = "kalman_filter"
     bandwidths = [512, 409, 307, 256, 204, 153, 102, 51, 0]
@@ -38,6 +14,13 @@ def kalman_filter(runs_count: int = 5):
         ("kalman_filter_dia.mlir", "analysis-detect", "rewrite"),
     ]
 
+    color_palette = [
+        "#94A3B8",  # gray
+        "#F97316",  # orange
+        "#06B6D4",  # cyan
+        "#00b200",  # green
+    ]
+
     result_path = bench.run(
         benchmark_name=benchmark_name,
         program_dir="./benchmarking/programs",
@@ -46,7 +29,14 @@ def kalman_filter(runs_count: int = 5):
         warmup=1,
         runs_count=runs_count,
     )
-    figures.bandwidth_plot(result_path, benchmark_name, "Kalman Filter Benchmark")
+
+    result_path = "./results/kalman_filter.csv"
+    figures.bandwidth_plot(
+        result_path,
+        benchmark_name,
+        "Kalman Filter Benchmark",
+        color_palette=color_palette,
+    )
 
 
 def batch_bertlike(runs_count: int = 5):
@@ -58,6 +48,17 @@ def batch_bertlike(runs_count: int = 5):
         #("batch_bertlike_dense.mlir", "analysis", "rewrite"),
         #("batch_bertlike_dia.mlir", "analysis", "rewrite"),
         ("batch_bertlike_dia.mlir", "analysis-detect", "rewrite"),
+        ("batch_bertlike_dia_inputs.mlir", "analysis", "rewrite"),
+        ("batch_bertlike_dia_inputs.mlir", "analysis-detect", "rewrite"),
+    ]
+
+    color_palette = [
+        "#94A3B8",  # gray
+        "#8B5CF6",  # Vibrant Purple
+        "#EC4899",  # Hot Pink
+        "#3B82F6",  # Bright Blue
+        "#F97316",  # Orange
+        "#06B6D4",  # Cyan
     ]
 
     result_path = bench.run(
@@ -68,14 +69,93 @@ def batch_bertlike(runs_count: int = 5):
         warmup=1,
         runs_count=runs_count,
     )
-    figures.bandwidth_plot(result_path, benchmark_name, "Batch Bert-Like Benchmark")
+
+    figures.bandwidth_plot(
+        result_path,
+        benchmark_name,
+        "Batch Bert-Like Benchmark",
+        color_palette=color_palette,
+    )
+
+
+def sparse_attention(runs_count: int = 5):
+    benchmark_name = "sparse_attention"
+    bandwidths = [512, 409, 307, 256, 204, 153, 102, 51, 0]
+
+    configs = [
+        ("sparse_attention_dense.mlir", "analysis", "rewrite"),
+    ]
+
+    color_palette = [
+        "#94A3B8",  # gray
+        "#E67C73",  # Salmon
+        "#F6BF26",  # Golden Yellow
+        "#57BB8A",  # Mint Green
+        "#5B9BD5",  # Light Blue
+        "#F59E0B",  # Amber/Gold
+    ]
+    result_path = bench.run(
+        benchmark_name=benchmark_name,
+        program_dir="./benchmarking/programs",
+        configs=configs,
+        bandwidths=bandwidths,
+        warmup=1,
+        runs_count=runs_count,
+    )
+
+    figures.bandwidth_plot(
+        result_path,
+        benchmark_name,
+        "Sparse Attention Benchmark",
+        color_palette=color_palette,
+    )
+
+
+def chained_matmul(runs_count: int = 5):
+    benchmark_name = "chain100"
+    bandwidths = [512, 409, 307, 256, 204, 153, 102, 51, 0]
+
+    configs = [
+        ("chain100_dense.mlir", None),
+        ("chain100_dense.mlir", "analysis", "rewrite"),
+        ("chain100_dia.mlir", "analysis", "rewrite"),
+        ("chain100_dia.mlir", "analysis-detect", "rewrite"),
+        ("chain100_dia_inputs.mlir", "analysis", "rewrite"),
+        ("chain100_dia_inputs.mlir", "analysis-detect", "rewrite"),
+    ]
+
+    color_palette = [
+        "#94A3B8",  # gray
+        "#8B5CF6",  # Vibrant Purple
+        "#EC4899",  # Hot Pink
+        "#3B82F6",  # Bright Blue
+        "#F97316",  # Orange
+        "#06B6D4",  # Cyan
+    ]
+
+    result_path = bench.run(
+        benchmark_name=benchmark_name,
+        program_dir="./benchmarking/programs",
+        configs=configs,
+        bandwidths=bandwidths,
+        warmup=1,
+        runs_count=runs_count,
+    )
+
+    figures.bandwidth_plot(
+        result_path,
+        benchmark_name,
+        "Batch Bert-Like Benchmark",
+        color_palette=color_palette,
+    )
 
 
 if __name__ == "__main__":
     dispatch = {
-        "chain": chain_matmul,
         "kalman_filter": kalman_filter,
         "batch_bertlike": batch_bertlike,
+        "chain100": chained_matmul,
+        "sparse_attention": sparse_attention,
     }
 
     parser = argparse.ArgumentParser()
@@ -84,7 +164,7 @@ if __name__ == "__main__":
         type=str,
         help="Comma-separated list of figures",
         # default="7,8,9,10,11,12",
-        default="kalman_filter,batch_bertlike",
+        default="kalman_filter,batch_bertlike,chain100,sparse_attention",
     )
 
     parser.add_argument(
