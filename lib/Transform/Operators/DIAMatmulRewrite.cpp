@@ -718,7 +718,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
 
     LogicalResult diaTimesDenseToDenseBandedMatmulToSCF(dia::MatmulOp op, PatternRewriter& rewriter,
                                                         const BandedSubMatrix& bandA,
-                                                        const BandedSubMatrix& bandB) const {
+                                                        const BandedSubMatrix& bandB,
+                                                        const BandedSubMatrix& resultBand) const {
         Location loc = op->getLoc();
         Value A = op.getLhs();
         Value B = op.getRhs();
@@ -727,13 +728,23 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         auto resultType = cast<RankedTensorType>(C.getType());
         const int64_t N = resultType.getDimSize(1);
 
+        uint64_t effLowerC = std::min(bandA.Property.LowerBandwidth + bandB.Property.LowerBandwidth,
+                                      resultBand.Property.LowerBandwidth);
+        uint64_t effUpperC = std::min(bandA.Property.UpperBandwidth + bandB.Property.UpperBandwidth,
+                                      resultBand.Property.UpperBandwidth);
+
         Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
         Value c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
         Value cN = arith::ConstantIndexOp::create(rewriter, loc, N);
+
         Value cLA = arith::ConstantIndexOp::create(rewriter, loc, bandA.Property.LowerBandwidth);
         Value cUA = arith::ConstantIndexOp::create(rewriter, loc, bandA.Property.UpperBandwidth);
         Value cLB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.LowerBandwidth);
         Value cUB = arith::ConstantIndexOp::create(rewriter, loc, bandB.Property.UpperBandwidth);
+
+        Value cLC = arith::ConstantIndexOp::create(rewriter, loc, effLowerC);
+        Value cUC = arith::ConstantIndexOp::create(rewriter, loc, effUpperC);
+
         Value cLAi64 =
             arith::ConstantIntOp::create(rewriter, loc, bandA.Property.LowerBandwidth, 64);
 
@@ -754,8 +765,18 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             rewriter, loc, c0, cN, c1, ValueRange{ zeroedC },
             [&](OpBuilder& ob, Location loc, Value row, ValueRange rowArgs) {
                 Value cRow = rowArgs[0];
+
+                // col_start = max(0, row - effLowerC)
+                Value rowMinusLC = arith::SubIOp::create(ob, loc, row, cLC);
+                Value colStart = arith::MaxSIOp::create(ob, loc, c0, rowMinusLC);
+
+                // col_end = min(N, row + effUpperC + 1)
+                Value rowPlusUC = arith::AddIOp::create(ob, loc, row, cUC);
+                Value rowPlusUC1 = arith::AddIOp::create(ob, loc, rowPlusUC, c1);
+                Value colEnd = arith::MinSIOp::create(ob, loc, cN, rowPlusUC1);
+
                 auto colLoop = scf::ForOp::create(
-                    ob, loc, c0, cN, c1, ValueRange{ cRow },
+                    ob, loc, colStart, colEnd, c1, ValueRange{ cRow },
                     [&](OpBuilder& cb, Location loc, Value col, ValueRange colArgs) {
                         Value cCol = colArgs[0];
 
@@ -998,7 +1019,9 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
             } else if (!bandA.IsDia && bandB.IsDia && !resultBand.IsDia) {
                 return denseTimesDiaToDenseBandedMatmulToSCF(op, rewriter, bandA, bandB);
             } else if (bandA.IsDia && !bandB.IsDia && !resultBand.IsDia) {
-                return diaTimesDenseToDenseBandedMatmulToSCF(op, rewriter, bandA, bandB);
+                // NOTE: OK
+                return diaTimesDenseToDenseBandedMatmulToSCF(op, rewriter, bandA, bandB,
+                                                             resultBand);
             } else if (!bandA.IsDia && !bandB.IsDia && !resultBand.IsDia) {
                 // this op is already implemented in the linalg lowering.
                 return denseTimesDenseToDenseMatmulToLinalg(op, rewriter, bandA, bandB);
