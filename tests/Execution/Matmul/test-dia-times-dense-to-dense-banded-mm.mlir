@@ -10,8 +10,42 @@
 
 module {
   func.func private @printMemrefF32(memref<*xf32>)
-  
-  func.func @main() {
+
+  func.func @forced() {
+    %c0 = arith.constant 0 : index
+    %c3 = arith.constant 3 : index
+
+    // =========================================================================
+    // Variation 1: Main Diagonal Only (Lower=0, Upper=0)
+    // =========================================================================
+    // CHECK: Unranked Memref {{.*}} rank = 2 offset = 0 sizes = [3, 3]
+    // CHECK-NEXT: {{\[}}[5{{.*}}, 5{{.*}}, 0{{.*}}],
+    // CHECK-NEXT:  [2{{.*}}, 4{{.*}}, 4{{.*}}],
+    // CHECK-NEXT:  [0{{.*}}, 6{{.*}}, 9{{.*}}]]
+
+    %r0 = tensor.empty(%c3) : tensor<?x3xf32>
+    %dia = arith.constant {metadata = {dia = true, lowerBw = 0 : i64, upperBw = 0 : i64, propertyDims = [0, 1]}}
+        dense<[[5.0, 2.0, 3.0]]> : tensor<1x3xf32>
+
+    %dense = arith.constant {metadata = {lowerBw = 2 : i64, upperBw = 2 : i64, propertyDims = [0, 1]}}
+        dense<[[1.0, 1.0, 1.0],
+               [1.0, 2.0, 2.0],
+               [1.0, 2.0, 3.0]]> : tensor<3x3xf32>
+
+    %1 = dia.matmul ins(%dia, %dense: tensor<1x3xf32>, tensor<3x3xf32>)
+                    outs(%r0 : tensor<?x3xf32>) -> tensor<?x3xf32> {metadata = {lowerBw = 1: i64, propertyDims = [0, 1], upperBw = 1: i64}}
+
+    %dim = tensor.dim %1, %c0 : tensor<?x3xf32>
+    %memref = memref.alloc(%dim) : memref<?x3xf32>
+    bufferization.materialize_in_destination %1 in writable %memref
+        : (tensor<?x3xf32>, memref<?x3xf32>) -> ()
+    %cast = memref.cast %memref : memref<?x3xf32> to memref<*xf32>
+    call @printMemrefF32(%cast) : (memref<*xf32>) -> ()
+    memref.dealloc %memref : memref<?x3xf32>
+    return
+  }
+
+  func.func @regular() {
     %c0 = arith.constant 0 : index
     %c3 = arith.constant 3 : index
 
@@ -152,7 +186,12 @@ module {
     %cast5 = memref.cast %memref5 : memref<?x3xf32> to memref<*xf32>
     call @printMemrefF32(%cast5) : (memref<*xf32>) -> ()
     memref.dealloc %memref5 : memref<?x3xf32>
+    return
+  }
 
+  func.func@main() {
+    call @forced() : () -> ()
+    call @regular() : () -> ()
     return
   }
 }

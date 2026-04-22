@@ -93,6 +93,7 @@ COPY --from=mlir-builder /opt/mlir /opt/mlir
 COPY --from=bpa-builder  /app/bpa  /app/bpa
 
 ENV PATH="/opt/mlir/bin:$PATH"
+ENV MLIR_LIB_DIR=/opt/mlir/lib
 
 # ---------------------------------------------------------------------------
 # Python environment
