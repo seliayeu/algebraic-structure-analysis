@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include "Analysis/BandedStructureAnalysis.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
@@ -17,6 +19,13 @@ inline bool shouldCompressResult(Operation& op, const BandedSubMatrix& resultBan
     const bool isOverheadSmaller =
         (resultBand.Property.LowerBandwidth + resultBand.Property.UpperBandwidth) < N - 1;
     return isAlreadyDIA || (isDialectSupported && isOverheadSmaller);
+}
+
+inline bool isFullyDense(const BandedSubMatrix& A, const BandedSubMatrix& B,
+                         const BandedSubMatrix& C, const uint64_t maxBandwidth) {
+    return A.Property.LowerBandwidth >= maxBandwidth && A.Property.UpperBandwidth >= maxBandwidth &&
+           B.Property.LowerBandwidth >= maxBandwidth && B.Property.UpperBandwidth >= maxBandwidth &&
+           C.Property.LowerBandwidth >= maxBandwidth && C.Property.UpperBandwidth >= maxBandwidth;
 }
 
 }  // namespace mlir::bpa

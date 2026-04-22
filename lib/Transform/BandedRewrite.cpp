@@ -207,6 +207,12 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
 
         const BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
         const BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
+
+        auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
+        const uint64_t MAX = resultType.getDimSize(1) - 1;
+
+        if (isFullyDense(bandA, bandB, opBandInfo, MAX)) return failure();
+
         if (bandA.isDiagonal() && bandB.isDiagonal() && opBandInfo.isDiagonal())
             return denseTimesDenseToDenseDiagMatmulToLinalg(op, rewriter);
         // banded
