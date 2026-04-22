@@ -4,7 +4,6 @@
 
 #include "Analysis/BandedProperty.h"
 #include "Dialect/DIA/DIAOps.h"
-#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -223,6 +222,101 @@ LogicalResult BandedStructureAnalysis::visitDIAMatmul(dia::MatmulOp* op) {
     return success();
 }
 
+LogicalResult BandedStructureAnalysis::visitDIABatchMatmul(dia::BatchMatmulOp* op) {
+    auto operands{ op->getOperands() };
+    auto result{ op->getResult() };
+    auto lhs{ op->getLhs() };
+    auto rhs{ op->getRhs() };
+    auto lhsType{ dyn_cast<TensorType>(lhs.getType()) };
+    auto rhsType{ dyn_cast<TensorType>(rhs.getType()) };
+
+    auto lhsShape{ lhsType.getShape() };
+    auto rhsShape{ rhsType.getShape() };
+
+    if (!propertyMap.contains(lhs) || !propertyMap.contains(rhs)) return success();
+
+    const auto& lhsMat{ propertyMap[lhs] };
+    const auto& rhsMat{ propertyMap[rhs] };
+
+    std::array<uint64_t, 2> expectedDims{ 1, 2 };
+    if (lhsMat.Dims != expectedDims || rhsMat.Dims != expectedDims) return success();
+
+    BandedProperty newProperty{ binaryMatmul(lhsMat.Property, rhsMat.Property) };
+
+    newProperty.UpperBandwidth = std::min<uint64_t>(newProperty.UpperBandwidth, rhsShape[2] - 1);
+    newProperty.LowerBandwidth = std::min<uint64_t>(newProperty.LowerBandwidth, lhsShape[2] - 1);
+
+    propertyMap[result] = BandedSubMatrix{ newProperty, { 1, 2 } };
+    propertyMap[result].IsDia = detectDIA ? false : true;
+
+    return success();
+}
+
+LogicalResult BandedStructureAnalysis::visitDIAElementwise(dia::ElementwiseOp* op) {
+    auto operands{ op->getOperands() };
+    auto result{ op->getResult() };
+
+    auto lhs{ operands[0] };
+    if (!propertyMap.contains(lhs)) return success();
+
+    const auto& lhsMat{ propertyMap[lhs] };
+
+    auto& resMat{ propertyMap[result] };
+
+    if (operands.size() == 2) {  // output matrix counts as an operand
+        auto inputProp{ propertyMap[operands[0]] };
+        auto newProperty{ unaryElementwise(inputProp.Property) };
+        resMat = { join(propertyMap[result].Property, newProperty), lhsMat.Dims };
+        return success();
+    }
+
+    auto rhs{ operands[1] };
+    if (!propertyMap.contains(rhs)) return success();
+
+    const auto& rhsMat{ propertyMap[rhs] };
+
+    if (rhsMat.Dims[0] != lhsMat.Dims[0] || rhsMat.Dims[1] != lhsMat.Dims[1]) return success();
+
+    if (operands.size() != 3) return failure();
+    if (op->getKind() == dia::ElementwiseKind::mul) {
+        auto newProperty{ binaryElementwiseProduct(lhsMat.Property, rhsMat.Property) };
+        resMat = { join(propertyMap[result].Property, newProperty), propertyMap[operands[0]].Dims };
+    } else {
+        auto newProperty{ binaryElementwiseGeneral(lhsMat.Property, rhsMat.Property) };
+        resMat = { join(propertyMap[result].Property, newProperty), propertyMap[operands[0]].Dims };
+    }
+
+    resMat.IsDia = detectDIA ? false : true;
+    return success();
+}
+
+LogicalResult BandedStructureAnalysis::visitDIATranspose(dia::TransposeOp* op) {
+    auto input = op->getInput();
+    auto result = op->getResult();
+
+    if (!propertyMap.contains(input)) return failure();
+
+    const BandedSubMatrix inputBand = propertyMap[input];
+    const BandedProperty newProperty(inputBand.Property.LowerBandwidth,
+                                     inputBand.Property.UpperBandwidth);
+    // doesn't currently support higher dims
+    propertyMap[result] = BandedSubMatrix{ newProperty, { 0, 1 }, true };
+
+    return success();
+}
+
+LogicalResult BandedStructureAnalysis::visitDIASoftmax(dia::SoftmaxOp* op) {
+    auto input = op->getInput();
+    auto result = op->getResult();
+
+    if (!propertyMap.contains(input)) return failure();
+
+    const BandedSubMatrix inputBand = propertyMap[input];
+    propertyMap[result] = inputBand;
+
+    return success();
+}
+
 LogicalResult BandedStructureAnalysis::visitMatmul(linalg::MatmulOp* op) {
     auto operands{ op->getOperands() };
     auto result{ op->getResult(0) };
@@ -253,36 +347,6 @@ LogicalResult BandedStructureAnalysis::visitMatmul(linalg::MatmulOp* op) {
         resMat.Dims[0] = lhsMat.Dims[0];
         resMat.Dims[1] = rhsMat.Dims[1];
     }
-
-    return success();
-}
-
-LogicalResult BandedStructureAnalysis::visitDIABatchMatmul(dia::BatchMatmulOp* op) {
-    auto operands{ op->getOperands() };
-    auto result{ op->getResult() };
-    auto lhs{ op->getLhs() };
-    auto rhs{ op->getRhs() };
-    auto lhsType{ dyn_cast<TensorType>(lhs.getType()) };
-    auto rhsType{ dyn_cast<TensorType>(rhs.getType()) };
-
-    auto lhsShape{ lhsType.getShape() };
-    auto rhsShape{ rhsType.getShape() };
-
-    if (!propertyMap.contains(lhs) || !propertyMap.contains(rhs)) return success();
-
-    const auto& lhsMat{ propertyMap[lhs] };
-    const auto& rhsMat{ propertyMap[rhs] };
-
-    std::array<uint64_t, 2> expectedDims{ 1, 2 };
-    if (lhsMat.Dims != expectedDims || rhsMat.Dims != expectedDims) return success();
-
-    BandedProperty newProperty{ binaryMatmul(lhsMat.Property, rhsMat.Property) };
-
-    newProperty.UpperBandwidth = std::min<uint64_t>(newProperty.UpperBandwidth, rhsShape[2] - 1);
-    newProperty.LowerBandwidth = std::min<uint64_t>(newProperty.LowerBandwidth, lhsShape[2] - 1);
-
-    propertyMap[result] = BandedSubMatrix{ newProperty, { 1, 2 } };
-    propertyMap[result].IsDia = detectDIA ? false : true;
 
     return success();
 }
@@ -361,33 +425,6 @@ LogicalResult BandedStructureAnalysis::visitMul(linalg::MulOp* op) {
     return success();
 }
 
-LogicalResult BandedStructureAnalysis::visitDIASoftmax(dia::SoftmaxOp* op) {
-    auto input = op->getInput();
-    auto result = op->getResult();
-
-    if (!propertyMap.contains(input)) return failure();
-
-    const BandedSubMatrix inputBand = propertyMap[input];
-    propertyMap[result] = inputBand;
-
-    return success();
-}
-
-LogicalResult BandedStructureAnalysis::visitDIATranspose(dia::TransposeOp* op) {
-    auto input = op->getInput();
-    auto result = op->getResult();
-
-    if (!propertyMap.contains(input)) return failure();
-
-    const BandedSubMatrix inputBand = propertyMap[input];
-    const BandedProperty newProperty(inputBand.Property.LowerBandwidth,
-                                     inputBand.Property.UpperBandwidth);
-    // doesn't currently support higher dims
-    propertyMap[result] = BandedSubMatrix{ newProperty, { 0, 1 }, true };
-
-    return success();
-}
-
 LogicalResult BandedStructureAnalysis::visitTranspose(linalg::TransposeOp* op) {
     auto input = op->getDpsInputOperand(0)->get();
     auto resultRange{ op->getResult() };
@@ -417,44 +454,6 @@ LogicalResult BandedStructureAnalysis::visitTranspose(linalg::TransposeOp* op) {
     auto newProperty{ transpose(mat.Property) };
     propertyMap[result] = { join(resMat.Property, newProperty), { dim1, dim0 } };
 
-    return success();
-}
-
-LogicalResult BandedStructureAnalysis::visitDIAElementwise(dia::ElementwiseOp* op) {
-    auto operands{ op->getOperands() };
-    auto result{ op->getResult() };
-
-    auto lhs{ operands[0] };
-    if (!propertyMap.contains(lhs)) return success();
-
-    const auto& lhsMat{ propertyMap[lhs] };
-
-    auto& resMat{ propertyMap[result] };
-
-    if (operands.size() == 2) {  // output matrix counts as an operand
-        auto inputProp{ propertyMap[operands[0]] };
-        auto newProperty{ unaryElementwise(inputProp.Property) };
-        resMat = { join(propertyMap[result].Property, newProperty), lhsMat.Dims };
-        return success();
-    }
-
-    auto rhs{ operands[1] };
-    if (!propertyMap.contains(rhs)) return success();
-
-    const auto& rhsMat{ propertyMap[rhs] };
-
-    if (rhsMat.Dims[0] != lhsMat.Dims[0] || rhsMat.Dims[1] != lhsMat.Dims[1]) return success();
-
-    if (operands.size() != 3) return failure();
-    if (op->getKind() == dia::ElementwiseKind::mul) {
-        auto newProperty{ binaryElementwiseProduct(lhsMat.Property, rhsMat.Property) };
-        resMat = { join(propertyMap[result].Property, newProperty), propertyMap[operands[0]].Dims };
-    } else {
-        auto newProperty{ binaryElementwiseGeneral(lhsMat.Property, rhsMat.Property) };
-        resMat = { join(propertyMap[result].Property, newProperty), propertyMap[operands[0]].Dims };
-    }
-
-    resMat.IsDia = detectDIA ? false : true;
     return success();
 }
 
