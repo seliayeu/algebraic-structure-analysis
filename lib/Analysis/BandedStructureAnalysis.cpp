@@ -4,6 +4,7 @@
 
 #include "Analysis/BandedProperty.h"
 #include "Dialect/DIA/DIAOps.h"
+#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -50,12 +51,12 @@ LogicalResult BandedStructureAnalysis::runBackward() {
 
         for (auto& v : inputs) {
             auto* definingOp{ v.getDefiningOp() };
-            if (isa<linalg::MatmulOp>(definingOp) ||
-                !(isa<linalg::LinalgOp>(definingOp) || isa<dia::ElementwiseOp>(definingOp) ||
+            if (!(isa<linalg::LinalgOp>(definingOp) || isa<dia::ElementwiseOp>(definingOp) ||
                   isa<arith::ConstantOp>(definingOp) || isa<tensor::EmptyOp>(definingOp)) ||
                 !propagateBackward(v))
                 continue;
-            bwList.push_back(definingOp);
+            if (!(isa<linalg::MatmulOp>(definingOp) || isa<dia::MatmulOp>(definingOp)))
+                bwList.push_back(definingOp);
         }
     }
 
@@ -153,6 +154,7 @@ LogicalResult BandedStructureAnalysis::visitOperation(Operation* op) {
     } else if (auto addOp{ dyn_cast<linalg::AddOp>(op) }) {
         return visitAdd(&addOp);
     } else if (auto elementwiseOp{ dyn_cast<linalg::ElementwiseOp>(op) }) {
+        if (elementwiseOp.getKind() == linalg::ElementwiseKind::mul) bwList.push_back(op);
         return visitElementwise(&elementwiseOp);
     } else if (auto mulOp{ dyn_cast<linalg::MulOp>(op) }) {
         bwList.push_back(op);
