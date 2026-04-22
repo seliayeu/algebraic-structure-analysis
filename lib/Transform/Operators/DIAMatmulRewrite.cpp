@@ -92,7 +92,9 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
     }
 
     LogicalResult diaTimesDiaToDiaBandedMatmulToSCF(dia::MatmulOp op, PatternRewriter& rewriter,
-                                                    const BandedSubMatrix& bandResult) const {
+                                                    const BandedSubMatrix& bandA,
+                                                    const BandedSubMatrix& bandB,
+                                                    const BandedSubMatrix& resultBand) const {
         Location loc = op.getLoc();
         Value A = op.getLhs();
         Value B = op.getRhs();
@@ -101,14 +103,6 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         Operation* defOpA = A.getDefiningOp();
         Operation* defOpB = B.getDefiningOp();
 
-        auto dictA = defOpA->getAttrDictionary();
-        auto dictB = defOpB->getAttrDictionary();
-
-        if (!dictA || !dictB) return failure();
-
-        const BandedSubMatrix bandA = BandedStructureAnalysis::readPropertyFromDictAttr(dictA);
-        const BandedSubMatrix bandB = BandedStructureAnalysis::readPropertyFromDictAttr(dictB);
-
         auto resultType = cast<RankedTensorType>(A.getType());
         const uint64_t N = resultType.getDimSize(1);
 
@@ -116,8 +110,8 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
         const int64_t uA = bandA.Property.UpperBandwidth;
         const int64_t lB = bandB.Property.LowerBandwidth;
         const int64_t uB = bandB.Property.UpperBandwidth;
-        const int64_t lC = bandResult.Property.LowerBandwidth;
-        const int64_t uC = bandResult.Property.UpperBandwidth;
+        const int64_t lC = resultBand.Property.LowerBandwidth;
+        const int64_t uC = resultBand.Property.UpperBandwidth;
 
         auto elementType = cast<RankedTensorType>(A.getType()).getElementType();
 
@@ -1041,7 +1035,7 @@ struct DIAMatMulPattern : public OpRewritePattern<dia::MatmulOp> {
                 // this op is already implemented in the linalg lowering.
                 return denseTimesDenseToDenseMatmulToLinalg(op, rewriter, bandA, bandB);
             } else if (bandA.IsDia && bandB.IsDia && resultBand.IsDia) {
-                return diaTimesDiaToDiaBandedMatmulToSCF(op, rewriter, resultBand);
+                return diaTimesDiaToDiaBandedMatmulToSCF(op, rewriter, bandA, bandB, resultBand);
             } else
                 return failure();
         }
