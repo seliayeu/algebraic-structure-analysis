@@ -40,10 +40,10 @@ struct FromDensePattern : public mlir::OpRewritePattern<FromDenseOp> {
         auto values = denseAttr.getValues<float>();
 
         for (int64_t d = 0; d < numDiags; ++d) {
-            int64_t k = -lowerBw + d;
-            for (int64_t j = 0; j < N; ++j) {
-                int64_t i = j - k;
-                if (i < 0 || i >= M) {
+            int64_t k = -static_cast<int64_t>(lowerBw) + d;
+            for (int64_t i = 0; i < static_cast<int64_t>(M); ++i) {
+                int64_t j = i + k;
+                if (j < 0 || j >= N) {
                     diaValues.push_back(0.0f);
                 } else {
                     diaValues.push_back(
@@ -51,7 +51,8 @@ struct FromDensePattern : public mlir::OpRewritePattern<FromDenseOp> {
                 }
             }
         }
-        auto outputType = RankedTensorType::get({ numDiags, N }, inputType.getElementType());
+        auto outputType = RankedTensorType::get({ numDiags, static_cast<int64_t>(M) },
+                                                inputType.getElementType());
         auto denseValues = DenseElementsAttr::get(outputType, ArrayRef<float>(diaValues));
 
         auto diaConst = arith::ConstantOp::create(rewriter, op->getLoc(), outputType, denseValues);
