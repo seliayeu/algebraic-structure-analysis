@@ -59,6 +59,52 @@ def tensor_type(dia: bool, bw: int) -> str:
         return f"tensor<{2 * bw + 1}x{N}xf32>"
     return f"tensor<{N}x{N}xf32>"
 
+FROM_DENSE_COMBOS = [
+    # (name,              lhs_from_dense, rhs_from_dense)
+    # ("dense_fd_x_dia_x_dia",        True,  False),  # dense*dia->dia via from_dense on lhs
+    # ("dense_fd_x_dense_fd_x_dia",   True,  True),   # dense*dense->dia via from_dense on both
+    ("dia_x_dense_fd_x_dia",   False,  True),   # dense*dense->dia via from_dense on both
+]
+
+
+def make_from_dense_matmul_mlir(lhs_from_dense: bool, rhs_from_dense: bool, bw: int) -> str:
+    """
+    Both inputs are stored dense (2048x2048) with bandwidth metadata.
+    Those marked from_dense are converted via dia.from_dense before the matmul,
+    making the effective computation dia * dia -> dia.
+    """
+    out_bw  = bw + bw
+    dense_t = tensor_type(dia=False, bw=bw)   # tensor<2048x2048xf32>
+    dia_t   = tensor_type(dia=True,  bw=bw)   # tensor<Yx2048xf32>
+    out_t   = tensor_type(dia=True,  bw=out_bw)
+
+    def input_block(var: str, from_dense: bool) -> str:
+        meta = input_meta(dia=False, bw=bw)   # no dia=true on the constant
+        lines = [f"  %{var}_dense = arith.constant {meta} dense<1.0> : {dense_t}"]
+        if from_dense:
+            lines.append(f"  %{var} = dia.from_dense %{var}_dense "
+                f"{input_meta(dia=True, bw=bw)} : {dense_t} -> {dia_t}"
+            )
+        else:
+            lines.append(f"  %{var} = arith.constant {input_meta(dia=True, bw=bw)} dense<1.0> : {dia_t}")
+        return "\n".join(lines)
+
+    lhs_t = dia_t if lhs_from_dense else dia_t   # after conversion both are dia_t
+    rhs_t = dia_t
+
+    return f"""\
+func.func @kernel() -> f32 {{
+  %out    = tensor.empty() {empty_meta()} : {out_t}
+{input_block("lhs", lhs_from_dense)}
+{input_block("rhs", rhs_from_dense)}
+  %result = dia.matmul ins(%lhs, %rhs : {lhs_t}, {rhs_t})
+                       outs(%out : {out_t}) -> {out_t} {result_meta(dia=True, bw=out_bw)}
+  %index  = arith.constant 0 : index
+  %val    = tensor.extract %result[%index, %index] : {out_t}
+  return %val : f32
+}}
+"""
+
 def make_single_matmul_mlir(lhs_dia: bool, rhs_dia: bool, out_dia: bool, bw: int) -> str:
     out_bw   = output_bw(bw)
     lhs_t    = tensor_type(lhs_dia, bw)
@@ -96,6 +142,7 @@ def lower_to_llvm(mlir_file: Path):
     # No --banded-analysis; rewrite pass uses the embedded metadata directly.
     cmd = [
         f"{BUILD_DIR}/tools/alg-opt", str(mlir_file),
+        "--canonicalize",
         "--banded-rewrite",
         "-empty-tensor-to-alloc-tensor",
         "-one-shot-bufferize=bufferize-function-boundaries",
@@ -173,27 +220,72 @@ def run_matmul_combinations(bandwidths: List[int], warmup: int, runs_count: int)
     logger.info(f"MATMUL COMBINATION BENCHMARK  ({len(combos)} combos × {len(bandwidths)} bws = {total} runs)")
     logger.info("=" * 80)
 
-    for lhs_dia, rhs_dia, out_dia in combos:
-        if (not lhs_dia and rhs_dia and out_dia):
-            continue
-        name   = combo_name(lhs_dia, rhs_dia, out_dia)
+    # for lhs_dia, rhs_dia, out_dia in combos:
+    #     if (not lhs_dia and rhs_dia and out_dia):
+    #         continue
+    #     name   = combo_name(lhs_dia, rhs_dia, out_dia)
+    #     logger.info(f"\nCOMBO: {name}")
+    #     logger.info("-" * 60)
+    #
+    #     for bw in bandwidths:
+    #         current += 1
+    #         run_name = f"matmul_{name}_bw{bw}"
+    #         logger.info(f"[{current}/{total}] {run_name}")
+    #
+    #         out_bw_val = output_bw(bw)
+    #         logger.info(f"  lhs_bw={bw}  rhs_bw={bw}  out_bw={'dense' if out_bw_val == INT64_MAX else out_bw_val}")
+    #
+    #         mlir_file = TMP_DIR / f"{run_name}.mlir"
+    #         ll_file   = TMP_DIR / f"{run_name}.ll"
+    #         obj_file  = TMP_DIR / f"{run_name}.o"
+    #         exe_file  = TMP_DIR / f"{run_name}.out"
+    #
+    #         mlir_file.write_text(make_single_matmul_mlir(lhs_dia, rhs_dia, out_dia, bw))
+    #
+    #         llvm_ir = lower_to_llvm(mlir_file)
+    #         ll_file.write_text(llvm_ir)
+    #         compile_kernel(ll_file, obj_file)
+    #         build_executable(obj_file, exe_file)
+    #
+    #         stats = run_benchmark_full(exe_file, warmup, runs_count)
+    #
+    #         row = {
+    #             "lhs":    "dia" if lhs_dia else "dense",
+    #             "rhs":    "dia" if rhs_dia else "dense",
+    #             "out":    "dia" if out_dia else "dense",
+    #             "bw":     bw,
+    #             "out_bw": out_bw_val,
+    #             **stats,
+    #         }
+    #         write_csv_row(csv_path, row, write_header=not header_written)
+    #         header_written = True
+    #
+    #         logger.info(f"  → avg={stats['avg_time_s']:.4f}s  rss={stats.get('max_rss_mb', '?'):.1f}MB")
+    #
+    # # ── from_dense cases ──────────────────────────────────────────────────────
+    total_fd = len(FROM_DENSE_COMBOS) * len(bandwidths)
+    current_fd = 0
+
+    logger.info("\n" + "=" * 80)
+    logger.info(f"FROM_DENSE CASES  ({len(FROM_DENSE_COMBOS)} combos × {len(bandwidths)} bws = {total_fd} runs)")
+    logger.info("=" * 80)
+
+    for name, lhs_fd, rhs_fd in FROM_DENSE_COMBOS:
         logger.info(f"\nCOMBO: {name}")
         logger.info("-" * 60)
 
         for bw in bandwidths:
-            current += 1
+            current_fd += 1
+            out_bw_val = bw + bw
             run_name = f"matmul_{name}_bw{bw}"
-            logger.info(f"[{current}/{total}] {run_name}")
-
-            out_bw_val = output_bw(bw)
-            logger.info(f"  lhs_bw={bw}  rhs_bw={bw}  out_bw={'dense' if out_bw_val == INT64_MAX else out_bw_val}")
+            logger.info(f"[{current_fd}/{total_fd}] {run_name}  out_bw={out_bw_val}")
 
             mlir_file = TMP_DIR / f"{run_name}.mlir"
             ll_file   = TMP_DIR / f"{run_name}.ll"
             obj_file  = TMP_DIR / f"{run_name}.o"
             exe_file  = TMP_DIR / f"{run_name}.out"
 
-            mlir_file.write_text(make_single_matmul_mlir(lhs_dia, rhs_dia, out_dia, bw))
+            mlir_file.write_text(make_from_dense_matmul_mlir(lhs_fd, rhs_fd, bw))
 
             llvm_ir = lower_to_llvm(mlir_file)
             ll_file.write_text(llvm_ir)
@@ -203,9 +295,9 @@ def run_matmul_combinations(bandwidths: List[int], warmup: int, runs_count: int)
             stats = run_benchmark_full(exe_file, warmup, runs_count)
 
             row = {
-                "lhs":    "dia" if lhs_dia else "dense",
-                "rhs":    "dia" if rhs_dia else "dense",
-                "out":    "dia" if out_dia else "dense",
+                "lhs":    "dense_fd" if lhs_fd else "dia",
+                "rhs":    "dense_fd" if rhs_fd else "dia",
+                "out":    "dia",
                 "bw":     bw,
                 "out_bw": out_bw_val,
                 **stats,

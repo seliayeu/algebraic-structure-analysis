@@ -135,6 +135,7 @@ def run_cmd(cmd, input_text=None):
 
 def replace_bandwidth(src: Path, dst: Path, bw: int):
     dst.write_text(src.read_text().replace("X", str(bw)))
+    dst.write_text(dst.read_text().replace("Y", str(2 * bw + 1)))
 
 
 def build_pipeline_flags(cfg):
