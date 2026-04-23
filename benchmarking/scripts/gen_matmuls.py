@@ -2,8 +2,7 @@ from pathlib import Path
 from enum import Enum, auto
 
 N = 1024
-NUM_MATMULS = 100
-
+NUM_MATMULS = 10
 
 class Mode(Enum):
     DENSE      = auto()
@@ -114,6 +113,6 @@ if __name__ == "__main__":
     out_dir = Path("./benchmarking/programs")
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    generate_chain_matmul(NUM_MATMULS, Mode.DENSE,      out_dir / "chain100_dense.mlir")
-    generate_chain_matmul(NUM_MATMULS, Mode.DIA,        out_dir / "chain100_dia.mlir")
-    generate_chain_matmul(NUM_MATMULS, Mode.DIA_INPUTS, out_dir / "chain100_dia_inputs.mlir")
+    generate_chain_matmul(NUM_MATMULS, Mode.DENSE,      out_dir / f"chain{NUM_MATMULS}_dense.mlir")
+    generate_chain_matmul(NUM_MATMULS, Mode.DIA,        out_dir / f"chain{NUM_MATMULS}_dia.mlir")
+    generate_chain_matmul(NUM_MATMULS, Mode.DIA_INPUTS, out_dir / f"chain{NUM_MATMULS}_dia_inputs.mlir")
