@@ -22,6 +22,11 @@ def BandedAnalysis : Pass<"banded-analysis", "mlir::func::FuncOp"> {
             "detect-dia",
             "bool",
             /*default=*/"false",
-            "Enable DIA compression">
+            "Enable DIA compression">,
+      Option<"heuristic",
+            "heuristic",
+            "bool",
+            /*default=*/"false",
+            "Enable from_dense insertion heuristic">
     ];
 }
