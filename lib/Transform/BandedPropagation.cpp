@@ -1,6 +1,7 @@
 #include "Transform/BandedPropagation.h"
 
 #include <cstdint>
+#include <iostream>
 #include <vector>
 
 #include "Analysis/BandedStructureAnalysis.h"
@@ -302,6 +303,78 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
                 return;
             }
         });
+
+        if (heuristic) {
+            SmallVector<dia::MatmulOp> matmuls;
+            funcOp->walk([&](Operation* inst) {
+                if (!isa<dia::MatmulOp>(inst)) return;
+                auto matmulOp{ cast<dia::MatmulOp>(inst) };
+                auto lhs{ matmulOp.getLhs() };
+                auto rhs{ matmulOp.getRhs() };
+                auto result{ matmulOp.getResult() };
+
+                BandedSubMatrix lhsRes{ BSA.getProperty(lhs) };
+                BandedSubMatrix rhsRes{ BSA.getProperty(rhs) };
+                BandedSubMatrix resultRes{ BSA.getProperty(result) };
+
+                if (!resultRes.IsDia) return;
+
+                if (!lhsRes.IsDia || !rhsRes.IsDia) matmuls.push_back(matmulOp);
+            });
+
+            for (auto& matmulOp : matmuls) {
+                OpBuilder builder(matmulOp);
+                auto lhs{ matmulOp.getLhs() };
+                auto rhs{ matmulOp.getRhs() };
+                BandedSubMatrix& lhsRes{ BSA.getProperty(lhs) };
+                BandedSubMatrix& rhsRes{ BSA.getProperty(rhs) };
+                if (!lhsRes.IsDia) {
+                    auto lhsType{ cast<RankedTensorType>(lhs.getType()) };
+                    auto rows{ std::min(lhsRes.Property.UpperBandwidth,
+                                        static_cast<uint64_t>(lhsType.getDimSize(1) - 1)) +
+                               std::min(lhsRes.Property.LowerBandwidth,
+                                        static_cast<uint64_t>(lhsType.getDimSize(1) - 1)) +
+                               1 };
+                    auto diaType{ RankedTensorType::get(
+                        { static_cast<int64_t>(rows), lhsType.getDimSize(1) },
+                        lhsType.getElementType()) };
+                    auto fromDenseOp{ dia::FromDenseOp::create(builder, matmulOp->getLoc(), diaType,
+                                                               lhs) };
+                    auto newMat{ lhsRes };
+                    newMat.IsDia = true;
+                    BSA.setProperty(fromDenseOp, newMat);
+                    auto attrDict{ cast<DictionaryAttr>(lhs.getDefiningOp()->getAttr("metadata")) };
+                    SmallVector<NamedAttribute> attrs(attrDict.begin(), attrDict.end());
+                    attrs.push_back(builder.getNamedAttr("dia", builder.getBoolAttr(true)));
+                    auto newDict{ DictionaryAttr::get(builder.getContext(), attrs) };
+                    fromDenseOp->setAttr("metadata", newDict);
+
+                    matmulOp.getLhsMutable().assign(fromDenseOp.getResult());
+                }
+                if (!rhsRes.IsDia) {
+                    auto rhsType{ cast<RankedTensorType>(rhs.getType()) };
+                    auto rows{ std::min(rhsRes.Property.UpperBandwidth,
+                                        static_cast<uint64_t>(rhsType.getDimSize(1) - 1)) +
+                               std::min(rhsRes.Property.LowerBandwidth,
+                                        static_cast<uint64_t>(rhsType.getDimSize(1) - 1)) +
+                               1 };
+                    auto diaType{ RankedTensorType::get(
+                        { static_cast<int64_t>(rows), rhsType.getDimSize(1) },
+                        rhsType.getElementType()) };
+                    auto fromDenseOp{ dia::FromDenseOp::create(builder, matmulOp->getLoc(), diaType,
+                                                               rhs) };
+                    auto newMat{ rhsRes };
+                    newMat.IsDia = true;
+                    BSA.setProperty(fromDenseOp, newMat);
+                    auto attrDict{ cast<DictionaryAttr>(rhs.getDefiningOp()->getAttr("metadata")) };
+                    SmallVector<NamedAttribute> attrs(attrDict.begin(), attrDict.end());
+                    attrs.push_back(builder.getNamedAttr("dia", builder.getBoolAttr(true)));
+                    auto newDict{ DictionaryAttr::get(builder.getContext(), attrs) };
+                    fromDenseOp->setAttr("metadata", newDict);
+                    matmulOp.getRhsMutable().assign(fromDenseOp.getResult());
+                }
+            }
+        }
 
         auto& result = getAnalysis<BandedAnalysisResult>();
         result.detectDIA = detectDIA;
