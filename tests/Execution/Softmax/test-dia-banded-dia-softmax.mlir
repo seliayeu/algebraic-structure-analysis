@@ -19,12 +19,14 @@
 // RUN:     --shared-libs=%llvm_root/build/lib/libmlir_runner_utils.%lib_format --shared-libs=%llvm_root/build/lib/libmlir_c_runner_utils.%lib_format > %t
 // RUN:  FileCheck %s < %t
 
-// CHECK:      rank = 2 offset = 0 sizes = [5, 5] strides = [5, 1]
-// CHECK-NEXT: {{[[][[]}}0.5,{{.*}}0.5,{{.*}}0,{{.*}}0,{{.*}}0],
-// CHECK-NEXT: {{[[:space:]]}}[0.333333,{{.*}}0.333333,{{.*}}0.333333,{{.*}}0,{{.*}}0],
-// CHECK-NEXT: {{[[:space:]]}}[0,{{.*}}0.333333,{{.*}}0.333333,{{.*}}0.333333,{{.*}}0],
-// CHECK-NEXT: {{[[:space:]]}}[0,{{.*}}0,{{.*}}0.333333,{{.*}}0.333333,{{.*}}0.333333],
-// CHECK-NEXT: {{[[:space:]]}}[0,{{.*}}0,{{.*}}0,{{.*}}0.5,{{.*}}0.5]]
+// CHECK:      rank = 2 offset = 0 sizes = [7, 4] strides = [4, 1]
+// CHECK-NEXT: {{[[][[]}}0,{{.*}}0,{{.*}}0,{{.*}}0.25],
+// CHECK-NEXT: {{[[:space:]]}}[0,{{.*}}0,{{.*}}0.174878,{{.*}}0.25],
+// CHECK-NEXT: {{[[:space:]]}}[0,{{.*}}0.365529,{{.*}}0.174878,{{.*}}0.25],
+// CHECK-NEXT: {{[[:space:]]}}[0.870049,{{.*}}0.365529,{{.*}}0.174878,{{.*}}0.25],
+// CHECK-NEXT: {{[[:space:]]}}[0.0433172,{{.*}}0.134471,{{.*}}0.475367,{{.*}}0],
+// CHECK-NEXT: {{[[:space:]]}}[0.0433172,{{.*}}0.134471,{{.*}}0,{{.*}}0],
+// CHECK-NEXT: {{[[:space:]]}}[0.0433172,{{.*}}0,{{.*}}0,{{.*}}0]]
 
 module {
   func.func private @printMemrefF32(memref<*xf32>)
