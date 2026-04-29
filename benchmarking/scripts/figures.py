@@ -171,10 +171,18 @@ def create_comptime_plot(
 
     fig.update_layout(**layout_updates)
 
+    output_path = str(csv_path).split(".csv")[0]
+    fig.write_html(
+        f"{output_path}.html",
+        config={
+            "displayModeBar": True,
+            "modeBarButtonsToAdd": ["drawline", "drawrect", "eraseshape"],
+            "displaylogo": False,
+        },
+    )
     if save_png_and_svg:
-        fig.write_image(f"{output_prefix}.png", width=550, height=410, scale=2)
-        fig.write_image(f"{output_prefix}.svg", width=550, height=410)
-        fig.write_html(f"{output_prefix}.html")
+        fig.write_image(f"{output_path}.svg", width=550, height=410)
+        fig.write_image(f"{output_path}.png", width=550, height=410, scale=2)
 
     fig.show()
     return fig
