@@ -1,9 +1,9 @@
 func.func @kernel() -> f32 {
-  %Q  = arith.constant {metadata = {lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %K  = arith.constant {metadata = {lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %V  = arith.constant {metadata = {lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
+  %Q  = tensor.empty() {metadata = {lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}}  : tensor<1024x1024xf32>
+  %K  = tensor.empty() {metadata = {lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}}  : tensor<1024x1024xf32>
+  %V  = tensor.empty() {metadata = {lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}}  : tensor<1024x1024xf32>
 
-  %mask  = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
+  %mask  = tensor.empty() {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} : tensor<1024x1024xf32>
   %factor = arith.constant dense<0.03125> : tensor<1024x1024xf32>
 
   %zero  = arith.constant 0.0 : f32

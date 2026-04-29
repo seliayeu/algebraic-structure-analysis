@@ -5,38 +5,7 @@ import subprocess
 import csv
 from typing import List, Tuple
 import logging
-
-
-class CustomFormatter(logging.Formatter):
-    grey = "\x1b[38;20m"
-    yellow = "\x1b[33;20m"
-    red = "\x1b[31;20m"
-    green = "\x1b[32;20m"
-    cyan = "\x1b[36;20m"
-    blue = "\x1b[34;20m"
-    magenta = "\x1b[35;20m"
-    bold = "\x1b[1m"
-    reset = "\x1b[0m"
-
-    def format(self, record):
-        if record.levelno == logging.INFO:
-            self._style._fmt = f"{self.green}[%(asctime)s]{self.reset} {self.blue}%(message)s{self.reset}"
-        elif record.levelno == logging.WARNING:
-            self._style._fmt = (
-                f"{self.yellow}[%(asctime)s] WARNING: %(message)s{self.reset}"
-            )
-        elif record.levelno == logging.ERROR:
-            self._style._fmt = f"{self.red}[%(asctime)s] ERROR: %(message)s{self.reset}"
-        elif record.levelno == logging.DEBUG:
-            self._style._fmt = (
-                f"{self.grey}[%(asctime)s] DEBUG: %(message)s{self.reset}"
-            )
-        else:
-            self._style._fmt = f"[%(asctime)s] %(message)s"
-
-        self._style._fmt = f"{self.bold}[%(levelname)s]{self.reset} " + self._style._fmt
-        return super().format(record)
-
+from custom_logging import CustomFormatter
 
 logging.basicConfig(
     level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%H:%M:%S"
@@ -47,7 +16,7 @@ for handler in logger.handlers:
     handler.setFormatter(CustomFormatter())
 
 BUILD_DIR = Path("./build")
-TMP_DIR = Path("/tmp/mlir_bench")
+TMP_DIR = Path("/tmp/bpa_main")
 RESULT_DIR = Path("./results")
 
 
@@ -200,7 +169,9 @@ def compile_kernel(ll_path: Path, obj_path: Path):
 def build_executable(obj_path: Path, exe_path: Path):
     logger.info(f"Building executable {exe_path.name}")
 
-    mlir_lib_dir = os.environ.get("MLIR_LIB_DIR")
+    mlir_lib_dir = os.environ.get(
+        "MLIR_LIB_DIR",
+    )
 
     if not mlir_lib_dir:
         raise RuntimeError("MLIR_LIB_DIR environment variable not set")
@@ -275,8 +246,10 @@ def run(
         logger.info(f"   Flags: {' '.join(flags) if flags else 'none'}")
         logger.info("-" * 60)
 
-        # No need to run for all bands
-        bw_list = [0] if tag == "baseline" else bandwidths
+        # batch bertlike takes a long time to run
+        bw_list = (
+            [0] if tag == "baseline" and "batch_bertlike" in file_name else bandwidths
+        )
 
         for bw in bw_list:
             current += 1

@@ -1,5 +1,6 @@
 import argparse
 import figures
+import comptime
 import bench
 
 
@@ -153,12 +154,31 @@ def chained_matmul(runs_count: int = 5):
     )
 
 
+def comptime_experiment(runs_count: int = 5):
+    benchmark_name = "compilation-time"
+    configs = [
+        ("analysis_rewrite", ["--banded-analysis --banded-rewrite"]),
+    ]
+    result_path = comptime.run_experiment(
+        benchmark_name, configs, sizes=[128], ops_range=[20, 30, 50, 100, 200]
+    )
+
+    figures.create_comptime_plot(
+        csv_path=result_path,
+        output_prefix="bpa_comptime",
+        figure_title="Compilation Time Breakdown by Component",
+        show_title=True,
+        save_png_and_svg=True,
+    )
+
+
 if __name__ == "__main__":
     dispatch = {
         "kalman_filter": kalman_filter,
         "batch_bertlike": batch_bertlike,
         "chain100": chained_matmul,
         "sparse_attention": sparse_attention,
+        "comptime": comptime_experiment,
     }
 
     parser = argparse.ArgumentParser()
@@ -167,7 +187,7 @@ if __name__ == "__main__":
         type=str,
         help="Comma-separated list of figures",
         # default="7,8,9,10,11,12",
-        default="kalman_filter,batch_bertlike,chain100,sparse_attention",
+        default="kalman_filter,batch_bertlike,chain100,sparse_attention,comptime",
     )
 
     parser.add_argument(

@@ -219,10 +219,10 @@ func.func @sparse_attention(
 // main (Simplified for Static Verification)
 // ============================================================
 func.func @kernel() -> f32 {
-  %Q    = arith.constant dense<1.0> : tensor<1024x1024xf32>
-  %K    = arith.constant dense<1.0> : tensor<1024x1024xf32>
-  %V    = arith.constant dense<1.0> : tensor<1024x1024xf32>
-  %mask = arith.constant dense<true> : tensor<1024x1024xi1>
+  %Q    = tensor.empty(): tensor<1024x1024xf32>
+  %K    = tensor.empty(): tensor<1024x1024xf32>
+  %V    = tensor.empty(): tensor<1024x1024xf32>
+  %mask = tensor.empty(): tensor<1024x1024xi1>
 
   %out = func.call @sparse_attention(%Q, %K, %V, %mask)
          : (tensor<1024x1024xf32>, tensor<1024x1024xf32>, tensor<1024x1024xf32>, tensor<1024x1024xi1>)
