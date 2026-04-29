@@ -19,13 +19,11 @@ for handler in logger.handlers:
     handler.setFormatter(CustomFormatter())
 
 BUILD_DIR = Path(os.environ.get("BUILD_DIR", "./build"))
-PROGRAM_DIR = Path("./generated_programs")
 RESULT_DIR = Path("./results")
 TMP_DIR = Path("/tmp/bpa_comptime/")
 
 RESULT_DIR.mkdir(exist_ok=True)
 TMP_DIR.mkdir(exist_ok=True)
-PROGRAM_DIR.mkdir(exist_ok=True)
 
 
 @dataclass
