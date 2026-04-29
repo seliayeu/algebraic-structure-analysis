@@ -359,6 +359,8 @@ def run_experiment(
                         header = True
                     writer.writerow(row)
 
+    return csv_path
+
 
 def replace_file_template(src: Path, dst: Path, from_str: str, to_str: str):
     dst.write_text(src.read_text().replace(from_str, to_str))
