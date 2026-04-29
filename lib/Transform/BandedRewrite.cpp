@@ -619,6 +619,9 @@ struct BandedRewrite : public impl::BandedRewriteBase<BandedRewrite> {
     using BandedRewriteBase::BandedRewriteBase;
 
     void runOnOperation() override {
+#ifdef ENABLE_BENCHMARKING
+        auto start{ std::chrono::high_resolution_clock::now() };
+#endif
         func::FuncOp funcOp = getOperation();
         MLIRContext* context = funcOp.getContext();
 
@@ -643,28 +646,14 @@ struct BandedRewrite : public impl::BandedRewriteBase<BandedRewrite> {
         config.setUseTopDownTraversal(true);
 
         (void)applyPatternsGreedily(funcOp, std::move(patterns), config);
-
-        funcOp.walk([&](func::ReturnOp returnOp) {
-            SmallVector<Type> newTypes;
-            bool changed = false;
-
-            for (Value operand : returnOp.getOperands()) {
-                newTypes.push_back(operand.getType());
-                Operation* defOp = operand.getDefiningOp();
-                if (!defOp) continue;
-                auto metadata = defOp->getAttrOfType<DictionaryAttr>("metadata");
-                if (!metadata) continue;
-                const BandedSubMatrix opBandInfo =
-                    BandedStructureAnalysis::readPropertyFromDictAttr(metadata);
-                if (opBandInfo.IsDia) changed = true;
-            }
-
-            if (!changed) return;
-
-            auto newFuncType =
-                FunctionType::get(context, funcOp.getFunctionType().getInputs(), newTypes);
-            funcOp.setType(newFuncType);
-        });
+#ifdef ENABLE_BENCHMARKING
+        auto end{ std::chrono::high_resolution_clock::now() };
+        llvm::errs() << "BandedRewrite time: "
+                     << std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(end -
+                                                                                              start)
+                            .count()
+                     << " ms\n";
+#endif
     }
 };
 }  // namespace mlir::bpa

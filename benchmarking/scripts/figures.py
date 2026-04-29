@@ -5,13 +5,188 @@ import kaleido
 import os
 
 
+def create_comptime_plot(
+    csv_path="./results/bpa_comptime.csv",
+    output_prefix="bpa_comptime",
+    figure_title: str = "Compilation Time Breakdown by Component",
+    show_title: bool = True,
+    save_png_and_svg: bool = True,
+):
+
+    df = pd.read_csv(csv_path)
+
+    df_processed = df.copy()
+    for idx, row in df_processed.iterrows():
+        analysis_time = row["analysis_time_avg"]
+        total_lowering = row["total_lowering_time_avg"]
+        pure_lowering = total_lowering - analysis_time
+        if pure_lowering < 0 and pure_lowering > -0.001:
+            pure_lowering = 0
+        df_processed.at[idx, "total_lowering_time"] = pure_lowering
+
+    configs = df_processed["config"].unique()
+    ops_values = [
+        "kalman filter",
+        "sparse attention",
+        "batch bertlike",
+        "chain100",
+        "20",
+        "30",
+        "50",
+        "100",
+        "200",
+    ]
+
+    components = ["total_lowering_time", "analysis_time_avg", "runtime_avg"]
+    component_labels = {
+        "total_lowering_time": "Compilation Time",
+        "analysis_time_avg": "Analysis Time",
+        "runtime_avg": "Runtime",
+    }
+
+    COLOR_PALETTE = {
+        "analysis_time_avg": "#e99575",
+        "total_lowering_time": "#88CCEE",
+        "runtime_avg": "#71b5a0",
+    }
+
+    fig = go.Figure()
+
+    n_configs = len(configs)
+    bar_width = 0.9 / n_configs
+
+    for ops_idx, ops in enumerate(ops_values):
+        group_center = ops_idx
+
+        for config_idx, config in enumerate(configs):
+            subset = df_processed[
+                (df_processed["config"] == config) & (df_processed["ops"] == ops)
+            ]
+
+            if subset.empty:
+                continue
+
+            config_label = config.replace("_", " ").title()
+            time_values = [subset[comp].values[0] for comp in components]
+            x_position = group_center + (config_idx - n_configs / 2 + 0.5) * bar_width
+
+            base_value = 0
+            for comp_idx, (comp, time_val) in enumerate(zip(components, time_values)):
+                fig.add_trace(
+                    go.Bar(
+                        name=component_labels[comp],
+                        x=[x_position],
+                        y=[time_val],
+                        base=[base_value],
+                        marker_color=COLOR_PALETTE[comp],
+                        marker_line_color="black",
+                        marker_line_width=0.8,
+                        opacity=0.9,
+                        width=bar_width * 0.85,
+                        showlegend=(ops_idx == 0 and config_idx == 0),
+                        legendgroup=comp,
+                        hovertemplate=(
+                            f"<b>{config_label}</b><br>"
+                            + f"Benchmark: {ops}<br>"
+                            + f"<b>{component_labels[comp]}</b>: {time_val:.4f} s<br>"
+                            + f"<b>Total Time</b>: {sum(time_values):.4f} s<br>"
+                            + "<extra></extra>"
+                        ),
+                    )
+                )
+                base_value += time_val
+
+    x_tick_positions = list(range(len(ops_values)))
+    x_tick_labels = ops_values
+
+    layout_updates = {
+        "title": {
+            "text": figure_title if show_title else None,
+            "font": {
+                "size": 20,
+                "family": "Inter, Arial, sans-serif",
+                "weight": "bold",
+            },
+            "x": 0.5,
+            "xanchor": "center",
+        },
+        "xaxis": {
+            "title": {
+                "text": "<b>Benchmark</b>",
+                "font": {
+                    "family": "Inter, Arial, sans-serif",
+                    "size": 13,
+                    "weight": "normal",
+                },
+            },
+            "tickfont": {"size": 11},
+            "tickmode": "array",
+            "tickvals": x_tick_positions,
+            "ticktext": x_tick_labels,
+            "gridcolor": "lightgray",
+            "gridwidth": 0.5,
+            "showgrid": False,
+            "zeroline": False,
+            "showline": True,
+            "linewidth": 0.5,
+            "linecolor": "black",
+            "mirror": True,
+        },
+        "yaxis": {
+            "type": "log",
+            "title": {
+                "text": "<b>End-to-End Time (s) - Log Scale</b>",
+                "font": {
+                    "family": "Inter, Arial, sans-serif",
+                    "size": 13,
+                    "weight": "normal",
+                },
+            },
+            "tickfont": {"size": 11},
+            "gridcolor": "lightgray",
+            "gridwidth": 0.5,
+            "showgrid": False,
+            "zeroline": False,
+            "showline": True,
+            "linewidth": 0.5,
+            "linecolor": "black",
+            "mirror": True,
+        },
+        "barmode": "stack",
+        "plot_bgcolor": "white",
+        "paper_bgcolor": "white",
+        "legend": {
+            "orientation": "h",
+            "yanchor": "top",
+            "y": -0.10,
+            "xanchor": "center",
+            "x": 0.5,
+            "bgcolor": "rgba(255, 255, 255, 0.95)",
+            "font": {"size": 11},
+        },
+        "margin": {"l": 0, "r": 20, "t": 0, "b": 0},
+        "width": 700,
+        "height": 500,
+    }
+
+    fig.update_layout(**layout_updates)
+
+    if save_png_and_svg:
+        fig.write_image(f"{output_prefix}.png", width=550, height=410, scale=2)
+        fig.write_image(f"{output_prefix}.svg", width=550, height=410)
+        fig.write_html(f"{output_prefix}.html")
+
+    fig.show()
+    return fig
+
+
 def create_time_plot(
     csv_path="./results/chain_matmul.csv",
     output_prefix="chain_matmul_time",
     figure_title: str = "Chain Matmul - Execution Time",
     show_title: bool = True,
     save_png_and_svg: bool = True,
-    color_palette: List[str] = None,
+    color_palette: List[str] = ["#94A3B8", "#8B5CF6", "#EC4899", "#3B82F6"],
 ):
     """
     Create execution time plot for chain matrix multiplication.
@@ -153,7 +328,7 @@ def create_time_plot(
         gridwidth=1,
         showgrid=True,
         zeroline=False,
-        showline=False,
+        showline=True,
         linecolor="#CBD5E1",
         linewidth=1,
         mirror=True,
@@ -169,7 +344,7 @@ def create_time_plot(
         gridwidth=1,
         showgrid=True,
         zeroline=False,
-        showline=False,
+        showline=True,
     )
 
     output_path = str(csv_path).split(".csv")[0] + "_time"
@@ -196,7 +371,7 @@ def create_memory_plot(
     figure_title: str = "Chain Matmul - Memory Footprint",
     show_title: bool = True,
     save_png_and_svg: bool = True,
-    color_palette: List[str] = None,
+    color_palette: List[str] = ["#94A3B8", "#8B5CF6", "#EC4899", "#3B82F6"],
 ):
     """
     Create memory footprint plot for chain matrix multiplication.
@@ -334,7 +509,7 @@ def create_memory_plot(
         gridwidth=1,
         showgrid=True,
         zeroline=False,
-        showline=False,
+        showline=True,
         linecolor="#CBD5E1",
         linewidth=1,
         mirror=True,
@@ -348,8 +523,7 @@ def create_memory_plot(
         gridcolor="#E2E8F0",
         gridwidth=1,
         showgrid=True,
-        zeroline=False,
-        showline=False,
+        showline=True,
     )
 
     output_path = str(csv_path).split(".csv")[0] + "_memory"
@@ -556,7 +730,7 @@ def compare_symbolic_chained(
         gridwidth=1,
         showgrid=True,
         zeroline=False,
-        showline=False,
+        showline=True,
         linecolor="#CBD5E1",
         linewidth=1,
         mirror=True,
@@ -570,7 +744,7 @@ def compare_symbolic_chained(
         gridwidth=1,
         showgrid=True,
         zeroline=False,
-        showline=False,
+        showline=True,
         type="log" if log else "linear",
     )
 
@@ -598,11 +772,18 @@ def compare_symbolic_chained(
 
 
 if __name__ == "__main__":
-    bandwidth_plot(
-        csv_path="./results/batch_bertlike.csv",
-        output_prefix="batch_bertlike",
-        figure_title="BERT-like",
+    create_memory_plot(
+        csv_path="./results/sparse_attention.csv",
+        output_prefix="kalman_filter",
+        figure_title="kalman filter",
         show_title=False,
+        save_png_and_svg=False,
     )
+    # bandwidth_plot(
+    #     csv_path="./results/batch_bertlike.csv",
+    #     output_prefix="batch_bertlike",
+    #     figure_title="BERT-like",
+    #     show_title=False,
+    # )
     # bandwidth_plot(csv_path="./results/bertlike.csv", output_prefix="bertlike", figure_title="BERT-like")
     # compare_symbolic_chained(log=True, show_title=False)

@@ -1,6 +1,5 @@
 
 #include <cstdint>
-#include <iostream>
 
 #include "Analysis/BandedStructureAnalysis.h"
 #include "Dialect/DIA/DIAOps.h"

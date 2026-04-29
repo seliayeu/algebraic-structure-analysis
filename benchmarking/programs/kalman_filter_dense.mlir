@@ -3,10 +3,10 @@ func.func @kernel() -> f32{
     %P0 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0,1]}} dense<1.0> : tensor<1024x1024xf32>
     %Q  = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0,1]}} dense<1.0> : tensor<1024x1024xf32>
 
-    %e0 = arith.constant dense<0.0>: tensor<1024x1024xf32>
-    %e1 = arith.constant dense<0.0>: tensor<1024x1024xf32>
-    %e2 = arith.constant dense<0.0>: tensor<1024x1024xf32>
-    %e3 = arith.constant dense<0.0>: tensor<1024x1024xf32>
+    %e0 = tensor.empty(): tensor<1024x1024xf32>
+    %e1 = tensor.empty(): tensor<1024x1024xf32>
+    %e2 = tensor.empty(): tensor<1024x1024xf32>
+    %e3 = tensor.empty(): tensor<1024x1024xf32>
 
     %At = linalg.transpose ins(%A  : tensor<1024x1024xf32>)
                            outs(%e0 : tensor<1024x1024xf32>)
