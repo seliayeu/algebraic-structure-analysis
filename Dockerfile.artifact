@@ -59,7 +59,7 @@ RUN git clone https://github.com/seliayeu/algebraic-structure-analysis /app/bpa 
 RUN cmake -G Ninja \
         -S /app/bpa \
         -B /app/bpa/build \
-        -DENABLE_BENCHMARKING=1 \
+        -DENABLE_BENCHMARKING=ON \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_C_COMPILER=clang \
         -DCMAKE_CXX_COMPILER=clang++ \
