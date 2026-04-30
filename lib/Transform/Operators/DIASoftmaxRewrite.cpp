@@ -48,6 +48,7 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
 
         const int64_t L = bandInfo.Property.LowerBandwidth;
         const int64_t U = bandInfo.Property.UpperBandwidth;
+        const int64_t maxSliceLen = L + U + 1;  // Maximum possible slice length
 
         // ---- constants -------------------------------------------------------
         Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
@@ -63,9 +64,6 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
         Value zeroF = arith::ConstantFloatOp::create(rewriter, loc, f32, llvm::APFloat(0.0f));
 
         // Static OpFoldResults for positions that are always 1.
-        // This is what makes rank-reducing extract_slice and rank-expanding
-        // insert_slice work: the dropped/added dimension must have a
-        // *static* size of 1 (an IntegerAttr), not a dynamic SSA value.
         OpFoldResult staticOne = rewriter.getIndexAttr(1);
         OpFoldResult staticStride = rewriter.getIndexAttr(1);
 
@@ -73,6 +71,12 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
         Value outInit =
             linalg::FillOp::create(rewriter, loc, ValueRange{ zeroF }, ValueRange{ outEmpty })
                 .getResult(0);
+
+        // ---- Pre-allocate buffers for reuse across iterations ----------------
+        Value expBuffer =
+            tensor::EmptyOp::create(rewriter, loc, ArrayRef<int64_t>{ maxSliceLen }, f32);
+        Value normBuffer =
+            tensor::EmptyOp::create(rewriter, loc, ArrayRef<int64_t>{ maxSliceLen }, f32);
 
         AffineMap map1D = AffineMap::getMultiDimIdentityMap(1, ctx);
         AffineMap mapSc = AffineMap::get(1, 0, ctx);
@@ -96,18 +100,9 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
             Value sliceLen = arith::SubIOp::create(rewriter, loc, jEnd, jStart);
 
             // ---- rank-reducing extract_slice ---------------------------------
-            // offsets = [i,      jStart]
-            // sizes   = [1,      sliceLen]   <- dim-0 size is STATIC 1
-            // strides = [1,      1]
-            //
-            // MLIR drops any dimension whose size is a static 1, so the result
-            // is tensor<?xf32> (rank 1) instead of tensor<1x?xf32> (rank 2).
             SmallVector<OpFoldResult> extractOffsets = { getAsOpFoldResult(i),
                                                          getAsOpFoldResult(jStart) };
-            SmallVector<OpFoldResult> extractSizes = {
-                staticOne,                   // static — triggers rank reduction
-                getAsOpFoldResult(sliceLen)  // dynamic
-            };
+            SmallVector<OpFoldResult> extractSizes = { staticOne, getAsOpFoldResult(sliceLen) };
             SmallVector<OpFoldResult> extractStrides = { staticStride, staticStride };
 
             Value slice = tensor::ExtractSliceOp::create(
@@ -115,8 +110,6 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
 
             // ==================================================================
             // Step 1 – row max  (reduce over the band slice only)
-            // input:  slice  (d0)->(d0)  [reduction]
-            // output: scalar (d0)->()
             // ==================================================================
             Value maxInitTensor =
                 linalg::FillOp::create(
@@ -129,28 +122,28 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
                     rewriter, loc, TypeRange{ maxInitTensor.getType() }, ValueRange{ slice },
                     ValueRange{ maxInitTensor }, ArrayRef<AffineMap>{ map1D, mapSc }, red1D,
                     [&](OpBuilder& b, Location loc, ValueRange args) {
-                        // args[0] = slice[j],  args[1] = running max
                         Value newMax = arith::MaximumFOp::create(b, loc, args[0], args[1]);
                         linalg::YieldOp::create(b, loc, newMax);
                     })
                     .getResult(0);
 
             // ==================================================================
-            // Step 2 – exp(slice[j] - rowMax)  over the band only
-            // input:  slice  (d0)->(d0)  [parallel]
-            //         rowMax (d0)->()    [broadcast]
-            // output: exps   (d0)->(d0)
+            // Step 2 – exp(slice[j] - rowMax)
+            // Use a sub-slice of the pre-allocated expBuffer
             // ==================================================================
-            Value expEmpty =
-                tensor::EmptyOp::create(rewriter, loc, ArrayRef<int64_t>{ ShapedType::kDynamic },
-                                        f32, ValueRange{ sliceLen });
+            SmallVector<OpFoldResult> expExtractOffsets = { getAsOpFoldResult(c0) };
+            SmallVector<OpFoldResult> expExtractSizes = { getAsOpFoldResult(sliceLen) };
+            SmallVector<OpFoldResult> expExtractStrides = { staticStride };
+
+            Value expEmpty = tensor::ExtractSliceOp::create(rewriter, loc, sliceType, expBuffer,
+                                                            expExtractOffsets, expExtractSizes,
+                                                            expExtractStrides);
 
             Value exps = linalg::GenericOp::create(
                              rewriter, loc, TypeRange{ expEmpty.getType() },
                              ValueRange{ slice, rowMaxTensor }, ValueRange{ expEmpty },
                              ArrayRef<AffineMap>{ map1D, mapSc, map1D }, par1D,
                              [&](OpBuilder& b, Location loc, ValueRange args) {
-                                 // args[0] = slice[j],  args[1] = rowMax (broadcast)
                                  Value shifted = arith::SubFOp::create(b, loc, args[0], args[1]);
                                  Value expVal = math::ExpOp::create(b, loc, shifted);
                                  linalg::YieldOp::create(b, loc, expVal);
@@ -159,8 +152,6 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
 
             // ==================================================================
             // Step 3 – row sum  (reduce over exps)
-            // input:  exps   (d0)->(d0)  [reduction]
-            // output: scalar (d0)->()
             // ==================================================================
             Value sumInitTensor =
                 linalg::FillOp::create(
@@ -173,7 +164,6 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
                     rewriter, loc, TypeRange{ sumInitTensor.getType() }, ValueRange{ exps },
                     ValueRange{ sumInitTensor }, ArrayRef<AffineMap>{ map1D, mapSc }, red1D,
                     [&](OpBuilder& b, Location loc, ValueRange args) {
-                        // args[0] = exps[j],  args[1] = running sum
                         Value newSum = arith::AddFOp::create(b, loc, args[0], args[1]);
                         linalg::YieldOp::create(b, loc, newSum);
                     })
@@ -181,20 +171,21 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
 
             // ==================================================================
             // Step 4 – normalize: exps[j] / rowSum
-            // input:  exps   (d0)->(d0)  [parallel]
-            //         rowSum (d0)->()    [broadcast]
-            // output: norm   (d0)->(d0)
+            // Use a sub-slice of the pre-allocated normBuffer
             // ==================================================================
-            Value normEmpty =
-                tensor::EmptyOp::create(rewriter, loc, ArrayRef<int64_t>{ ShapedType::kDynamic },
-                                        f32, ValueRange{ sliceLen });
+            SmallVector<OpFoldResult> normExtractOffsets = { getAsOpFoldResult(c0) };
+            SmallVector<OpFoldResult> normExtractSizes = { getAsOpFoldResult(sliceLen) };
+            SmallVector<OpFoldResult> normExtractStrides = { staticStride };
+
+            Value normEmpty = tensor::ExtractSliceOp::create(rewriter, loc, sliceType, normBuffer,
+                                                             normExtractOffsets, normExtractSizes,
+                                                             normExtractStrides);
 
             Value normalized = linalg::GenericOp::create(
                                    rewriter, loc, TypeRange{ normEmpty.getType() },
                                    ValueRange{ exps, rowSumTensor }, ValueRange{ normEmpty },
                                    ArrayRef<AffineMap>{ map1D, mapSc, map1D }, par1D,
                                    [&](OpBuilder& b, Location loc, ValueRange args) {
-                                       // args[0] = exps[j],  args[1] = rowSum (broadcast)
                                        Value div = arith::DivFOp::create(b, loc, args[0], args[1]);
                                        linalg::YieldOp::create(b, loc, div);
                                    })
@@ -202,18 +193,10 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
 
             // ==================================================================
             // Step 5 – rank-expanding insert_slice back into the output tensor
-            // source:  normalized  tensor<?xf32>   (rank 1)
-            // dest:    outCarried  tensor<NxNxf32>  (rank 2)
-            // offsets = [i,      jStart]
-            // sizes   = [1,      sliceLen]   <- static 1 re-adds the dimension
-            // strides = [1,      1]
             // ==================================================================
             SmallVector<OpFoldResult> insertOffsets = { getAsOpFoldResult(i),
                                                         getAsOpFoldResult(jStart) };
-            SmallVector<OpFoldResult> insertSizes = {
-                staticOne,                   // static — triggers rank expansion
-                getAsOpFoldResult(sliceLen)  // dynamic
-            };
+            SmallVector<OpFoldResult> insertSizes = { staticOne, getAsOpFoldResult(sliceLen) };
             SmallVector<OpFoldResult> insertStrides = { staticStride, staticStride };
 
             Value updatedOut = tensor::InsertSliceOp::create(
@@ -240,6 +223,7 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
         const int64_t L = bandInfo.Property.LowerBandwidth;
         const int64_t U = bandInfo.Property.UpperBandwidth;
         const int64_t N = inputType.getDimSize(1);  // matrix dimension (columns)
+        const int64_t maxSliceLen = L + U + 1;      // Maximum possible slice length
 
         // ---- constants -----------------------------------------------------------
         Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
@@ -266,6 +250,12 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
         AffineMap mapSc = AffineMap::get(1, 0, ctx);  // scalar broadcast
         auto sliceType = RankedTensorType::get({ ShapedType::kDynamic }, f32);
 
+        // ---- Pre-allocate buffers for reuse across iterations ----------------
+        Value expBuffer =
+            tensor::EmptyOp::create(rewriter, loc, ArrayRef<int64_t>{ maxSliceLen }, f32);
+        Value normBuffer =
+            tensor::EmptyOp::create(rewriter, loc, ArrayRef<int64_t>{ maxSliceLen }, f32);
+
         // ---- outer loop over matrix rows -----------------------------------------
         auto rowLoop = scf::ForOp::create(rewriter, loc, c0, dimN, c1, ValueRange{ input });
         rewriter.setInsertionPointToStart(rowLoop.getBody());
@@ -290,9 +280,6 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
                 arith::IndexCastOp::create(rewriter, loc, rewriter.getIndexType(), rowStartI64);
 
             // ---- rank-reducing extract_slice ---------------------------------
-            // offsets = [diaRowStart, i]
-            // sizes   = [sliceLen,    1]  <- dim-1 size is STATIC 1
-            // strides = [1,           1]
             SmallVector<OpFoldResult> extractOffsets = { getAsOpFoldResult(diaRowStart),
                                                          getAsOpFoldResult(i) };
             SmallVector<OpFoldResult> extractSizes = { getAsOpFoldResult(sliceLen), staticOne };
@@ -322,10 +309,15 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
 
             // ==================================================================
             // Step 2 – exp(slice[j] - rowMax)
+            // Use a sub-slice of the pre-allocated expBuffer
             // ==================================================================
-            Value expEmpty =
-                tensor::EmptyOp::create(rewriter, loc, ArrayRef<int64_t>{ ShapedType::kDynamic },
-                                        f32, ValueRange{ sliceLen });
+            SmallVector<OpFoldResult> expExtractOffsets = { getAsOpFoldResult(c0) };
+            SmallVector<OpFoldResult> expExtractSizes = { getAsOpFoldResult(sliceLen) };
+            SmallVector<OpFoldResult> expExtractStrides = { staticStride };
+
+            Value expEmpty = tensor::ExtractSliceOp::create(rewriter, loc, sliceType, expBuffer,
+                                                            expExtractOffsets, expExtractSizes,
+                                                            expExtractStrides);
 
             Value exps = linalg::GenericOp::create(
                              rewriter, loc, TypeRange{ expEmpty.getType() },
@@ -359,10 +351,15 @@ struct DIASoftmaxPattern : public OpRewritePattern<dia::SoftmaxOp> {
 
             // ==================================================================
             // Step 4 – normalize: exps[j] / rowSum
+            // Use a sub-slice of the pre-allocated normBuffer
             // ==================================================================
-            Value normEmpty =
-                tensor::EmptyOp::create(rewriter, loc, ArrayRef<int64_t>{ ShapedType::kDynamic },
-                                        f32, ValueRange{ sliceLen });
+            SmallVector<OpFoldResult> normExtractOffsets = { getAsOpFoldResult(c0) };
+            SmallVector<OpFoldResult> normExtractSizes = { getAsOpFoldResult(sliceLen) };
+            SmallVector<OpFoldResult> normExtractStrides = { staticStride };
+
+            Value normEmpty = tensor::ExtractSliceOp::create(rewriter, loc, sliceType, normBuffer,
+                                                             normExtractOffsets, normExtractSizes,
+                                                             normExtractStrides);
 
             Value normalized = linalg::GenericOp::create(
                                    rewriter, loc, TypeRange{ normEmpty.getType() },
