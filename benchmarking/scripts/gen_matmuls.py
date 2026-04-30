@@ -1,118 +1,127 @@
-from pathlib import Path
-from enum import Enum, auto
+#!/usr/bin/env python3
+"""Generate K-chained matmul programs in three variants: dia, dia-inputs, dense.
 
-N = 1024
-NUM_MATMULS = 10
+Linear chain: m_1 = matmul(input, W_1); m_i = matmul(m_{i-1}, W_i) for i in [2, K].
+Non-batched, square N x N matrices.
 
-class Mode(Enum):
-    DENSE      = auto()
-    DIA        = auto()
-    DIA_INPUTS = auto()
+Placeholders left intact for downstream substitution:
+  X = bandwidth (lowerBw / upperBw values in metadata)
+  Y = DIA storage dim (only appears in dia-inputs variant)
 
+Empties and intermediate result tensors use `?` for the DIA storage dim.
 
-# ── Type/metadata helpers ─────────────────────────────────────────────────────
-
-def dense_type() -> str:
-    return f"tensor<{N}x{N}xf32>"
-
-def dia_static_type() -> str:
-    return f"tensor<Yx{N}xf32>"
-
-def dia_dyn_type() -> str:
-    return f"tensor<?x{N}xf32>"
-
-def dense_meta() -> str:
-    return "{metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}}"
-
-def dia_meta() -> str:
-    return "{metadata = {dia = true, lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}}"
-
-def dia_inputs_meta() -> str:
-    return "{metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}}"
+Usage:
+    python gen_chain.py --out-dir ./out [--K 100] [--N 2048]
+"""
+import argparse
+import os
 
 
-# ── Generator ─────────────────────────────────────────────────────────────────
+def dia_program(K: int, N: int) -> str:
+    md = "{lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}"
+    weight_t = f"tensor<{N}x{N}xf32>"
+    out_t = f"tensor<?x{N}xf32>"
 
-def generate_chain_matmul(n: int, mode: Mode, out_path: Path):
-    lines = []
-    lines.append("func.func @kernel() -> f32 {")
-
-    # ── empty tensors ─────────────────────────────────────────────────────────
-    if mode == Mode.DIA:
-        dyn_t = dia_dyn_type()
-        lines.append("  %c0 = arith.constant 0 : index")
-        for i in range(1, n + 2):
-            lines.append(f"  %e{i} = tensor.empty(%c0) : {dyn_t}")
-    else:
-        t = dense_type()
-        for i in range(1, n + 2):
-            lines.append(f"  %e{i} = tensor.empty() : {t}")
-
-    lines.append("")
-
-    # ── constants ─────────────────────────────────────────────────────────────
-    if mode == Mode.DENSE:
-        t, meta = dense_type(), dense_meta()
-    elif mode == Mode.DIA:
-        t, meta = dia_static_type(), dia_meta()
-    else:  # DIA_INPUTS
-        t, meta = dense_type(), dia_inputs_meta()
-
-    lines.append(f"  %input = arith.constant {meta} dense<1.0> : {t}")
-    for i in range(1, n + 1):
-        lines.append(f"  %W{i} = arith.constant {meta} dense<1.0> : {t}")
-
-    lines.append("")
-
-    # ── matmul chain ──────────────────────────────────────────────────────────
-    if mode == Mode.DENSE:
-        op, static_t, inter_t = "linalg.matmul", dense_type(), dense_type()
-    elif mode == Mode.DIA:
-        op, static_t, inter_t = "dia.matmul", dia_static_type(), dia_dyn_type()
-    else:  # DIA_INPUTS
-        op, static_t, inter_t = "dia.matmul", dense_type(), dense_type()
-
+    lines = ["func.func @kernel() -> f32 {"]
+    lines.append("  %c0 = arith.constant 0 : index")
+    for i in range(1, K + 1):
+        lines.append(f"  %e{i} = tensor.empty(%c0) : {out_t}")
+    lines.append(f"  %input = arith.constant {{metadata = {md}}} dense<1.0> : {weight_t}")
+    for i in range(1, K + 1):
+        v = 1.0 + i * 0.01
+        lines.append(f"  %W{i} = arith.constant {{metadata = {md}}} dense<{v:.4f}> : {weight_t}")
     lines.append(
-        f"  %m1 = {op} ins(%input, %W1 : {static_t}, {static_t})"
-        f" outs(%e1 : {inter_t}) -> {inter_t}"
+        f"  %m1 = dia.matmul ins(%input, %W1 : {weight_t}, {weight_t}) "
+        f"outs(%e1 : {out_t}) -> {out_t}"
     )
-    for i in range(2, n + 1):
+    for i in range(2, K + 1):
         lines.append(
-            f"  %m{i} = {op} ins(%m{i-1}, %W{i} : {inter_t}, {static_t})"
-            f" outs(%e{i} : {inter_t}) -> {inter_t}"
+            f"  %m{i} = dia.matmul ins(%m{i-1}, %W{i} : {out_t}, {weight_t}) "
+            f"outs(%e{i} : {out_t}) -> {out_t}"
         )
-
-    lines.append("")
-
-    # ── residual add ──────────────────────────────────────────────────────────
-    if mode == Mode.DENSE:
-        add_op = "linalg.add"
-    else:
-        add_op = "dia.elementwise kind = <add>"
-
-    lines.append(
-        f"  %result_add = {add_op}"
-        f" ins(%m{n}, %input : {inter_t}, {static_t})"
-        f" outs(%e{n+1} : {inter_t}) -> {inter_t}"
-    )
-
-    lines.append("")
-
-    # ── extract scalar ────────────────────────────────────────────────────────
-    idx = "0" if mode == Mode.DIA else "5"
-    lines.append(f"  %index = arith.constant {idx} : index")
-    lines.append(f"  %val = tensor.extract %result_add[%index, %index] : {inter_t}")
-    lines.append("  return %val : f32")
+    lines.append("  %index = arith.constant 0 : index")
+    lines.append(f"  %result = tensor.extract %m{K}[%index, %index] : {out_t}")
+    lines.append("  return %result : f32")
     lines.append("}")
+    return "\n".join(lines) + "\n"
 
-    out_path.write_text("\n".join(lines) + "\n")
-    print(f"Written: {out_path}  ({n} matmuls, {mode.name})")
+
+def dia_inputs_program(K: int, N: int) -> str:
+    md = "{dia = true, lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}"
+    weight_t = f"tensor<Yx{N}xf32>"
+    out_t = f"tensor<?x{N}xf32>"
+
+    lines = ["func.func @kernel() -> f32 {"]
+    lines.append("  %c0 = arith.constant 0 : index")
+    for i in range(1, K + 1):
+        lines.append(f"  %e{i} = tensor.empty(%c0) : {out_t}")
+    lines.append(f"  %input = arith.constant {{metadata = {md}}} dense<1.0> : {weight_t}")
+    for i in range(1, K + 1):
+        v = 1.0 + i * 0.01
+        lines.append(f"  %W{i} = arith.constant {{metadata = {md}}} dense<{v:.4f}> : {weight_t}")
+    lines.append(
+        f"  %m1 = dia.matmul ins(%input, %W1 : {weight_t}, {weight_t}) "
+        f"outs(%e1 : {out_t}) -> {out_t}"
+    )
+    for i in range(2, K + 1):
+        lines.append(
+            f"  %m{i} = dia.matmul ins(%m{i-1}, %W{i} : {out_t}, {weight_t}) "
+            f"outs(%e{i} : {out_t}) -> {out_t}"
+        )
+    lines.append("  %index = arith.constant 0 : index")
+    lines.append(f"  %result = tensor.extract %m{K}[%index, %index] : {out_t}")
+    lines.append("  return %result : f32")
+    lines.append("}")
+    return "\n".join(lines) + "\n"
+
+
+def dense_program(K: int, N: int) -> str:
+    md = "{lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}"
+    t = f"tensor<{N}x{N}xf32>"
+
+    lines = ["func.func @kernel() -> f32 {"]
+    for i in range(1, K + 1):
+        lines.append(f"  %e{i} = arith.constant dense<0.0> : {t}")
+    lines.append(f"  %input = arith.constant {{metadata = {md}}} dense<1.0> : {t}")
+    for i in range(1, K + 1):
+        v = 1.0 + i * 0.01
+        lines.append(f"  %W{i} = arith.constant {{metadata = {md}}} dense<{v:.4f}> : {t}")
+    lines.append(
+        f"  %m1 = linalg.matmul ins(%input, %W1 : {t}, {t}) "
+        f"outs(%e1 : {t}) -> {t}"
+    )
+    for i in range(2, K + 1):
+        lines.append(
+            f"  %m{i} = linalg.matmul ins(%m{i-1}, %W{i} : {t}, {t}) "
+            f"outs(%e{i} : {t}) -> {t}"
+        )
+    lines.append("  %index = arith.constant 0 : index")
+    lines.append(f"  %result = tensor.extract %m{K}[%index, %index] : {t}")
+    lines.append("  return %result : f32")
+    lines.append("}")
+    return "\n".join(lines) + "\n"
+
+
+def main() -> None:
+    p = argparse.ArgumentParser()
+    p.add_argument("--out-dir", default="benchmarking/programs")
+    p.add_argument("--K", type=int, default=10, help="chain length")
+    p.add_argument("--N", type=int, default=10, help="matrix size")
+    args = p.parse_args()
+
+    os.makedirs(args.out_dir, exist_ok=True)
+
+    variants = {
+        f"chain{args.K}_dia.mlir": dia_program(args.K, args.N),
+        f"chain{args.K}_dia_inputs.mlir": dia_inputs_program(args.K, args.N),
+        f"chain{args.K}_dense.mlir": dense_program(args.K, args.N),
+    }
+    for name, body in variants.items():
+        path = os.path.join(args.out_dir, name)
+        with open(path, "w") as f:
+            f.write(body)
+        print(f"wrote {path} ({len(body.splitlines())} lines)")
 
 
 if __name__ == "__main__":
-    out_dir = Path("./benchmarking/programs")
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    generate_chain_matmul(NUM_MATMULS, Mode.DENSE,      out_dir / f"chain{NUM_MATMULS}_dense.mlir")
-    generate_chain_matmul(NUM_MATMULS, Mode.DIA,        out_dir / f"chain{NUM_MATMULS}_dia.mlir")
-    generate_chain_matmul(NUM_MATMULS, Mode.DIA_INPUTS, out_dir / f"chain{NUM_MATMULS}_dia_inputs.mlir")
+    main()
