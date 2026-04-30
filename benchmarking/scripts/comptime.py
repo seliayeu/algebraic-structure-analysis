@@ -1,13 +1,13 @@
 import re
 import os
-import random
 import time
 import csv
+import random
+import logging
 import subprocess
 from pathlib import Path
-from dataclasses import dataclass
 from typing import List, Tuple
-import logging
+from dataclasses import dataclass
 from custom_logging import CustomFormatter
 
 logging.basicConfig(
