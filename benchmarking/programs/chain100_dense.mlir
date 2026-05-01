@@ -1,208 +1,205 @@
 func.func @kernel() -> f32 {
-  %e1 = tensor.empty() : tensor<1024x1024xf32>
-  %e2 = tensor.empty() : tensor<1024x1024xf32>
-  %e3 = tensor.empty() : tensor<1024x1024xf32>
-  %e4 = tensor.empty() : tensor<1024x1024xf32>
-  %e5 = tensor.empty() : tensor<1024x1024xf32>
-  %e6 = tensor.empty() : tensor<1024x1024xf32>
-  %e7 = tensor.empty() : tensor<1024x1024xf32>
-  %e8 = tensor.empty() : tensor<1024x1024xf32>
-  %e9 = tensor.empty() : tensor<1024x1024xf32>
-  %e10 = tensor.empty() : tensor<1024x1024xf32>
-  %e11 = tensor.empty() : tensor<1024x1024xf32>
-  %e12 = tensor.empty() : tensor<1024x1024xf32>
-  %e13 = tensor.empty() : tensor<1024x1024xf32>
-  %e14 = tensor.empty() : tensor<1024x1024xf32>
-  %e15 = tensor.empty() : tensor<1024x1024xf32>
-  %e16 = tensor.empty() : tensor<1024x1024xf32>
-  %e17 = tensor.empty() : tensor<1024x1024xf32>
-  %e18 = tensor.empty() : tensor<1024x1024xf32>
-  %e19 = tensor.empty() : tensor<1024x1024xf32>
-  %e20 = tensor.empty() : tensor<1024x1024xf32>
-  %e21 = tensor.empty() : tensor<1024x1024xf32>
-  %e22 = tensor.empty() : tensor<1024x1024xf32>
-  %e23 = tensor.empty() : tensor<1024x1024xf32>
-  %e24 = tensor.empty() : tensor<1024x1024xf32>
-  %e25 = tensor.empty() : tensor<1024x1024xf32>
-  %e26 = tensor.empty() : tensor<1024x1024xf32>
-  %e27 = tensor.empty() : tensor<1024x1024xf32>
-  %e28 = tensor.empty() : tensor<1024x1024xf32>
-  %e29 = tensor.empty() : tensor<1024x1024xf32>
-  %e30 = tensor.empty() : tensor<1024x1024xf32>
-  %e31 = tensor.empty() : tensor<1024x1024xf32>
-  %e32 = tensor.empty() : tensor<1024x1024xf32>
-  %e33 = tensor.empty() : tensor<1024x1024xf32>
-  %e34 = tensor.empty() : tensor<1024x1024xf32>
-  %e35 = tensor.empty() : tensor<1024x1024xf32>
-  %e36 = tensor.empty() : tensor<1024x1024xf32>
-  %e37 = tensor.empty() : tensor<1024x1024xf32>
-  %e38 = tensor.empty() : tensor<1024x1024xf32>
-  %e39 = tensor.empty() : tensor<1024x1024xf32>
-  %e40 = tensor.empty() : tensor<1024x1024xf32>
-  %e41 = tensor.empty() : tensor<1024x1024xf32>
-  %e42 = tensor.empty() : tensor<1024x1024xf32>
-  %e43 = tensor.empty() : tensor<1024x1024xf32>
-  %e44 = tensor.empty() : tensor<1024x1024xf32>
-  %e45 = tensor.empty() : tensor<1024x1024xf32>
-  %e46 = tensor.empty() : tensor<1024x1024xf32>
-  %e47 = tensor.empty() : tensor<1024x1024xf32>
-  %e48 = tensor.empty() : tensor<1024x1024xf32>
-  %e49 = tensor.empty() : tensor<1024x1024xf32>
-  %e50 = tensor.empty() : tensor<1024x1024xf32>
-  %e51 = tensor.empty() : tensor<1024x1024xf32>
-  %e52 = tensor.empty() : tensor<1024x1024xf32>
-  %e53 = tensor.empty() : tensor<1024x1024xf32>
-  %e54 = tensor.empty() : tensor<1024x1024xf32>
-  %e55 = tensor.empty() : tensor<1024x1024xf32>
-  %e56 = tensor.empty() : tensor<1024x1024xf32>
-  %e57 = tensor.empty() : tensor<1024x1024xf32>
-  %e58 = tensor.empty() : tensor<1024x1024xf32>
-  %e59 = tensor.empty() : tensor<1024x1024xf32>
-  %e60 = tensor.empty() : tensor<1024x1024xf32>
-  %e61 = tensor.empty() : tensor<1024x1024xf32>
-  %e62 = tensor.empty() : tensor<1024x1024xf32>
-  %e63 = tensor.empty() : tensor<1024x1024xf32>
-  %e64 = tensor.empty() : tensor<1024x1024xf32>
-  %e65 = tensor.empty() : tensor<1024x1024xf32>
-  %e66 = tensor.empty() : tensor<1024x1024xf32>
-  %e67 = tensor.empty() : tensor<1024x1024xf32>
-  %e68 = tensor.empty() : tensor<1024x1024xf32>
-  %e69 = tensor.empty() : tensor<1024x1024xf32>
-  %e70 = tensor.empty() : tensor<1024x1024xf32>
-  %e71 = tensor.empty() : tensor<1024x1024xf32>
-  %e72 = tensor.empty() : tensor<1024x1024xf32>
-  %e73 = tensor.empty() : tensor<1024x1024xf32>
-  %e74 = tensor.empty() : tensor<1024x1024xf32>
-  %e75 = tensor.empty() : tensor<1024x1024xf32>
-  %e76 = tensor.empty() : tensor<1024x1024xf32>
-  %e77 = tensor.empty() : tensor<1024x1024xf32>
-  %e78 = tensor.empty() : tensor<1024x1024xf32>
-  %e79 = tensor.empty() : tensor<1024x1024xf32>
-  %e80 = tensor.empty() : tensor<1024x1024xf32>
-  %e81 = tensor.empty() : tensor<1024x1024xf32>
-  %e82 = tensor.empty() : tensor<1024x1024xf32>
-  %e83 = tensor.empty() : tensor<1024x1024xf32>
-  %e84 = tensor.empty() : tensor<1024x1024xf32>
-  %e85 = tensor.empty() : tensor<1024x1024xf32>
-  %e86 = tensor.empty() : tensor<1024x1024xf32>
-  %e87 = tensor.empty() : tensor<1024x1024xf32>
-  %e88 = tensor.empty() : tensor<1024x1024xf32>
-  %e89 = tensor.empty() : tensor<1024x1024xf32>
-  %e90 = tensor.empty() : tensor<1024x1024xf32>
-  %e91 = tensor.empty() : tensor<1024x1024xf32>
-  %e92 = tensor.empty() : tensor<1024x1024xf32>
-  %e93 = tensor.empty() : tensor<1024x1024xf32>
-  %e94 = tensor.empty() : tensor<1024x1024xf32>
-  %e95 = tensor.empty() : tensor<1024x1024xf32>
-  %e96 = tensor.empty() : tensor<1024x1024xf32>
-  %e97 = tensor.empty() : tensor<1024x1024xf32>
-  %e98 = tensor.empty() : tensor<1024x1024xf32>
-  %e99 = tensor.empty() : tensor<1024x1024xf32>
-  %e100 = tensor.empty() : tensor<1024x1024xf32>
-  %e101 = tensor.empty() : tensor<1024x1024xf32>
-
+  %e1 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e2 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e3 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e4 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e5 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e6 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e7 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e8 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e9 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e10 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e11 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e12 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e13 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e14 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e15 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e16 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e17 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e18 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e19 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e20 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e21 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e22 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e23 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e24 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e25 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e26 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e27 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e28 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e29 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e30 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e31 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e32 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e33 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e34 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e35 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e36 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e37 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e38 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e39 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e40 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e41 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e42 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e43 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e44 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e45 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e46 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e47 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e48 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e49 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e50 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e51 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e52 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e53 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e54 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e55 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e56 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e57 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e58 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e59 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e60 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e61 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e62 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e63 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e64 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e65 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e66 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e67 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e68 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e69 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e70 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e71 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e72 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e73 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e74 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e75 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e76 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e77 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e78 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e79 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e80 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e81 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e82 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e83 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e84 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e85 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e86 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e87 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e88 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e89 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e90 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e91 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e92 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e93 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e94 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e95 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e96 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e97 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e98 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e99 = arith.constant dense<0.0> : tensor<1024x1024xf32>
+  %e100 = arith.constant dense<0.0> : tensor<1024x1024xf32>
   %input = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W1 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W2 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W3 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W4 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W5 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W6 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W7 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W8 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W9 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W10 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W11 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W12 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W13 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W14 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W15 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W16 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W17 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W18 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W19 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W20 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W21 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W22 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W23 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W24 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W25 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W26 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W27 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W28 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W29 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W30 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W31 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W32 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W33 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W34 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W35 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W36 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W37 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W38 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W39 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W40 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W41 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W42 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W43 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W44 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W45 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W46 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W47 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W48 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W49 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W50 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W51 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W52 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W53 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W54 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W55 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W56 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W57 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W58 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W59 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W60 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W61 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W62 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W63 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W64 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W65 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W66 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W67 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W68 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W69 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W70 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W71 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W72 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W73 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W74 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W75 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W76 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W77 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W78 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W79 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W80 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W81 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W82 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W83 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W84 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W85 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W86 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W87 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W88 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W89 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W90 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W91 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W92 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W93 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W94 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W95 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W96 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W97 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W98 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W99 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-  %W100 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0> : tensor<1024x1024xf32>
-
+  %W1 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0100> : tensor<1024x1024xf32>
+  %W2 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0200> : tensor<1024x1024xf32>
+  %W3 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0300> : tensor<1024x1024xf32>
+  %W4 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0400> : tensor<1024x1024xf32>
+  %W5 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0500> : tensor<1024x1024xf32>
+  %W6 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0600> : tensor<1024x1024xf32>
+  %W7 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0700> : tensor<1024x1024xf32>
+  %W8 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0800> : tensor<1024x1024xf32>
+  %W9 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0900> : tensor<1024x1024xf32>
+  %W10 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.1000> : tensor<1024x1024xf32>
+  %W11 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.1100> : tensor<1024x1024xf32>
+  %W12 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.1200> : tensor<1024x1024xf32>
+  %W13 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.1300> : tensor<1024x1024xf32>
+  %W14 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.1400> : tensor<1024x1024xf32>
+  %W15 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.1500> : tensor<1024x1024xf32>
+  %W16 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.1600> : tensor<1024x1024xf32>
+  %W17 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.1700> : tensor<1024x1024xf32>
+  %W18 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.1800> : tensor<1024x1024xf32>
+  %W19 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.1900> : tensor<1024x1024xf32>
+  %W20 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.2000> : tensor<1024x1024xf32>
+  %W21 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.2100> : tensor<1024x1024xf32>
+  %W22 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.2200> : tensor<1024x1024xf32>
+  %W23 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.2300> : tensor<1024x1024xf32>
+  %W24 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.2400> : tensor<1024x1024xf32>
+  %W25 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.2500> : tensor<1024x1024xf32>
+  %W26 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.2600> : tensor<1024x1024xf32>
+  %W27 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.2700> : tensor<1024x1024xf32>
+  %W28 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.2800> : tensor<1024x1024xf32>
+  %W29 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.2900> : tensor<1024x1024xf32>
+  %W30 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.3000> : tensor<1024x1024xf32>
+  %W31 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.3100> : tensor<1024x1024xf32>
+  %W32 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.3200> : tensor<1024x1024xf32>
+  %W33 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.3300> : tensor<1024x1024xf32>
+  %W34 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.3400> : tensor<1024x1024xf32>
+  %W35 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.3500> : tensor<1024x1024xf32>
+  %W36 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.3600> : tensor<1024x1024xf32>
+  %W37 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.3700> : tensor<1024x1024xf32>
+  %W38 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.3800> : tensor<1024x1024xf32>
+  %W39 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.3900> : tensor<1024x1024xf32>
+  %W40 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.4000> : tensor<1024x1024xf32>
+  %W41 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.4100> : tensor<1024x1024xf32>
+  %W42 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.4200> : tensor<1024x1024xf32>
+  %W43 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.4300> : tensor<1024x1024xf32>
+  %W44 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.4400> : tensor<1024x1024xf32>
+  %W45 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.4500> : tensor<1024x1024xf32>
+  %W46 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.4600> : tensor<1024x1024xf32>
+  %W47 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.4700> : tensor<1024x1024xf32>
+  %W48 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.4800> : tensor<1024x1024xf32>
+  %W49 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.4900> : tensor<1024x1024xf32>
+  %W50 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.5000> : tensor<1024x1024xf32>
+  %W51 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.5100> : tensor<1024x1024xf32>
+  %W52 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.5200> : tensor<1024x1024xf32>
+  %W53 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.5300> : tensor<1024x1024xf32>
+  %W54 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.5400> : tensor<1024x1024xf32>
+  %W55 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.5500> : tensor<1024x1024xf32>
+  %W56 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.5600> : tensor<1024x1024xf32>
+  %W57 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.5700> : tensor<1024x1024xf32>
+  %W58 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.5800> : tensor<1024x1024xf32>
+  %W59 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.5900> : tensor<1024x1024xf32>
+  %W60 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.6000> : tensor<1024x1024xf32>
+  %W61 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.6100> : tensor<1024x1024xf32>
+  %W62 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.6200> : tensor<1024x1024xf32>
+  %W63 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.6300> : tensor<1024x1024xf32>
+  %W64 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.6400> : tensor<1024x1024xf32>
+  %W65 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.6500> : tensor<1024x1024xf32>
+  %W66 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.6600> : tensor<1024x1024xf32>
+  %W67 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.6700> : tensor<1024x1024xf32>
+  %W68 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.6800> : tensor<1024x1024xf32>
+  %W69 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.6900> : tensor<1024x1024xf32>
+  %W70 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.7000> : tensor<1024x1024xf32>
+  %W71 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.7100> : tensor<1024x1024xf32>
+  %W72 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.7200> : tensor<1024x1024xf32>
+  %W73 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.7300> : tensor<1024x1024xf32>
+  %W74 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.7400> : tensor<1024x1024xf32>
+  %W75 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.7500> : tensor<1024x1024xf32>
+  %W76 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.7600> : tensor<1024x1024xf32>
+  %W77 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.7700> : tensor<1024x1024xf32>
+  %W78 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.7800> : tensor<1024x1024xf32>
+  %W79 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.7900> : tensor<1024x1024xf32>
+  %W80 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.8000> : tensor<1024x1024xf32>
+  %W81 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.8100> : tensor<1024x1024xf32>
+  %W82 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.8200> : tensor<1024x1024xf32>
+  %W83 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.8300> : tensor<1024x1024xf32>
+  %W84 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.8400> : tensor<1024x1024xf32>
+  %W85 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.8500> : tensor<1024x1024xf32>
+  %W86 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.8600> : tensor<1024x1024xf32>
+  %W87 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.8700> : tensor<1024x1024xf32>
+  %W88 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.8800> : tensor<1024x1024xf32>
+  %W89 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.8900> : tensor<1024x1024xf32>
+  %W90 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.9000> : tensor<1024x1024xf32>
+  %W91 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.9100> : tensor<1024x1024xf32>
+  %W92 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.9200> : tensor<1024x1024xf32>
+  %W93 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.9300> : tensor<1024x1024xf32>
+  %W94 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.9400> : tensor<1024x1024xf32>
+  %W95 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.9500> : tensor<1024x1024xf32>
+  %W96 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.9600> : tensor<1024x1024xf32>
+  %W97 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.9700> : tensor<1024x1024xf32>
+  %W98 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.9800> : tensor<1024x1024xf32>
+  %W99 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.9900> : tensor<1024x1024xf32>
+  %W100 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<2.0000> : tensor<1024x1024xf32>
   %m1 = linalg.matmul ins(%input, %W1 : tensor<1024x1024xf32>, tensor<1024x1024xf32>) outs(%e1 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
   %m2 = linalg.matmul ins(%m1, %W2 : tensor<1024x1024xf32>, tensor<1024x1024xf32>) outs(%e2 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
   %m3 = linalg.matmul ins(%m2, %W3 : tensor<1024x1024xf32>, tensor<1024x1024xf32>) outs(%e3 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
@@ -303,10 +300,7 @@ func.func @kernel() -> f32 {
   %m98 = linalg.matmul ins(%m97, %W98 : tensor<1024x1024xf32>, tensor<1024x1024xf32>) outs(%e98 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
   %m99 = linalg.matmul ins(%m98, %W99 : tensor<1024x1024xf32>, tensor<1024x1024xf32>) outs(%e99 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
   %m100 = linalg.matmul ins(%m99, %W100 : tensor<1024x1024xf32>, tensor<1024x1024xf32>) outs(%e100 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
-
-  %result_add = linalg.add ins(%m100, %input : tensor<1024x1024xf32>, tensor<1024x1024xf32>) outs(%e101 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
-
-  %index = arith.constant 5 : index
-  %val = tensor.extract %result_add[%index, %index] : tensor<1024x1024xf32>
-  return %val : f32
+  %index = arith.constant 0 : index
+  %result = tensor.extract %m100[%index, %index] : tensor<1024x1024xf32>
+  return %result : f32
 }
