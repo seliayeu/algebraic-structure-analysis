@@ -6,7 +6,7 @@ import bench
 
 def kalman_filter(runs_count: int = 5):
     benchmark_name = "kalman_filter"
-    bandwidths = [512, 409, 307, 256, 204, 153, 102, 51, 0]
+    bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
 
     configs = [
         ("kalman_filter_dense.mlir", None),
@@ -42,7 +42,7 @@ def kalman_filter(runs_count: int = 5):
 
 def batch_bertlike(runs_count: int = 5):
     benchmark_name = "batch_bertlike"
-    bandwidths = [409, 307, 256, 204, 153, 102, 51, 0]
+    bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
 
     configs = [
         #("batch_bertlike_dense.mlir", None),
@@ -81,7 +81,7 @@ def batch_bertlike(runs_count: int = 5):
 
 def sparse_attention(runs_count: int = 5):
     benchmark_name = "sparse_attention"
-    bandwidths = [512, 409, 307, 256, 204, 153, 102, 51, 0]
+    bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
 
     configs = [
         ("sparse_attention_baseline.mlir", None),
@@ -117,7 +117,7 @@ def sparse_attention(runs_count: int = 5):
 
 def chained_matmul(runs_count: int = 5):
     benchmark_name = "chain100"
-    bandwidths = [512, 409, 307, 256, 204, 153, 102, 51, 0]
+    bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
 
     configs = [
         ("chain100_dense.mlir", None),
