@@ -1,8 +1,9 @@
-from typing import List
-import pandas as pd
-import plotly.graph_objects as go
 import kaleido
 import os
+import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from typing import List, Dict, Optional
 
 
 def create_comptime_plot(
@@ -776,6 +777,500 @@ def compare_symbolic_chained(
         + (", .svg, .png" if save_png_and_svg else "")
     )
 
+    return fig
+
+
+def create_grouped_memory_plot(
+    csv_paths: List[str],
+    output_prefix: str = "memory_consumption",
+    figure_title: str = "Bandwidth Memory Consumption",
+    show_title: bool = True,
+    save_png_and_svg: bool = True,
+    color_palette: Optional[Dict[str, str]] = None,
+):
+    if color_palette is None:
+        color_palette = {
+            "baseline": "#ef4444",
+            "bpa-dense": "#A5B4FC",
+            "bpa-dia": "#C4B5FD",
+            "bpa-hybrid": "#6EE7B7",
+        }
+
+    n_rows = 2
+    n_cols = 2
+
+    fig = make_subplots(
+        rows=n_rows,
+        cols=n_cols,
+        shared_yaxes=False,
+        shared_xaxes=False,
+        horizontal_spacing=0.06,
+        vertical_spacing=0.01,
+    )
+
+    bar_width = 0.25
+
+    for idx, csv_path in enumerate(csv_paths):
+        row = idx // n_cols + 1
+        col = idx % n_cols + 1
+
+        df = pd.read_csv(csv_path)
+        df["bw"] = pd.to_numeric(df["bw"])
+
+        benchmark_name = (
+            csv_path.split("/")[-1].replace(".csv", "").replace("_", " ").title()
+        )
+
+        baseline = df[df["config"] == "baseline"]
+        ar_dense = df[
+            (df["config"] == "AR") & (df["file_name"].str.contains("dense", na=False))
+        ]
+        ar_dia = df[
+            (df["config"] == "AR") & (df["file_name"].str.contains("dia", na=False))
+        ]
+        ard_dia = df[
+            (df["config"] == "ADR") & (df["file_name"].str.contains("dia", na=False))
+        ]
+
+        bw_values = sorted(df["bw"].unique())
+        n_bandwidths = len(bw_values)
+
+        x_positions = list(range(n_bandwidths))
+
+        if not baseline.empty:
+            baseline_mean = baseline["max_rss_mb"].mean()
+
+            x_min = -0.5
+            x_max = n_bandwidths - 0.5
+
+            fig.add_trace(
+                go.Scatter(
+                    x=[x_min, x_max],
+                    y=[baseline_mean, baseline_mean],
+                    mode="lines",
+                    name="baseline",
+                    legendgroup="baseline",
+                    line=dict(color=color_palette["baseline"], width=2.5, dash="dash"),
+                    hovertemplate=f"<b>baseline</b><br>Mean: {baseline_mean:.1f} MB<br><extra></extra>",
+                    showlegend=(idx == 0),
+                ),
+                row=row,
+                col=col,
+            )
+
+        bar_configs = [
+            ("bpa-dense", ar_dense, color_palette["bpa-dense"]),
+            ("bpa-dia", ar_dia, color_palette["bpa-dia"]),
+            ("bpa-hybrid", ard_dia, color_palette["bpa-hybrid"]),
+        ]
+
+        for config_idx, (name, data, color) in enumerate(bar_configs):
+            if data.empty:
+                continue
+
+            bw_to_memory = dict(zip(data["bw"], data["max_rss_mb"]))
+
+            x_pos = []
+            y_values = []
+            customdata = []
+
+            for bw_idx, bw in enumerate(bw_values):
+                if bw in bw_to_memory:
+                    x_pos.append(bw_idx + (config_idx - 1) * bar_width)
+                    y_values.append(bw_to_memory[bw])
+                    customdata.append(bw)
+
+            if x_pos:
+                fig.add_trace(
+                    go.Bar(
+                        x=x_pos,
+                        y=y_values,
+                        name=name,
+                        legendgroup=name,
+                        marker_color=color,
+                        marker_line_color="black",
+                        marker_line_width=0.8,
+                        opacity=0.85,
+                        width=bar_width,
+                        hovertemplate=f"<b>{name}</b><br>Bandwidth: %{{customdata}}<br>Memory: %{{y:.1f}} MB<br><extra></extra>",
+                        customdata=customdata,
+                        showlegend=(idx == 0),
+                    ),
+                    row=row,
+                    col=col,
+                )
+
+        tick_positions = x_positions
+        tick_labels = [str(bw) for bw in bw_values]
+
+        fig.update_xaxes(
+            # title_text="Bandwidth" if row == 2 else "",
+            title_font={"family": "serif", "size": 12, "weight": "normal"},
+            tickfont={"family": "serif", "size": 12},
+            tickmode="array",
+            tickvals=tick_positions if row == 2 else [],
+            ticktext=tick_labels if row == 2 else None,
+            showgrid=False,
+            zeroline=False,
+            showline=True,
+            linewidth=0.5,
+            linecolor="black",
+            mirror=True,
+            row=row,
+            col=col,
+            title_standoff=10,
+            # side="top",
+        )
+
+        fig.update_yaxes(
+            # title_text="Peak Memory Consumption (MB)" if col == 1 else "",
+            title_font={"family": "serif", "size": 10, "weight": "normal"},
+            tickfont={"family": "serif", "size": 12},
+            showgrid=False,
+            zeroline=False,
+            showline=True,
+            linewidth=0.5,
+            linecolor="black",
+            mirror=True,
+            row=row,
+            col=col,
+        )
+
+        max_y = df["max_rss_mb"].max()
+        fig.add_annotation(
+            text=" " + benchmark_name + " ",
+            x=2.0,
+            y=max_y * 0.9999,
+            xref=f"x{idx + 1}",
+            yref=f"y{idx + 1}",
+            xanchor="left",
+            yanchor="top",
+            showarrow=False,
+            font={"family": "serif", "size": 12, "weight": "bold", "color": "#333333"},
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="black",
+            borderwidth=0.5,
+            row=row,
+            col=col,
+        )
+
+    fig.add_annotation(
+        text="Bandwidth",
+        xref="paper",
+        yref="paper",
+        x=0.5,
+        y=-0.08,
+        xanchor="center",
+        yanchor="middle",
+        showarrow=False,
+        font={"family": "serif", "size": 12, "weight": "normal"},
+    )
+
+    fig.add_annotation(
+        text="Peak Memory Consumption (MB)",
+        xref="paper",
+        yref="paper",
+        x=-0.08,
+        y=0.5,
+        textangle=-90,
+        xanchor="center",
+        yanchor="middle",
+        showarrow=False,
+        font={"family": "serif", "size": 12, "weight": "normal"},
+    )
+
+    fig.update_layout(
+        title={
+            "text": figure_title if show_title else None,
+            "font": {"family": "serif", "size": 12, "weight": "normal"},
+            "x": 0.5,
+            "xanchor": "center",
+        },
+        showlegend=True,
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": -0.19,
+            "xanchor": "center",
+            "x": 0.4,
+            "title": {"font": {"family": "serif", "size": 9}},
+            "font": {"family": "serif", "size": 12},
+            "bgcolor": "rgba(255, 255, 255, 0.95)",
+        },
+        hovermode="closest",
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=12,
+            font_family="serif",
+        ),
+        width=900,
+        height=700,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        margin=dict(t=0, b=0, l=40, r=20),
+    )
+
+    output_path = "./results/memory_comparison"
+    fig.write_html(
+        f"{output_path}.html",
+        config={
+            "displayModeBar": True,
+            "modeBarButtonsToAdd": ["drawline", "drawrect", "eraseshape"],
+            "displaylogo": False,
+        },
+    )
+    if save_png_and_svg:
+        fig.write_image(f"{output_path}.svg", width=550, height=410)
+        fig.write_image(f"{output_path}.png", width=550, height=410, scale=2)
+
+    fig.show()
+    return fig
+
+
+def create_grouped_runtime_plot(
+    csv_paths: List[str],
+    output_prefix: str = "timing_comparison",
+    figure_title: str = "Average Runtime Comparison",
+    show_title: bool = True,
+    save_png_and_svg: bool = True,
+    color_palette: Optional[Dict[str, str]] = None,
+):
+    if color_palette is None:
+        color_palette = {
+            "baseline": "#ef4444",
+            "bpa-dense": "#F4A460",
+            "bpa-dia": "#87CEEB",
+            "bpa-hybrid": "#98FB98",
+        }
+
+    n_rows = 2
+    n_cols = 2
+
+    fig = make_subplots(
+        rows=n_rows,
+        cols=n_cols,
+        shared_yaxes=False,
+        shared_xaxes=False,
+        horizontal_spacing=0.05,
+        vertical_spacing=0.01,
+    )
+
+    bar_width = 0.25
+
+    for idx, csv_path in enumerate(csv_paths):
+        row = idx // n_cols + 1
+        col = idx % n_cols + 1
+
+        df = pd.read_csv(csv_path)
+        df["bw"] = pd.to_numeric(df["bw"])
+
+        benchmark_name = (
+            csv_path.split("/")[-1].replace(".csv", "").replace("_", " ").title()
+        )
+
+        baseline = df[df["config"] == "baseline"]
+        ar_dense = df[
+            (df["config"] == "AR") & (df["file_name"].str.contains("dense", na=False))
+        ]
+        ar_dia = df[
+            (df["config"] == "AR") & (df["file_name"].str.contains("dia", na=False))
+        ]
+        ard_dia = df[
+            (df["config"] == "ADR") & (df["file_name"].str.contains("dia", na=False))
+        ]
+
+        bw_values = sorted(df["bw"].unique())
+        n_bandwidths = len(bw_values)
+
+        x_positions = list(range(n_bandwidths))
+
+        if not baseline.empty:
+            baseline_times = []
+            baseline_bws = []
+            for bw in bw_values:
+                baseline_subset = baseline[baseline["bw"] == bw]
+                if not baseline_subset.empty:
+                    baseline_bws.append(bw)
+                    baseline_times.append(baseline_subset["avg_time_s"].values[0])
+
+            if baseline_times:
+                x_min = -0.5
+                x_max = n_bandwidths - 0.5
+
+                fig.add_trace(
+                    go.Scatter(
+                        x=[x_min, x_max],
+                        y=[baseline_times[0], baseline_times[0]],
+                        mode="lines",
+                        name="baseline",
+                        legendgroup="baseline",
+                        line=dict(
+                            color=color_palette["baseline"], width=2.0, dash="dash"
+                        ),
+                        hovertemplate=f"<b>baseline</b><br>Time: {baseline_times[0]:.4f} s<br><extra></extra>",
+                        showlegend=(idx == 0),
+                    ),
+                    row=row,
+                    col=col,
+                )
+
+        bar_configs = [
+            ("bpa-dense", ar_dense, color_palette["bpa-dense"]),
+            ("bpa-dia", ar_dia, color_palette["bpa-dia"]),
+            ("bpa-hybrid", ard_dia, color_palette["bpa-hybrid"]),
+        ]
+
+        for config_idx, (name, data, color) in enumerate(bar_configs):
+            if data.empty:
+                continue
+
+            bw_to_time = dict(zip(data["bw"], data["avg_time_s"]))
+
+            x_pos = []
+            y_values = []
+            customdata = []
+
+            for bw_idx, bw in enumerate(bw_values):
+                if bw in bw_to_time:
+                    x_pos.append(bw_idx + (config_idx - 1) * bar_width)
+                    y_values.append(bw_to_time[bw])
+                    customdata.append(bw)
+
+            if x_pos:
+                fig.add_trace(
+                    go.Bar(
+                        x=x_pos,
+                        y=y_values,
+                        name=name,
+                        legendgroup=name,
+                        marker_color=color,
+                        marker_line_color="black",
+                        marker_line_width=0.8,
+                        opacity=0.85,
+                        width=bar_width,
+                        hovertemplate=f"<b>{name}</b><br>Bandwidth: %{{customdata}}<br>Time: %{{y:.4f}} s<br><extra></extra>",
+                        customdata=customdata,
+                        showlegend=(idx == 0),
+                    ),
+                    row=row,
+                    col=col,
+                )
+
+        tick_positions = x_positions
+        tick_labels = [str(bw) for bw in bw_values]
+
+        fig.update_xaxes(
+            title_font={"family": "serif", "size": 12, "weight": "normal"},
+            tickfont={"family": "serif", "size": 12},
+            tickmode="array",
+            tickvals=tick_positions if row == 2 else [],
+            ticktext=tick_labels if row == 2 else None,
+            showgrid=False,
+            zeroline=False,
+            showline=True,
+            linewidth=0.5,
+            linecolor="black",
+            mirror=True,
+            row=row,
+            col=col,
+            title_standoff=10,
+        )
+
+        fig.update_yaxes(
+            type="log",
+            title_font={"family": "serif", "size": 10, "weight": "normal"},
+            tickfont={"family": "serif", "size": 12},
+            showgrid=False,
+            zeroline=False,
+            showline=True,
+            linewidth=0.5,
+            linecolor="black",
+            mirror=True,
+            row=row,
+            col=col,
+        )
+
+        fig.add_annotation(
+            text=" " + benchmark_name + " ",
+            x=0.02,
+            y=0.70 if benchmark_name in ["Kalman Filter", "Sparse Attention"] else 1.99,
+            xref=f"x{idx + 1}",
+            yref=f"y{idx + 1}",
+            xanchor="left",
+            yanchor="top",
+            showarrow=False,
+            font={"family": "serif", "size": 12, "weight": "bold", "color": "#333333"},
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="black",
+            borderwidth=0.5,
+            row=row,
+            col=col,
+        )
+
+    fig.add_annotation(
+        text="Bandwidth",
+        xref="paper",
+        yref="paper",
+        x=0.5,
+        y=-0.08,
+        xanchor="center",
+        yanchor="middle",
+        showarrow=False,
+        font={"family": "serif", "size": 12, "weight": "normal"},
+    )
+
+    fig.add_annotation(
+        text="Average Runtime (seconds) - Log Scale",
+        xref="paper",
+        yref="paper",
+        x=-0.08,
+        y=0.5,
+        textangle=-90,
+        xanchor="center",
+        yanchor="middle",
+        showarrow=False,
+        font={"family": "serif", "size": 12, "weight": "normal"},
+    )
+
+    fig.update_layout(
+        title={
+            "text": figure_title if show_title else None,
+            "font": {"family": "serif", "size": 12, "weight": "normal"},
+            "x": 0.5,
+            "xanchor": "center",
+        },
+        showlegend=True,
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": -0.19,
+            "xanchor": "center",
+            "x": 0.4,
+            "title": {"font": {"family": "serif", "size": 9}},
+            "font": {"family": "serif", "size": 12},
+            "bgcolor": "rgba(255, 255, 255, 0.95)",
+        },
+        hovermode="closest",
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=12,
+            font_family="serif",
+        ),
+        width=900,
+        height=700,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        margin=dict(t=0, b=0, l=40, r=20),
+    )
+
+    output_path = f"./results/{output_prefix}"
+    fig.write_html(f"{output_path}.html")
+
+    if save_png_and_svg:
+        fig.write_image(f"{output_path}.svg", width=550, height=410)
+        fig.write_image(f"{output_path}.png", width=550, height=410, scale=2)
+
+    fig.show()
     return fig
 
 

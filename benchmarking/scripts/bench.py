@@ -169,9 +169,7 @@ def compile_kernel(ll_path: Path, obj_path: Path):
 def build_executable(obj_path: Path, exe_path: Path):
     logger.info(f"Building executable {exe_path.name}")
 
-    mlir_lib_dir = os.environ.get(
-        "MLIR_LIB_DIR",
-    )
+    mlir_lib_dir = os.environ.get("MLIR_LIB_DIR")
 
     if not mlir_lib_dir:
         raise RuntimeError("MLIR_LIB_DIR environment variable not set")
@@ -246,9 +244,12 @@ def run(
         logger.info(f"   Flags: {' '.join(flags) if flags else 'none'}")
         logger.info("-" * 60)
 
-        # batch bertlike takes a long time to run
+        # batch bertlike and chain100 takes a long time to run
+        # baseline should be constant
         bw_list = (
-            [0] if tag == "baseline" and "batch_bertlike" in file_name else bandwidths
+            [0]
+            if tag == "baseline" and (file_name in ["batch_bertlike", "chain100"])
+            else bandwidths
         )
 
         for bw in bw_list:
