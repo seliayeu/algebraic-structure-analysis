@@ -7,8 +7,8 @@ from typing import List, Dict, Optional
 
 
 def create_comptime_plot(
-    csv_path="./results/bpa_comptime.csv",
-    output_prefix="bpa_comptime",
+    csv_path="./results/compilation_time.csv",
+    output_prefix="comp_time",
     figure_title: str = "Compilation Time Breakdown by Component",
     show_title: bool = True,
     save_png_and_svg: bool = True,
@@ -98,7 +98,18 @@ def create_comptime_plot(
                 base_value += time_val
 
     x_tick_positions = list(range(len(ops_values)))
-    x_tick_labels = ops_values
+    ops_names = [
+        "Kalman<br>Filter",
+        "Sparse<br>Attention",
+        "Bertlike",
+        "Chain<br>Matmul",
+        "20",
+        "30",
+        "50",
+        "100",
+        "200",
+    ]
+    x_tick_labels = ops_names
 
     layout_updates = {
         "title": {
@@ -159,7 +170,7 @@ def create_comptime_plot(
         "legend": {
             "orientation": "h",
             "yanchor": "top",
-            "y": -0.10,
+            "y": -0.16,
             "xanchor": "center",
             "x": 0.5,
             "bgcolor": "rgba(255, 255, 255, 0.95)",
@@ -1208,7 +1219,7 @@ def create_grouped_runtime_plot(
         )
 
     fig.add_annotation(
-        text="Bandwidth",
+        text="<b>Bandwidth</b>",
         xref="paper",
         yref="paper",
         x=0.5,
@@ -1220,7 +1231,7 @@ def create_grouped_runtime_plot(
     )
 
     fig.add_annotation(
-        text="Average Runtime (seconds) - Log Scale",
+        text="<b>Average Runtime (seconds) - Log Scale</b>",
         xref="paper",
         yref="paper",
         x=-0.08,
@@ -1275,18 +1286,5 @@ def create_grouped_runtime_plot(
 
 
 if __name__ == "__main__":
-    create_memory_plot(
-        csv_path="./results/sparse_attention.csv",
-        output_prefix="kalman_filter",
-        figure_title="kalman filter",
-        show_title=False,
-        save_png_and_svg=False,
-    )
-    # bandwidth_plot(
-    #     csv_path="./results/batch_bertlike.csv",
-    #     output_prefix="batch_bertlike",
-    #     figure_title="BERT-like",
-    #     show_title=False,
-    # )
-    # bandwidth_plot(csv_path="./results/bertlike.csv", output_prefix="bertlike", figure_title="BERT-like")
-    # compare_symbolic_chained(log=True, show_title=False)
+    # create_comptime_plot(show_title=False)
+    create_grouped_runtime_plot(["./results/kalman_filter.csv"])

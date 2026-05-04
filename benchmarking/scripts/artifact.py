@@ -155,7 +155,7 @@ def chained_matmul(runs_count: int = 5):
 
 
 def comptime_experiment(runs_count: int = 5):
-    benchmark_name = "compilation-time"
+    benchmark_name = "compilation_time"
     configs = [
         ("analysis_rewrite", ["--banded-analysis --banded-rewrite"]),
     ]

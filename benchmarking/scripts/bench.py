@@ -122,7 +122,7 @@ def build_pipeline_flags(cfg):
             flags.append("--banded-rewrite")
             tag += "R"
 
-    return flags, tag if tag else "baseline"
+    return flags, tag if tag and "baseline" not in cfg[0] else "baseline"
 
 
 def lower_to_llvm(mlir_file: Path, flags: List[str]):
