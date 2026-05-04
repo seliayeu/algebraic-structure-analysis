@@ -84,7 +84,7 @@ def sparse_attention(runs_count: int = 5):
     bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
 
     configs = [
-        ("sparse_attention_baseline.mlir", None),
+        ("sparse_attention_baseline.mlir", "analysis", "rewrite"),
         ("sparse_attention_dense.mlir", "analysis", "rewrite"),
         ("sparse_attention_dia.mlir", "analysis", "rewrite"),
         ("sparse_attention_dia.mlir", "analysis-detect", "rewrite"),
@@ -155,7 +155,7 @@ def chained_matmul(runs_count: int = 5):
 
 
 def comptime_experiment(runs_count: int = 5):
-    benchmark_name = "compilation-time"
+    benchmark_name = "compilation_time"
     configs = [
         ("analysis_rewrite", ["--banded-analysis --banded-rewrite"]),
     ]
