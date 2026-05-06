@@ -572,10 +572,6 @@ def bandwidth_plot(
     save_png_and_svg: bool = True,
     color_palette: List[str] = ["#94A3B8", "#8B5CF6", "#EC4899", "#3B82F6"],
 ):
-    """
-    Create performance analysis plots for chain matrix multiplication.
-    Creates two separate figures: one for execution time and one for memory footprint.
-    """
 
     time_fig = create_time_plot(
         csv_path,
@@ -828,6 +824,8 @@ def create_grouped_memory_plot(
         df = pd.read_csv(csv_path)
         df["bw"] = pd.to_numeric(df["bw"])
 
+        df["max_rss_gb"] = df["max_rss_mb"] / 1024
+
         benchmark_name = (
             csv_path.split("/")[-1].replace(".csv", "").replace("_", " ").title()
         )
@@ -849,7 +847,7 @@ def create_grouped_memory_plot(
         x_positions = list(range(n_bandwidths))
 
         if not baseline.empty:
-            baseline_mean = baseline["max_rss_mb"].mean()
+            baseline_mean = baseline["max_rss_gb"].mean()
 
             x_min = -0.5
             x_max = n_bandwidths - 0.5
@@ -879,7 +877,7 @@ def create_grouped_memory_plot(
             if data.empty:
                 continue
 
-            bw_to_memory = dict(zip(data["bw"], data["max_rss_mb"]))
+            bw_to_memory = dict(zip(data["bw"], data["max_rss_gb"]))
 
             x_pos = []
             y_values = []
@@ -925,6 +923,7 @@ def create_grouped_memory_plot(
             zeroline=False,
             showline=True,
             linewidth=0.5,
+            tickangle=45,
             linecolor="black",
             mirror=True,
             row=row,
@@ -947,7 +946,7 @@ def create_grouped_memory_plot(
             col=col,
         )
 
-        max_y = df["max_rss_mb"].max()
+        max_y = df["max_rss_gb"].max()
         fig.add_annotation(
             text=" " + benchmark_name + " ",
             x=2.0,
@@ -966,11 +965,11 @@ def create_grouped_memory_plot(
         )
 
     fig.add_annotation(
-        text="Bandwidth",
+        text="<b>Bandwidth</b>",
         xref="paper",
         yref="paper",
         x=0.5,
-        y=-0.08,
+        y=-0.10,
         xanchor="center",
         yanchor="middle",
         showarrow=False,
@@ -978,7 +977,7 @@ def create_grouped_memory_plot(
     )
 
     fig.add_annotation(
-        text="Peak Memory Consumption (MB)",
+        text="<b>Peak Memory Consumption (GB)</b>",
         xref="paper",
         yref="paper",
         x=-0.08,
@@ -1183,6 +1182,7 @@ def create_grouped_runtime_plot(
             linecolor="black",
             mirror=True,
             row=row,
+            tickangle=45,
             col=col,
             title_standoff=10,
         )
@@ -1223,7 +1223,7 @@ def create_grouped_runtime_plot(
         xref="paper",
         yref="paper",
         x=0.5,
-        y=-0.08,
+        y=-0.10,
         xanchor="center",
         yanchor="middle",
         showarrow=False,
@@ -1286,5 +1286,24 @@ def create_grouped_runtime_plot(
 
 
 if __name__ == "__main__":
-    # create_comptime_plot(show_title=False)
-    create_grouped_runtime_plot(["./results/kalman_filter.csv"])
+    benchmark_files = [
+        "./results/kalman_filter.csv",
+        "./results/sparse_attention.csv",
+        "./results/batch_bertlike.csv",
+        "./results/chain.csv",
+    ]
+
+    fig = create_grouped_memory_plot(
+        csv_paths=benchmark_files,
+        output_prefix="memory_comparison",
+        figure_title="Memory Footprint Across Benchmarks",
+        show_title=False,
+        save_png_and_svg=True,
+    )
+    fig = create_grouped_runtime_plot(
+        csv_paths=benchmark_files,
+        output_prefix="runtime_comparison",
+        figure_title="Speedup Over Baseline",
+        show_title=False,
+        save_png_and_svg=True,
+    )

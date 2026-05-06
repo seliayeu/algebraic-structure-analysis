@@ -116,7 +116,7 @@ def sparse_attention(runs_count: int = 5):
 
 
 def chained_matmul(runs_count: int = 5):
-    benchmark_name = "chain100"
+    benchmark_name = "chain"
     bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
 
     configs = [
