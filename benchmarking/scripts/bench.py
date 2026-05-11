@@ -248,7 +248,8 @@ def run(
         # baseline should be constant
         bw_list = (
             [0]
-            if tag == "baseline" and (file_name in ["batch_bertlike", "chain100"])
+            if tag == "baseline"
+            and (file_name in ["batch_bertlike_dense.mlir", "chain100_dense.mlir"])
             else bandwidths
         )
 

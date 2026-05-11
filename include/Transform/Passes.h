@@ -2,6 +2,7 @@
 #define LIB_TRANSFORMS_PASSES_H
 #include "Transform/BandedPropagation.h"
 #include "Transform/BandedRewrite.h"
+#include "Transform/DenseSoftmaxRewrite.h"
 
 namespace mlir::bpa {
 #define GEN_PASS_REGISTRATION
