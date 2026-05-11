@@ -1,7 +1,7 @@
 func.func @kernel() -> f32{
     %A  = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0,1]}} dense<1.0> : tensor<1024x1024xf32>
-    %P0 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0,1]}} dense<1.0> : tensor<1024x1024xf32>
-    %Q  = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0,1]}} dense<1.0> : tensor<1024x1024xf32>
+    %P0 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0,1]}} dense<1.1> : tensor<1024x1024xf32>
+    %Q  = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0,1]}} dense<1.2> : tensor<1024x1024xf32>
 
     %e0 = tensor.empty(): tensor<1024x1024xf32>
     %e1 = tensor.empty(): tensor<1024x1024xf32>
