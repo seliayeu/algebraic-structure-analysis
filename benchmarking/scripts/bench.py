@@ -121,6 +121,8 @@ def build_pipeline_flags(cfg):
         elif c == "rewrite":
             flags.append("--banded-rewrite")
             tag += "R"
+        elif c == "dense-softmax":
+            flags.append("--dense-softmax-rewrite")
 
     return flags, tag if tag and "baseline" not in cfg[0] else "baseline"
 
@@ -249,7 +251,14 @@ def run(
         bw_list = (
             [0]
             if tag == "baseline"
-            and (file_name in ["batch_bertlike_dense.mlir", "chain100_dense.mlir"])
+            and (
+                file_name
+                in [
+                    "batch_bertlike_dense.mlir",
+                    "chain100_dense.mlir",
+                    "sparse_attention_baseline.mlir",
+                ]
+            )
             else bandwidths
         )
 
