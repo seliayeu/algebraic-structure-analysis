@@ -1,7 +1,6 @@
 #include "Transform/BandedPropagation.h"
 
 #include <cstdint>
-#include <iostream>
 #include <vector>
 
 #include "Analysis/BandedStructureAnalysis.h"

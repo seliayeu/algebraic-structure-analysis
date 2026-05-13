@@ -1,5 +1,10 @@
 include "mlir/Pass/PassBase.td"
 
+def DenseSoftmaxRewrite: Pass<"dense-softmax-rewrite", "mlir::func::FuncOp"> {
+  let summary = "Lower a dense softmax to linalg";
+  let dependentDialects = ["tensor::TensorDialect",];
+}
+
 def BandedRewrite: Pass<"banded-rewrite", "mlir::func::FuncOp"> {
     let summary = "Replace operations on banded matrices with more efficient versions";
     let description = [{
