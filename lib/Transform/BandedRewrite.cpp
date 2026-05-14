@@ -607,6 +607,10 @@ struct TransposePattern : public OpRewritePattern<linalg::TransposeOp> {
         if (!dict) dict = DictionaryAttr();
         BandedSubMatrix opBandInfo = BandedStructureAnalysis::readPropertyFromDictAttr(dict);
 
+        if (opBandInfo.isDiagonal()) {
+            rewriter.replaceOp(op, op.getInput());
+            return success();
+        }
         return denseBandedTranspose(op, rewriter);
     }
 };
