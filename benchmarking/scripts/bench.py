@@ -293,37 +293,37 @@ def run(
 
 
 if __name__ == "__main__":
-    bandwidths = [512, 409, 307, 256, 204, 153, 102, 51, 0]
+    bandwidths = [1024]
 
     configs = [
-        ("chain_matmul_dense.mlir", None),
-        ("chain_matmul_dense.mlir", "analysis", "rewrite"),
-        ("chain_matmul_dia.mlir", "analysis", "rewrite"),
-        ("chain_matmul_dia.mlir", "analysis-detect", "rewrite"),
+        ("batch_bertlike_dia.mlir", "analysis-detect", "rewrite"),
+        ("batch_bertlike_dense.mlir", None),
+        ("batch_bertlike_dense.mlir", "analysis", "rewrite"),
+        ("batch_bertlike_dia.mlir", "analysis", "rewrite"),
     ]
 
     run(
-        benchmark_name="chain_matmul",
+        benchmark_name="batch_bertlike_1024",
         program_dir="./benchmarking/programs",
         configs=configs,
         bandwidths=bandwidths,
-        warmup=1,
+        warmup=0,
         runs_count=1,
     )
-
-    bandwidths = [1024, 512, 409, 307, 256, 204, 153, 102, 51, 0]
-    configs_bert = [
-        ("bertlike_dia.mlir", "analysis", "rewrite"),
-        ("bertlike_dia.mlir", "analysis-detect", "rewrite"),
-        ("bertlike_dense.mlir", None),
-        ("bertlike_dense.mlir", "analysis", "rewrite"),
-    ]
-
-    run(
-        benchmark_name="bertlike",
-        program_dir="./benchmarking/programs",
-        configs=configs_bert,
-        bandwidths=bandwidths,
-        warmup=1,
-        runs_count=5,
-    )
+    #
+    # bandwidths = [1024, 512, 409, 307, 256, 204, 153, 102, 51, 0]
+    # configs_bert = [
+    #     ("bertlike_dia.mlir", "analysis", "rewrite"),
+    #     ("bertlike_dia.mlir", "analysis-detect", "rewrite"),
+    #     ("bertlike_dense.mlir", None),
+    #     ("bertlike_dense.mlir", "analysis", "rewrite"),
+    # ]
+    #
+    # run(
+    #     benchmark_name="bertlike",
+    #     program_dir="./benchmarking/programs",
+    #     configs=configs_bert,
+    #     bandwidths=bandwidths,
+    #     warmup=1,
+    #     runs_count=5,
+    # )

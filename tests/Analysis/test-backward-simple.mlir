@@ -9,6 +9,9 @@ module {
     %lower_A = arith.constant { metadata = { upperBw = 0 : i64, lowerBw = 2 : i64, propertyDims = [0, 1] } }
              dense<[[2.0,0.0,0.0],[4.0,3.0,0.0],[5.0,9.0,7.0]]> : tensor<3x3xf32>
     // CHECK: arith.constant
+    // CHECK-SAME: lowerBw = 2
+    // CHECK-SAME: propertyDims = [0, 1]
+    // CHECK-SAME: upperBw = 0
     %general_B = arith.constant
              dense<[[1.0,2.0,3.0],[4.0,5.0,6.0],[7.0,8.0,9.0]]> : tensor<3x3xf32>
     // CHECK: arith.constant

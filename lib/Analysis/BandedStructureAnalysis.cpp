@@ -1,6 +1,7 @@
 #include "Analysis/BandedStructureAnalysis.h"
 
 #include <algorithm>
+#include <iostream>
 
 #include "Analysis/BandedProperty.h"
 #include "Dialect/DIA/DIAOps.h"
@@ -31,7 +32,7 @@ LogicalResult BandedStructureAnalysis::run(Block* block) {
         if (failed(visitOperation(&op))) return failure();
 
     // backward
-    return runBackward();
+    return disableBW ? success() : runBackward();
 }
 
 LogicalResult BandedStructureAnalysis::runBackward() {

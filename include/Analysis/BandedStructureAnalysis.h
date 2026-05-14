@@ -57,10 +57,12 @@ class BandedStructureAnalysis {
     std::vector<Operation*> bwList;  // list of ops to perform bw prop on
 
     bool detectDIA{ false };
+    bool disableBW{ false };
 
    public:
-    BandedStructureAnalysis(bool detectDIA) {
+    BandedStructureAnalysis(bool detectDIA, bool disableBW) {
         this->detectDIA = detectDIA;
+        this->disableBW = disableBW;
     }
 
     LogicalResult run(Block* block);

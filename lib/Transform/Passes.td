@@ -27,6 +27,11 @@ def BandedAnalysis : Pass<"banded-analysis", "mlir::func::FuncOp"> {
             "heuristic",
             "bool",
             /*default=*/"false",
-            "Enable from_dense insertion heuristic">
+            "Enable from_dense insertion heuristic">,
+      Option<"disableBW",
+            "disable-bw",
+            "bool",
+            /*default=*/"false",
+            "Toggle whether backward prop should happen">
     ];
 }
