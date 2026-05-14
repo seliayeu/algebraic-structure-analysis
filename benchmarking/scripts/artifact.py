@@ -13,6 +13,8 @@ def kalman_filter(runs_count: int = 5):
         ("kalman_filter_dense.mlir", "analysis", "rewrite"),
         ("kalman_filter_dia.mlir", "analysis", "rewrite"),
         ("kalman_filter_dia.mlir", "analysis-detect", "rewrite"),
+        ("kalman_filter_dia_input.mlir", "analysis", "rewrite"),
+        ("kalman_filter_dia_input.mlir", "analysis-detect", "rewrite"),
     ]
 
     color_palette = [
@@ -88,6 +90,8 @@ def sparse_attention(runs_count: int = 5):
         ("sparse_attention_dense.mlir", "analysis", "rewrite"),
         ("sparse_attention_dia.mlir", "analysis", "rewrite"),
         ("sparse_attention_dia.mlir", "analysis-detect", "rewrite"),
+        ("sparse_attention_dia_input.mlir", "analysis", "rewrite"),
+        ("sparse_attention_dia_input.mlir", "analysis-detect", "rewrite"),
     ]
 
     color_palette = [
