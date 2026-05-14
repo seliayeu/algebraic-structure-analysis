@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "Analysis/BandedStructureAnalysis.h"
+#include "Dialect/DIA/DIAOps.h"
 #include "Utils/TransformUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
@@ -93,6 +94,48 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
     LogicalResult updateShape(dia::ElementwiseOp op, BandedStructureAnalysis& BSA) {
         auto rank{ cast<RankedTensorType>(op.getOperand(0).getType()).getRank() };
         int64_t N = cast<RankedTensorType>(op.getOperand(0).getType()).getDimSize(rank - 1);
+
+        auto result{ op.getResult() };
+        auto output{ op.getOutput() };
+        if (cast<RankedTensorType>(result.getType()).hasStaticShape()) return failure();
+        if (!BSA.hasProperty(result)) return failure();
+
+        BandedSubMatrix analysisResult{ BSA.getProperty(result) };
+
+        auto resultType{ dyn_cast<RankedTensorType>(result.getType()) };
+        if (!resultType) return failure();
+
+        int64_t M = 0;
+        if (!analysisResult.IsDia)
+            M = N;
+        else {
+            int64_t lC = static_cast<int64_t>(analysisResult.Property.UpperBandwidth);
+            int64_t uC = static_cast<int64_t>(analysisResult.Property.LowerBandwidth);
+            M = std::min(2 * N - 1, lC + uC + 1);
+        }
+
+        std::vector<int64_t> dims;
+        dims.reserve(resultType.getRank());
+        if (resultType.getRank() > 2) {
+            for (int64_t i = 0; i < resultType.getRank() - 2; ++i)
+                dims.push_back(resultType.getDimSize(i));
+        }
+        dims.push_back(M);
+        dims.push_back(N);
+
+        auto newType = RankedTensorType::get(dims, resultType.getElementType());
+        result.setType(newType);
+        output.setType(newType);
+        if (auto emptyOp = output.getDefiningOp<tensor::EmptyOp>()) {
+            emptyOp.getResult().setType(newType);
+            emptyOp->setOperands({});
+        }
+        return success();
+    }
+
+    LogicalResult updateShape(dia::SoftmaxOp op, BandedStructureAnalysis& BSA) {
+        auto rank{ cast<RankedTensorType>(op.getInput().getType()).getRank() };
+        int64_t N = cast<RankedTensorType>(op.getInput().getType()).getDimSize(rank - 1);
 
         auto result{ op.getResult() };
         auto output{ op.getOutput() };
@@ -281,8 +324,9 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
         });
 
         funcOp->walk([&](Operation* inst) {
-            if (!dyn_cast<dia::MatmulOp>(inst) && !dyn_cast<dia::ElementwiseOp>(inst) &&
-                !dyn_cast<dia::BatchMatmulOp>(inst) && !dyn_cast<dia::TransposeOp>(inst) &&
+            if (!dyn_cast<dia::SoftmaxOp>(inst) && !dyn_cast<dia::MatmulOp>(inst) &&
+                !dyn_cast<dia::ElementwiseOp>(inst) && !dyn_cast<dia::BatchMatmulOp>(inst) &&
+                !dyn_cast<dia::TransposeOp>(inst) &&
                 !(dyn_cast<arith::ConstantOp>(inst) &&
                   isa<RankedTensorType>(inst->getResult(0).getType())))
                 return;
@@ -297,6 +341,8 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
                 if (failed(updateShape(transposeOp, BSA))) return;
             } else if (auto constantOp{ dyn_cast<arith::ConstantOp>(inst) }) {
                 if (failed(updateShape(constantOp, BSA))) return;
+            } else if (auto softmaxOp{ dyn_cast<dia::SoftmaxOp>(inst) }) {
+                if (failed(updateShape(softmaxOp, BSA))) return;
 
             } else {
                 return;

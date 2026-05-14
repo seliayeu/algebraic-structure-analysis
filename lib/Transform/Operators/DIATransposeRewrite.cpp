@@ -98,6 +98,7 @@ struct DIATransposePattern : public OpRewritePattern<dia::TransposeOp> {
                     });
                 scf::YieldOp::create(ob, loc, jLoop.getResults());
             });
+        if (auto metadata = op->getAttr("metadata")) iLoop->setAttr("metadata", metadata);
         rewriter.replaceOp(op, iLoop.getResult(0));
         return success();
     }
