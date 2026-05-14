@@ -22,13 +22,13 @@ module {
     // CHECK: dia.transpose
     // CHECK-SAME: lowerBw = 0
     // CHECK-SAME: propertyDims = [0, 1]
-    // CHECK-SAME: upperBw = 2
+    // CHECK-SAME: upperBw = 0
     %trans = dia.transpose (%A : tensor<5x5xf32>)
 
     // CHECK: dia.matmul
-    // CHECK-SAME: lowerBw = 2
+    // CHECK-SAME: lowerBw = 0
     // CHECK-SAME: propertyDims = [0, 1]
-    // CHECK-SAME: upperBw = 1
+    // CHECK-SAME: upperBw = 0
     %matmul = dia.matmul ins(%A, %B : tensor<5x5xf32>, tensor<5x5xf32>) outs(%out : tensor<5x5xf32>) -> tensor<5x5xf32>
 
     // CHECK: dia.elementwise kind = <mul>
