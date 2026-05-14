@@ -50,11 +50,14 @@ LogicalResult BandedStructureAnalysis::runBackward() {
 
         for (auto& v : inputs) {
             auto* definingOp{ v.getDefiningOp() };
-            if (!(isa<linalg::LinalgOp>(definingOp) || isa<dia::ElementwiseOp>(definingOp) ||
-                  isa<arith::ConstantOp>(definingOp) || isa<tensor::EmptyOp>(definingOp)) ||
-                !propagateBackward(v))
-                continue;
-            if (!(isa<linalg::MatmulOp>(definingOp) || isa<dia::MatmulOp>(definingOp)))
+            bool validOp{ isa<linalg::LinalgOp>(definingOp) ||
+                          isa<dia::ElementwiseOp>(definingOp) ||
+                          isa<arith::ConstantOp>(definingOp) || isa<tensor::EmptyOp>(definingOp) ||
+                          isa<dia::MatmulOp>(definingOp) || isa<dia::TransposeOp>(definingOp) ||
+                          isa<dia::BatchMatmulOp>(definingOp) || isa<dia::SoftmaxOp>(definingOp) };
+            if (!validOp || !propagateBackward(v)) continue;
+            if (!(isa<linalg::MatmulOp>(definingOp) || isa<dia::MatmulOp>(definingOp) ||
+                  isa<linalg::BatchMatmulOp>(definingOp) || isa<dia::BatchMatmulOp>(definingOp)))
                 bwList.push_back(definingOp);
         }
     }
