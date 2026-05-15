@@ -21,23 +21,23 @@
 namespace mlir::bpa {
 
 struct DIAElementwisePattern : public OpRewritePattern<dia::ElementwiseOp> {
-private:
-    Value diaTimesDiaToDenseKernel(
-        OpBuilder& rewriter, Location loc, dia::ElementwiseOp op,
-        Value A, Value B, Value initC, Type elementType,
-        Value totalRows, Value totalCols,
-        int64_t lA, int64_t lB, int64_t uA, int64_t uB,
-        ArrayRef<Value> batchIndices) const {
-
+   private:
+    Value diaTimesDiaToDenseKernel(OpBuilder& rewriter, Location loc, dia::ElementwiseOp op,
+                                   Value A, Value B, Value initC, Type elementType, Value totalRows,
+                                   Value totalCols, int64_t lA, int64_t lB, int64_t uA, int64_t uB,
+                                   ArrayRef<Value> batchIndices) const {
         auto c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
         auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
-        auto cf0 = arith::ConstantOp::create(rewriter, loc, rewriter.getFloatAttr(elementType, 0.0));
+        auto cf0 =
+            arith::ConstantOp::create(rewriter, loc, rewriter.getFloatAttr(elementType, 0.0));
 
-        auto lDiff = arith::ConstantIndexOp::create(rewriter, loc, std::max(lA, lB) - std::min(lA, lB));
+        auto lDiff =
+            arith::ConstantIndexOp::create(rewriter, loc, std::max(lA, lB) - std::min(lA, lB));
         auto lMax = arith::ConstantIndexOp::create(rewriter, loc, std::max(lA, lB));
         auto lMin = arith::ConstantIndexOp::create(rewriter, loc, std::min(lA, lB));
-        auto uDiff = arith::ConstantIndexOp::create(rewriter, loc, std::max(uA, uB) - std::min(uA, uB));
-        
+        auto uDiff =
+            arith::ConstantIndexOp::create(rewriter, loc, std::max(uA, uB) - std::min(uA, uB));
+
         auto cLA = arith::ConstantIndexOp::create(rewriter, loc, lA);
         auto cLB = arith::ConstantIndexOp::create(rewriter, loc, lB);
 
@@ -99,7 +99,8 @@ private:
         }
 
         if (op.getKind() != dia::ElementwiseKind::mul && (uA > uB || uB > uA)) {
-            auto startUpperBand = arith::ConstantIndexOp::create(rewriter, loc, std::min(uA, uB) + 1);
+            auto startUpperBand =
+                arith::ConstantIndexOp::create(rewriter, loc, std::min(uA, uB) + 1);
             scf::ForOp iLoop = scf::ForOp::create(
                 rewriter, loc, c0, uDiff, c1, ValueRange{ currC },
                 [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
@@ -212,7 +213,8 @@ private:
         currC = iLoopLower.getResult(0);
 
         if (std::min(uA, uB) != 0) {
-            auto totalUpperDiags = arith::ConstantIndexOp::create(rewriter, loc, std::min(uA, uB) + 1);
+            auto totalUpperDiags =
+                arith::ConstantIndexOp::create(rewriter, loc, std::min(uA, uB) + 1);
             auto iLoopUpper = scf::ForOp::create(
                 rewriter, loc, c1, totalUpperDiags, c1, ValueRange{ currC },
                 [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
@@ -230,12 +232,14 @@ private:
                             SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                             idxA.push_back(aInd);
                             idxA.push_back(r);
-                            auto operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA);
+                            auto operand1 =
+                                tensor::ExtractOp::create(ib, loc, elementType, A, idxA);
 
                             SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                             idxB.push_back(bInd);
                             idxB.push_back(r);
-                            auto operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB);
+                            auto operand2 =
+                                tensor::ExtractOp::create(ib, loc, elementType, B, idxB);
 
                             Value newOp;
                             switch (op.getKind()) {
@@ -267,15 +271,14 @@ private:
         return currC;
     }
 
-    Value diaTimesDiaToDiaKernel(
-        OpBuilder& rewriter, Location loc, dia::ElementwiseOp op,
-        Value A, Value B, Value initC, Type elementType,
-        Value totalRows, int64_t lA, int64_t lB, int64_t uA, int64_t uB, int64_t lC,
-        ArrayRef<Value> batchIndices) const {
-
+    Value diaTimesDiaToDiaKernel(OpBuilder& rewriter, Location loc, dia::ElementwiseOp op, Value A,
+                                 Value B, Value initC, Type elementType, Value totalRows,
+                                 int64_t lA, int64_t lB, int64_t uA, int64_t uB, int64_t lC,
+                                 ArrayRef<Value> batchIndices) const {
         auto c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
         auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
-        auto cf0 = arith::ConstantOp::create(rewriter, loc, rewriter.getFloatAttr(elementType, 0.0));
+        auto cf0 =
+            arith::ConstantOp::create(rewriter, loc, rewriter.getFloatAttr(elementType, 0.0));
 
         auto cLA = arith::ConstantIndexOp::create(rewriter, loc, lA);
         auto cLB = arith::ConstantIndexOp::create(rewriter, loc, lB);
@@ -284,7 +287,8 @@ private:
         Value currC = initC;
 
         if (op.getKind() != dia::ElementwiseKind::mul && (lA > lB || lB > lA)) {
-            auto totalDiags = arith::ConstantIndexOp::create(rewriter, loc, std::max(lA, lB) - std::min(lA, lB));
+            auto totalDiags =
+                arith::ConstantIndexOp::create(rewriter, loc, std::max(lA, lB) - std::min(lA, lB));
             auto lMax = arith::ConstantIndexOp::create(rewriter, loc, std::max(lA, lB));
 
             scf::ForOp iLoop = scf::ForOp::create(
@@ -308,7 +312,8 @@ private:
                                 SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                                 idxA.push_back(aInd);
                                 idxA.push_back(r);
-                                operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
+                                operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA)
+                                               .getResult();
                             }
 
                             Value operand2 = cf0;
@@ -316,14 +321,17 @@ private:
                                 SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                                 idxB.push_back(bInd);
                                 idxB.push_back(r);
-                                operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                                operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB)
+                                               .getResult();
                             }
 
                             Value newOp;
                             if (op.getKind() == dia::ElementwiseKind::add)
-                                newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
                             else
-                                newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
 
                             SmallVector<Value> idxC(batchIndices.begin(), batchIndices.end());
                             idxC.push_back(cInd);
@@ -338,8 +346,10 @@ private:
         }
 
         if (op.getKind() != dia::ElementwiseKind::mul && (uA > uB || uB > uA)) {
-            auto numDiagonals = arith::ConstantIndexOp::create(rewriter, loc, std::max(uA, uB) - std::min(uA, uB));
-            auto startUpperBand = arith::ConstantIndexOp::create(rewriter, loc, std::min(uA, uB) + 1);
+            auto numDiagonals =
+                arith::ConstantIndexOp::create(rewriter, loc, std::max(uA, uB) - std::min(uA, uB));
+            auto startUpperBand =
+                arith::ConstantIndexOp::create(rewriter, loc, std::min(uA, uB) + 1);
 
             scf::ForOp iLoop = scf::ForOp::create(
                 rewriter, loc, c0, numDiagonals, c1, ValueRange{ currC },
@@ -362,7 +372,8 @@ private:
                                 SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                                 idxA.push_back(aInd);
                                 idxA.push_back(r);
-                                operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
+                                operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA)
+                                               .getResult();
                             }
 
                             Value operand2 = cf0;
@@ -370,14 +381,17 @@ private:
                                 SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                                 idxB.push_back(bInd);
                                 idxB.push_back(r);
-                                operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                                operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB)
+                                               .getResult();
                             }
 
                             Value newOp;
                             if (op.getKind() == dia::ElementwiseKind::add)
-                                newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
                             else
-                                newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
 
                             SmallVector<Value> idxC(batchIndices.begin(), batchIndices.end());
                             idxC.push_back(cInd);
@@ -391,7 +405,8 @@ private:
             currC = iLoop.getResult(0);
         }
 
-        auto numDiagonals = arith::ConstantIndexOp::create(rewriter, loc, std::min(lA, lB) + 1 + std::min(uA, uB));
+        auto numDiagonals =
+            arith::ConstantIndexOp::create(rewriter, loc, std::min(lA, lB) + 1 + std::min(uA, uB));
         auto minL = arith::ConstantIndexOp::create(rewriter, loc, std::min(lA, lB));
 
         scf::ForOp iLoop = scf::ForOp::create(
@@ -409,23 +424,28 @@ private:
                         SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                         idxA.push_back(aInd);
                         idxA.push_back(r);
-                        Value operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
+                        Value operand1 =
+                            tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
 
                         SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                         idxB.push_back(bInd);
                         idxB.push_back(r);
-                        Value operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                        Value operand2 =
+                            tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
 
                         Value newOp;
                         switch (op.getKind()) {
                             case dia::ElementwiseKind::add:
-                                newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             case dia::ElementwiseKind::sub:
-                                newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             case dia::ElementwiseKind::mul:
-                                newOp = arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             default:
                                 assert(false);
@@ -444,16 +464,14 @@ private:
         return iLoop.getResult(0);
     }
 
-    Value diaTimesDenseToDiaKernel(
-        OpBuilder& rewriter, Location loc, dia::ElementwiseOp op,
-        Value A, Value B, Value initC, Type elementType,
-        Value totalRows, Value totalCols,
-        int64_t lA, int64_t uA, int64_t lC, int64_t uC,
-        ArrayRef<Value> batchIndices) const {
-
+    Value diaTimesDenseToDiaKernel(OpBuilder& rewriter, Location loc, dia::ElementwiseOp op,
+                                   Value A, Value B, Value initC, Type elementType, Value totalRows,
+                                   Value totalCols, int64_t lA, int64_t uA, int64_t lC, int64_t uC,
+                                   ArrayRef<Value> batchIndices) const {
         auto c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
         auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
-        auto cf0 = arith::ConstantOp::create(rewriter, loc, rewriter.getFloatAttr(elementType, 0.0));
+        auto cf0 =
+            arith::ConstantOp::create(rewriter, loc, rewriter.getFloatAttr(elementType, 0.0));
 
         auto cLA = arith::ConstantIndexOp::create(rewriter, loc, lA);
         auto cLC = arith::ConstantIndexOp::create(rewriter, loc, lC);
@@ -469,37 +487,44 @@ private:
                     Value currBand = arith::SubIOp::create(ob, loc, cLC, i).getResult();
                     Value cInd = arith::SubIOp::create(ob, loc, cLC, currBand).getResult();
 
-                    Value mMinusBand = arith::SubIOp::create(ob, loc, totalRows, currBand).getResult();
-                    Value numEls = arith::MinUIOp::create(ob, loc, mMinusBand, totalCols).getResult();
+                    Value mMinusBand =
+                        arith::SubIOp::create(ob, loc, totalRows, currBand).getResult();
+                    Value numEls =
+                        arith::MinUIOp::create(ob, loc, mMinusBand, totalCols).getResult();
 
                     auto rLoop = scf::ForOp::create(
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                             auto cInner = rArgs[0];
                             Value cRow = arith::AddIOp::create(ib, loc, r, currBand).getResult();
-                            
+
                             Value operand1 = cf0;
-                            
+
                             SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                             idxB.push_back(cRow);
                             idxB.push_back(r);
-                            Value operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                            Value operand2 =
+                                tensor::ExtractOp::create(ib, loc, elementType, B, idxB)
+                                    .getResult();
 
                             Value newOp;
                             switch (op.getKind()) {
                                 case dia::ElementwiseKind::add:
-                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::sub:
-                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::mul:
-                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 default:
                                     assert(false);
                             }
-                            
+
                             SmallVector<Value> idxC(batchIndices.begin(), batchIndices.end());
                             idxC.push_back(cInd);
                             idxC.push_back(cRow);
@@ -524,8 +549,10 @@ private:
                     Value aInd = arith::SubIOp::create(ob, loc, cLA, currBand).getResult();
                     Value cInd = arith::SubIOp::create(ob, loc, cLC, currBand).getResult();
 
-                    Value mMinusBand = arith::SubIOp::create(ob, loc, totalRows, currBand).getResult();
-                    Value numEls = arith::MinUIOp::create(ob, loc, mMinusBand, totalCols).getResult();
+                    Value mMinusBand =
+                        arith::SubIOp::create(ob, loc, totalRows, currBand).getResult();
+                    Value numEls =
+                        arith::MinUIOp::create(ob, loc, mMinusBand, totalCols).getResult();
 
                     auto rLoop = scf::ForOp::create(
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
@@ -536,23 +563,30 @@ private:
                             SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                             idxA.push_back(aInd);
                             idxA.push_back(cRow);
-                            Value operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
-                            
+                            Value operand1 =
+                                tensor::ExtractOp::create(ib, loc, elementType, A, idxA)
+                                    .getResult();
+
                             SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                             idxB.push_back(cRow);
                             idxB.push_back(r);
-                            Value operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                            Value operand2 =
+                                tensor::ExtractOp::create(ib, loc, elementType, B, idxB)
+                                    .getResult();
 
                             Value newOp;
                             switch (op.getKind()) {
                                 case dia::ElementwiseKind::add:
-                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::sub:
-                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::mul:
-                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 default:
                                     assert(false);
@@ -592,23 +626,28 @@ private:
                         SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                         idxA.push_back(aInd);
                         idxA.push_back(r);
-                        Value operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
-                        
+                        Value operand1 =
+                            tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
+
                         SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                         idxB.push_back(r);
                         idxB.push_back(cCol);
-                        Value operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                        Value operand2 =
+                            tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
 
                         Value newOp;
                         switch (op.getKind()) {
                             case dia::ElementwiseKind::add:
-                                newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             case dia::ElementwiseKind::sub:
-                                newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             case dia::ElementwiseKind::mul:
-                                newOp = arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             default:
                                 assert(false);
@@ -635,32 +674,39 @@ private:
                     Value currBand = arith::AddIOp::create(ob, loc, i, startUpperBand).getResult();
                     Value cInd = arith::AddIOp::create(ob, loc, cLC, currBand).getResult();
 
-                    Value nMinusBand = arith::SubIOp::create(ob, loc, totalCols, currBand).getResult();
-                    Value numEls = arith::MinUIOp::create(ob, loc, totalRows, nMinusBand).getResult();
+                    Value nMinusBand =
+                        arith::SubIOp::create(ob, loc, totalCols, currBand).getResult();
+                    Value numEls =
+                        arith::MinUIOp::create(ob, loc, totalRows, nMinusBand).getResult();
 
                     auto rLoop = scf::ForOp::create(
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                             auto cInner = rArgs[0];
                             Value cCol = arith::AddIOp::create(ib, loc, r, currBand).getResult();
-                            
-                            Value operand1 = cf0; 
-                            
+
+                            Value operand1 = cf0;
+
                             SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                             idxB.push_back(r);
                             idxB.push_back(cCol);
-                            Value operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                            Value operand2 =
+                                tensor::ExtractOp::create(ib, loc, elementType, B, idxB)
+                                    .getResult();
 
                             Value newOp;
                             switch (op.getKind()) {
                                 case dia::ElementwiseKind::add:
-                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::sub:
-                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::mul:
-                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 default:
                                     assert(false);
@@ -681,12 +727,10 @@ private:
         return currC;
     }
 
-    Value denseTimesDenseToDiaKernel(
-        OpBuilder& rewriter, Location loc, dia::ElementwiseOp op,
-        Value A, Value B, Value initC, Type elementType,
-        Value totalRows, Value totalCols, int64_t lC, int64_t uC,
-        ArrayRef<Value> batchIndices) const {
-
+    Value denseTimesDenseToDiaKernel(OpBuilder& rewriter, Location loc, dia::ElementwiseOp op,
+                                     Value A, Value B, Value initC, Type elementType,
+                                     Value totalRows, Value totalCols, int64_t lC, int64_t uC,
+                                     ArrayRef<Value> batchIndices) const {
         auto c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
         auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
         auto cLC = arith::ConstantIndexOp::create(rewriter, loc, lC);
@@ -699,7 +743,7 @@ private:
             [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
                 auto cOuter = iArgs[0];
                 Value currBand = arith::SubIOp::create(ob, loc, cLC, i).getResult();
-                Value cInd = i; 
+                Value cInd = i;
 
                 Value mMinusBand = arith::SubIOp::create(ob, loc, totalRows, currBand).getResult();
                 Value numEls = arith::MinUIOp::create(ob, loc, mMinusBand, totalCols).getResult();
@@ -713,23 +757,28 @@ private:
                         SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                         idxA.push_back(cRow);
                         idxA.push_back(r);
-                        Value operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
+                        Value operand1 =
+                            tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
 
                         SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                         idxB.push_back(cRow);
                         idxB.push_back(r);
-                        Value operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                        Value operand2 =
+                            tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
 
                         Value newOp;
                         switch (op.getKind()) {
                             case dia::ElementwiseKind::add:
-                                newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             case dia::ElementwiseKind::sub:
-                                newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             case dia::ElementwiseKind::mul:
-                                newOp = arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             default:
                                 assert(false && "Unsupported elementwise kind");
@@ -755,8 +804,10 @@ private:
                     Value currBand = arith::AddIOp::create(ob, loc, i, c1).getResult();
                     Value cInd = arith::AddIOp::create(ob, loc, cLC, currBand).getResult();
 
-                    Value nMinusBand = arith::SubIOp::create(ob, loc, totalCols, currBand).getResult();
-                    Value numEls = arith::MinUIOp::create(ob, loc, totalRows, nMinusBand).getResult();
+                    Value nMinusBand =
+                        arith::SubIOp::create(ob, loc, totalCols, currBand).getResult();
+                    Value numEls =
+                        arith::MinUIOp::create(ob, loc, totalRows, nMinusBand).getResult();
 
                     auto rLoop = scf::ForOp::create(
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
@@ -767,23 +818,30 @@ private:
                             SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                             idxA.push_back(r);
                             idxA.push_back(cCol);
-                            Value operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
+                            Value operand1 =
+                                tensor::ExtractOp::create(ib, loc, elementType, A, idxA)
+                                    .getResult();
 
                             SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                             idxB.push_back(r);
                             idxB.push_back(cCol);
-                            Value operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                            Value operand2 =
+                                tensor::ExtractOp::create(ib, loc, elementType, B, idxB)
+                                    .getResult();
 
                             Value newOp;
                             switch (op.getKind()) {
                                 case dia::ElementwiseKind::add:
-                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::sub:
-                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::mul:
-                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 default:
                                     assert(false && "Unsupported elementwise kind");
@@ -804,16 +862,14 @@ private:
         return currC;
     }
 
-    Value denseTimesDiaToDiaKernel(
-        OpBuilder& rewriter, Location loc, dia::ElementwiseOp op,
-        Value A, Value B, Value initC, Type elementType,
-        Value totalRows, Value totalCols,
-        int64_t lB, int64_t uB, int64_t lC, int64_t uC,
-        ArrayRef<Value> batchIndices) const {
-
+    Value denseTimesDiaToDiaKernel(OpBuilder& rewriter, Location loc, dia::ElementwiseOp op,
+                                   Value A, Value B, Value initC, Type elementType, Value totalRows,
+                                   Value totalCols, int64_t lB, int64_t uB, int64_t lC, int64_t uC,
+                                   ArrayRef<Value> batchIndices) const {
         auto c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
         auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
-        auto cf0 = arith::ConstantOp::create(rewriter, loc, rewriter.getFloatAttr(elementType, 0.0));
+        auto cf0 =
+            arith::ConstantOp::create(rewriter, loc, rewriter.getFloatAttr(elementType, 0.0));
 
         auto cLB = arith::ConstantIndexOp::create(rewriter, loc, lB);
         auto cLC = arith::ConstantIndexOp::create(rewriter, loc, lC);
@@ -829,32 +885,39 @@ private:
                     Value currBand = arith::SubIOp::create(ob, loc, cLC, i).getResult();
                     Value cInd = arith::SubIOp::create(ob, loc, cLC, currBand).getResult();
 
-                    Value mMinusBand = arith::SubIOp::create(ob, loc, totalRows, currBand).getResult();
-                    Value numEls = arith::MinUIOp::create(ob, loc, mMinusBand, totalCols).getResult();
+                    Value mMinusBand =
+                        arith::SubIOp::create(ob, loc, totalRows, currBand).getResult();
+                    Value numEls =
+                        arith::MinUIOp::create(ob, loc, mMinusBand, totalCols).getResult();
 
                     auto rLoop = scf::ForOp::create(
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                             auto cInner = rArgs[0];
                             Value cRow = arith::AddIOp::create(ib, loc, r, currBand).getResult();
-                            
+
                             SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                             idxA.push_back(cRow);
                             idxA.push_back(r);
-                            Value operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
-                            
+                            Value operand1 =
+                                tensor::ExtractOp::create(ib, loc, elementType, A, idxA)
+                                    .getResult();
+
                             Value operand2 = cf0;
 
                             Value newOp;
                             switch (op.getKind()) {
                                 case dia::ElementwiseKind::add:
-                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::sub:
-                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::mul:
-                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 default:
                                     assert(false);
@@ -884,8 +947,10 @@ private:
                     Value bInd = arith::SubIOp::create(ob, loc, cLB, currBand).getResult();
                     Value cInd = arith::SubIOp::create(ob, loc, cLC, currBand).getResult();
 
-                    Value mMinusBand = arith::SubIOp::create(ob, loc, totalRows, currBand).getResult();
-                    Value numEls = arith::MinUIOp::create(ob, loc, mMinusBand, totalCols).getResult();
+                    Value mMinusBand =
+                        arith::SubIOp::create(ob, loc, totalRows, currBand).getResult();
+                    Value numEls =
+                        arith::MinUIOp::create(ob, loc, mMinusBand, totalCols).getResult();
 
                     auto rLoop = scf::ForOp::create(
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
@@ -896,23 +961,30 @@ private:
                             SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                             idxA.push_back(cRow);
                             idxA.push_back(r);
-                            Value operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
-                            
+                            Value operand1 =
+                                tensor::ExtractOp::create(ib, loc, elementType, A, idxA)
+                                    .getResult();
+
                             SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                             idxB.push_back(bInd);
                             idxB.push_back(cRow);
-                            Value operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                            Value operand2 =
+                                tensor::ExtractOp::create(ib, loc, elementType, B, idxB)
+                                    .getResult();
 
                             Value newOp;
                             switch (op.getKind()) {
                                 case dia::ElementwiseKind::add:
-                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::sub:
-                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::mul:
-                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 default:
                                     assert(false);
@@ -952,23 +1024,28 @@ private:
                         SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                         idxA.push_back(r);
                         idxA.push_back(cCol);
-                        Value operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
-                        
+                        Value operand1 =
+                            tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
+
                         SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                         idxB.push_back(bInd);
                         idxB.push_back(r);
-                        Value operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                        Value operand2 =
+                            tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
 
                         Value newOp;
                         switch (op.getKind()) {
                             case dia::ElementwiseKind::add:
-                                newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             case dia::ElementwiseKind::sub:
-                                newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             case dia::ElementwiseKind::mul:
-                                newOp = arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             default:
                                 assert(false);
@@ -995,32 +1072,39 @@ private:
                     Value currBand = arith::AddIOp::create(ob, loc, i, startUpperBand).getResult();
                     Value cInd = arith::AddIOp::create(ob, loc, cLC, currBand).getResult();
 
-                    Value nMinusBand = arith::SubIOp::create(ob, loc, totalCols, currBand).getResult();
-                    Value numEls = arith::MinUIOp::create(ob, loc, totalRows, nMinusBand).getResult();
+                    Value nMinusBand =
+                        arith::SubIOp::create(ob, loc, totalCols, currBand).getResult();
+                    Value numEls =
+                        arith::MinUIOp::create(ob, loc, totalRows, nMinusBand).getResult();
 
                     auto rLoop = scf::ForOp::create(
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                             auto cInner = rArgs[0];
                             Value cCol = arith::AddIOp::create(ib, loc, r, currBand).getResult();
-                            
+
                             SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                             idxA.push_back(r);
                             idxA.push_back(cCol);
-                            Value operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
-                            
-                            Value operand2 = cf0; 
+                            Value operand1 =
+                                tensor::ExtractOp::create(ib, loc, elementType, A, idxA)
+                                    .getResult();
+
+                            Value operand2 = cf0;
 
                             Value newOp;
                             switch (op.getKind()) {
                                 case dia::ElementwiseKind::add:
-                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::sub:
-                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::mul:
-                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 default:
                                     assert(false);
@@ -1043,11 +1127,10 @@ private:
 
     Value diaToDiaKernel(OpBuilder& rewriter, Location loc, Value input, Value initC,
                          linalg::ElementwiseKind linalgKind) const {
-        
         MLIRContext* context = rewriter.getContext();
         auto inputType = cast<RankedTensorType>(input.getType());
         int64_t rank = inputType.getRank();
-        
+
         AffineMap identityMap = rewriter.getMultiDimIdentityMap(rank);
         auto indexingMapsAttr = rewriter.getAffineMapArrayAttr({ identityMap, identityMap });
 
@@ -1061,22 +1144,20 @@ private:
             rewriter.getNamedAttr("iterator_types", iteratorTypesAttr)
         };
 
-        auto elementwiseOp = linalg::ElementwiseOp::create(
-            rewriter, loc, ValueRange{ input }, ValueRange{ initC }, attrs);
-            
+        auto elementwiseOp = linalg::ElementwiseOp::create(rewriter, loc, ValueRange{ input },
+                                                           ValueRange{ initC }, attrs);
+
         return elementwiseOp->getResult(0);
     }
 
-    Value diaTimesDenseToDenseKernel(
-        OpBuilder& rewriter, Location loc, dia::ElementwiseOp op,
-        Value A, Value B, Value initC, Type elementType,
-        Value totalRows, Value totalCols,
-        int64_t lA, int64_t uA, int64_t lC, int64_t uC,
-        ArrayRef<Value> batchIndices) const {
-
+    Value diaTimesDenseToDenseKernel(OpBuilder& rewriter, Location loc, dia::ElementwiseOp op,
+                                     Value A, Value B, Value initC, Type elementType,
+                                     Value totalRows, Value totalCols, int64_t lA, int64_t uA,
+                                     int64_t lC, int64_t uC, ArrayRef<Value> batchIndices) const {
         auto c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
         auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
-        auto cf0 = arith::ConstantOp::create(rewriter, loc, rewriter.getFloatAttr(elementType, 0.0));
+        auto cf0 =
+            arith::ConstantOp::create(rewriter, loc, rewriter.getFloatAttr(elementType, 0.0));
 
         auto cLA = arith::ConstantIndexOp::create(rewriter, loc, lA);
         auto cLC = arith::ConstantIndexOp::create(rewriter, loc, lC);
@@ -1090,29 +1171,35 @@ private:
                 [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
                     auto cOuter = iArgs[0];
                     Value currBand = arith::SubIOp::create(ob, loc, cLC, i).getResult();
-                    Value mMinusBand = arith::SubIOp::create(ob, loc, totalRows, currBand).getResult();
-                    Value numEls = arith::MinUIOp::create(ob, loc, mMinusBand, totalCols).getResult();
+                    Value mMinusBand =
+                        arith::SubIOp::create(ob, loc, totalRows, currBand).getResult();
+                    Value numEls =
+                        arith::MinUIOp::create(ob, loc, mMinusBand, totalCols).getResult();
 
                     auto rLoop = scf::ForOp::create(
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                             auto cInner = rArgs[0];
                             Value cRow = arith::AddIOp::create(ib, loc, r, currBand).getResult();
-                            
+
                             Value operand1 = cf0;
 
                             SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                             idxB.push_back(cRow);
                             idxB.push_back(r);
-                            Value operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                            Value operand2 =
+                                tensor::ExtractOp::create(ib, loc, elementType, B, idxB)
+                                    .getResult();
 
                             Value newOp;
                             switch (op.getKind()) {
                                 case dia::ElementwiseKind::add:
-                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::sub:
-                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 default:
                                     assert(false);
@@ -1131,7 +1218,8 @@ private:
         }
 
         auto lMinVal = std::min(lA, lC);
-        auto totalLowerDiags = arith::ConstantIndexOp::create(rewriter, loc, lMinVal + 1); // do main diag
+        auto totalLowerDiags =
+            arith::ConstantIndexOp::create(rewriter, loc, lMinVal + 1);  // do main diag
         auto lMin = arith::ConstantIndexOp::create(rewriter, loc, lMinVal);
 
         scf::ForOp iLoopLower = scf::ForOp::create(
@@ -1152,20 +1240,24 @@ private:
                         SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                         idxA.push_back(aInd);
                         idxA.push_back(cRow);
-                        Value operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
+                        Value operand1 =
+                            tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
 
                         SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                         idxB.push_back(cRow);
                         idxB.push_back(r);
-                        Value operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                        Value operand2 =
+                            tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
 
                         Value newOp;
                         switch (op.getKind()) {
                             case dia::ElementwiseKind::add:
-                                newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             case dia::ElementwiseKind::sub:
-                                newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             default:
                                 assert(false);
@@ -1190,29 +1282,35 @@ private:
                 [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
                     auto cOuter = iArgs[0];
                     Value currBand = arith::AddIOp::create(ob, loc, i, startUpperBand).getResult();
-                    Value nMinusBand = arith::SubIOp::create(ob, loc, totalCols, currBand).getResult();
-                    Value numEls = arith::MinUIOp::create(ob, loc, totalRows, nMinusBand).getResult();
+                    Value nMinusBand =
+                        arith::SubIOp::create(ob, loc, totalCols, currBand).getResult();
+                    Value numEls =
+                        arith::MinUIOp::create(ob, loc, totalRows, nMinusBand).getResult();
 
                     auto rLoop = scf::ForOp::create(
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                             auto cInner = rArgs[0];
                             Value cCol = arith::AddIOp::create(ib, loc, r, currBand).getResult();
-                            
+
                             Value operand1 = cf0;
 
                             SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                             idxB.push_back(r);
                             idxB.push_back(cCol);
-                            Value operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                            Value operand2 =
+                                tensor::ExtractOp::create(ib, loc, elementType, B, idxB)
+                                    .getResult();
 
                             Value newOp;
                             switch (op.getKind()) {
                                 case dia::ElementwiseKind::add:
-                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::sub:
-                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 default:
                                     assert(false);
@@ -1239,8 +1337,10 @@ private:
                     auto cOuter = iArgs[0];
                     Value currBand = arith::AddIOp::create(ob, loc, i, c1).getResult();
                     Value aInd = arith::AddIOp::create(ob, loc, cLA, currBand).getResult();
-                    Value nMinusBand = arith::SubIOp::create(ob, loc, totalCols, currBand).getResult();
-                    Value numEls = arith::MinUIOp::create(ob, loc, totalRows, nMinusBand).getResult();
+                    Value nMinusBand =
+                        arith::SubIOp::create(ob, loc, totalCols, currBand).getResult();
+                    Value numEls =
+                        arith::MinUIOp::create(ob, loc, totalRows, nMinusBand).getResult();
 
                     auto rLoop = scf::ForOp::create(
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
@@ -1251,20 +1351,26 @@ private:
                             SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                             idxA.push_back(aInd);
                             idxA.push_back(r);
-                            Value operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
+                            Value operand1 =
+                                tensor::ExtractOp::create(ib, loc, elementType, A, idxA)
+                                    .getResult();
 
                             SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                             idxB.push_back(r);
                             idxB.push_back(cCol);
-                            Value operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                            Value operand2 =
+                                tensor::ExtractOp::create(ib, loc, elementType, B, idxB)
+                                    .getResult();
 
                             Value newOp;
                             switch (op.getKind()) {
                                 case dia::ElementwiseKind::add:
-                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::sub:
-                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 default:
                                     assert(false);
@@ -1285,16 +1391,14 @@ private:
         return currC;
     }
 
-    Value denseTimesDiaToDenseKernel(
-        OpBuilder& rewriter, Location loc, dia::ElementwiseOp op,
-        Value A, Value B, Value initC, Type elementType,
-        Value totalRows, Value totalCols,
-        int64_t lB, int64_t uB, int64_t lC, int64_t uC,
-        ArrayRef<Value> batchIndices) const {
-
+    Value denseTimesDiaToDenseKernel(OpBuilder& rewriter, Location loc, dia::ElementwiseOp op,
+                                     Value A, Value B, Value initC, Type elementType,
+                                     Value totalRows, Value totalCols, int64_t lB, int64_t uB,
+                                     int64_t lC, int64_t uC, ArrayRef<Value> batchIndices) const {
         auto c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
         auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
-        auto cf0 = arith::ConstantOp::create(rewriter, loc, rewriter.getFloatAttr(elementType, 0.0));
+        auto cf0 =
+            arith::ConstantOp::create(rewriter, loc, rewriter.getFloatAttr(elementType, 0.0));
 
         auto cLB = arith::ConstantIndexOp::create(rewriter, loc, lB);
         auto cLC = arith::ConstantIndexOp::create(rewriter, loc, lC);
@@ -1308,29 +1412,39 @@ private:
                 [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
                     auto cOuter = iArgs[0];
                     Value currBand = arith::SubIOp::create(ob, loc, cLC, i).getResult();
-                    Value mMinusBand = arith::SubIOp::create(ob, loc, totalRows, currBand).getResult();
-                    Value numEls = arith::MinUIOp::create(ob, loc, mMinusBand, totalCols).getResult();
-                    
+                    Value mMinusBand =
+                        arith::SubIOp::create(ob, loc, totalRows, currBand).getResult();
+                    Value numEls =
+                        arith::MinUIOp::create(ob, loc, mMinusBand, totalCols).getResult();
+
                     auto rLoop = scf::ForOp::create(
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                             auto cInner = rArgs[0];
                             Value cRow = arith::AddIOp::create(ib, loc, r, currBand).getResult();
-                            
+
                             SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                             idxA.push_back(cRow);
                             idxA.push_back(r);
-                            Value operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
-                            
-                            Value operand2 = cf0; // B is outside its lower bandwidth
-                            
+                            Value operand1 =
+                                tensor::ExtractOp::create(ib, loc, elementType, A, idxA)
+                                    .getResult();
+
+                            Value operand2 = cf0;  // B is outside its lower bandwidth
+
                             Value newOp;
                             switch (op.getKind()) {
                                 case dia::ElementwiseKind::add:
-                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::sub:
-                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
+                                    break;
+                                case dia::ElementwiseKind::mul:
+                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 default:
                                     assert(false);
@@ -1339,7 +1453,7 @@ private:
                             SmallVector<Value> idxC(batchIndices.begin(), batchIndices.end());
                             idxC.push_back(cRow);
                             idxC.push_back(r);
-                            
+
                             auto updated = tensor::InsertOp::create(ib, loc, newOp, cInner, idxC);
                             scf::YieldOp::create(ib, loc, ValueRange{ updated });
                         });
@@ -1359,30 +1473,38 @@ private:
                 Value bInd = arith::SubIOp::create(ob, loc, cLB, currBand).getResult();
                 Value mMinusBand = arith::SubIOp::create(ob, loc, totalRows, currBand).getResult();
                 Value numEls = arith::MinUIOp::create(ob, loc, mMinusBand, totalCols).getResult();
-                
+
                 auto rLoop = scf::ForOp::create(
                     ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                     [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                         auto cInner = rArgs[0];
                         Value cRow = arith::AddIOp::create(ib, loc, r, currBand).getResult();
-                        
+
                         SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                         idxA.push_back(cRow);
                         idxA.push_back(r);
-                        Value operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
-                        
+                        Value operand1 =
+                            tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
+
                         SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                         idxB.push_back(bInd);
                         idxB.push_back(cRow);
-                        Value operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                        Value operand2 =
+                            tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
 
                         Value newOp;
                         switch (op.getKind()) {
                             case dia::ElementwiseKind::add:
-                                newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             case dia::ElementwiseKind::sub:
-                                newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                newOp =
+                                    arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                break;
+                            case dia::ElementwiseKind::mul:
+                                newOp =
+                                    arith::MulFOp::create(ib, loc, operand1, operand2).getResult();
                                 break;
                             default:
                                 assert(false);
@@ -1391,7 +1513,7 @@ private:
                         SmallVector<Value> idxC(batchIndices.begin(), batchIndices.end());
                         idxC.push_back(cRow);
                         idxC.push_back(r);
-                        
+
                         auto updated = tensor::InsertOp::create(ib, loc, newOp, cInner, idxC);
                         scf::YieldOp::create(ib, loc, ValueRange{ updated });
                     });
@@ -1407,29 +1529,39 @@ private:
                 [&](OpBuilder& ob, Location loc, Value i, ValueRange iArgs) {
                     auto cOuter = iArgs[0];
                     Value currBand = arith::AddIOp::create(ob, loc, i, startUpperBand).getResult();
-                    Value nMinusBand = arith::SubIOp::create(ob, loc, totalCols, currBand).getResult();
-                    Value numEls = arith::MinUIOp::create(ob, loc, totalRows, nMinusBand).getResult();
-                    
+                    Value nMinusBand =
+                        arith::SubIOp::create(ob, loc, totalCols, currBand).getResult();
+                    Value numEls =
+                        arith::MinUIOp::create(ob, loc, totalRows, nMinusBand).getResult();
+
                     auto rLoop = scf::ForOp::create(
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                             auto cInner = rArgs[0];
                             Value cCol = arith::AddIOp::create(ib, loc, r, currBand).getResult();
-                            
+
                             SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                             idxA.push_back(r);
                             idxA.push_back(cCol);
-                            Value operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
-                            
-                            Value operand2 = cf0; // B is outside its upper bandwidth
+                            Value operand1 =
+                                tensor::ExtractOp::create(ib, loc, elementType, A, idxA)
+                                    .getResult();
+
+                            Value operand2 = cf0;  // B is outside its upper bandwidth
 
                             Value newOp;
                             switch (op.getKind()) {
                                 case dia::ElementwiseKind::add:
-                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::sub:
-                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
+                                    break;
+                                case dia::ElementwiseKind::mul:
+                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 default:
                                     assert(false);
@@ -1438,7 +1570,7 @@ private:
                             SmallVector<Value> idxC(batchIndices.begin(), batchIndices.end());
                             idxC.push_back(r);
                             idxC.push_back(cCol);
-                            
+
                             auto updated = tensor::InsertOp::create(ib, loc, newOp, cInner, idxC);
                             scf::YieldOp::create(ib, loc, ValueRange{ updated });
                         });
@@ -1456,32 +1588,44 @@ private:
                     auto cOuter = iArgs[0];
                     Value currBand = arith::AddIOp::create(ob, loc, i, c1).getResult();
                     Value bInd = arith::AddIOp::create(ob, loc, cLB, currBand).getResult();
-                    Value nMinusBand = arith::SubIOp::create(ob, loc, totalCols, currBand).getResult();
-                    Value numEls = arith::MinUIOp::create(ob, loc, totalRows, nMinusBand).getResult();
-                    
+                    Value nMinusBand =
+                        arith::SubIOp::create(ob, loc, totalCols, currBand).getResult();
+                    Value numEls =
+                        arith::MinUIOp::create(ob, loc, totalRows, nMinusBand).getResult();
+
                     auto rLoop = scf::ForOp::create(
                         ob, loc, c0, numEls, c1, ValueRange{ cOuter },
                         [&](OpBuilder& ib, Location loc, Value r, ValueRange rArgs) {
                             auto cInner = rArgs[0];
                             Value cCol = arith::AddIOp::create(ib, loc, r, currBand).getResult();
-                            
+
                             SmallVector<Value> idxA(batchIndices.begin(), batchIndices.end());
                             idxA.push_back(r);
                             idxA.push_back(cCol);
-                            Value operand1 = tensor::ExtractOp::create(ib, loc, elementType, A, idxA).getResult();
-                            
+                            Value operand1 =
+                                tensor::ExtractOp::create(ib, loc, elementType, A, idxA)
+                                    .getResult();
+
                             SmallVector<Value> idxB(batchIndices.begin(), batchIndices.end());
                             idxB.push_back(bInd);
                             idxB.push_back(r);
-                            Value operand2 = tensor::ExtractOp::create(ib, loc, elementType, B, idxB).getResult();
+                            Value operand2 =
+                                tensor::ExtractOp::create(ib, loc, elementType, B, idxB)
+                                    .getResult();
 
                             Value newOp;
                             switch (op.getKind()) {
                                 case dia::ElementwiseKind::add:
-                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::AddFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 case dia::ElementwiseKind::sub:
-                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2).getResult();
+                                    newOp = arith::SubFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
+                                    break;
+                                case dia::ElementwiseKind::mul:
+                                    newOp = arith::MulFOp::create(ib, loc, operand1, operand2)
+                                                .getResult();
                                     break;
                                 default:
                                     assert(false);
@@ -1490,7 +1634,7 @@ private:
                             SmallVector<Value> idxC(batchIndices.begin(), batchIndices.end());
                             idxC.push_back(r);
                             idxC.push_back(cCol);
-                            
+
                             auto updated = tensor::InsertOp::create(ib, loc, newOp, cInner, idxC);
                             scf::YieldOp::create(ib, loc, ValueRange{ updated });
                         });
@@ -1502,17 +1646,16 @@ private:
         return currC;
     }
 
-    Value denseTimesDenseToDenseKernel(OpBuilder& rewriter, Location loc, 
-                                       Value A, Value B, Value initC,
-                                       linalg::ElementwiseKind linalgKind) const {
-        
+    Value denseTimesDenseToDenseKernel(OpBuilder& rewriter, Location loc, Value A, Value B,
+                                       Value initC, linalg::ElementwiseKind linalgKind) const {
         MLIRContext* context = rewriter.getContext();
         auto inputType = cast<RankedTensorType>(A.getType());
         int64_t rank = inputType.getRank();
-        
+
         AffineMap identityMap = rewriter.getMultiDimIdentityMap(rank);
-        
-        auto indexingMapsAttr = rewriter.getAffineMapArrayAttr({ identityMap, identityMap, identityMap });
+
+        auto indexingMapsAttr =
+            rewriter.getAffineMapArrayAttr({ identityMap, identityMap, identityMap });
 
         SmallVector<Attribute> iteratorTypes(
             rank, linalg::IteratorTypeAttr::get(context, utils::IteratorType::parallel));
@@ -1524,18 +1667,17 @@ private:
             rewriter.getNamedAttr("iterator_types", iteratorTypesAttr)
         };
 
-        auto elementwiseOp = linalg::ElementwiseOp::create(
-            rewriter, loc, ValueRange{ A, B }, ValueRange{ initC }, attrs);
-            
+        auto elementwiseOp = linalg::ElementwiseOp::create(rewriter, loc, ValueRange{ A, B },
+                                                           ValueRange{ initC }, attrs);
+
         return elementwiseOp->getResult(0);
     }
 
-public:
+   public:
     using OpRewritePattern::OpRewritePattern;
 
     LogicalResult diaTimesDiaToDenseBandedElementwiseToSCF(
         dia::ElementwiseOp op, PatternRewriter& rewriter, const BandedSubMatrix& bandResult) const {
-
         Location loc{ op.getLoc() };
         Value A{ op.getInputs()[0] };
         Value B{ op.getInputs()[1] };
@@ -1575,22 +1717,22 @@ public:
         if (hasBatch) {
             auto c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
             auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
-            Value batchSize = arith::ConstantIndexOp::create(rewriter, loc, outputType.getDimSize(0));
+            Value batchSize =
+                arith::ConstantIndexOp::create(rewriter, loc, outputType.getDimSize(0));
 
-            auto bLoop = scf::ForOp::create(
-                rewriter, loc, c0, batchSize, c1, ValueRange{ currC },
-                [&](OpBuilder& b, Location loc, Value bIdx, ValueRange bArgs) {
-                    SmallVector<Value> batchIndices = { bIdx };
-                    Value loopC = diaTimesDiaToDenseKernel(
-                        b, loc, op, A, B, bArgs[0], elementType,
-                        totalRows, totalCols, lA, lB, uA, uB, batchIndices);
-                    scf::YieldOp::create(b, loc, ValueRange{ loopC });
-                });
+            auto bLoop =
+                scf::ForOp::create(rewriter, loc, c0, batchSize, c1, ValueRange{ currC },
+                                   [&](OpBuilder& b, Location loc, Value bIdx, ValueRange bArgs) {
+                                       SmallVector<Value> batchIndices = { bIdx };
+                                       Value loopC = diaTimesDiaToDenseKernel(
+                                           b, loc, op, A, B, bArgs[0], elementType, totalRows,
+                                           totalCols, lA, lB, uA, uB, batchIndices);
+                                       scf::YieldOp::create(b, loc, ValueRange{ loopC });
+                                   });
             currC = bLoop.getResult(0);
         } else {
-            currC = diaTimesDiaToDenseKernel(
-                rewriter, loc, op, A, B, currC, elementType,
-                totalRows, totalCols, lA, lB, uA, uB, {});
+            currC = diaTimesDiaToDenseKernel(rewriter, loc, op, A, B, currC, elementType, totalRows,
+                                             totalCols, lA, lB, uA, uB, {});
         }
 
         currC.getDefiningOp()->setAttr("metadata", op->getAttr("metadata"));
@@ -1631,30 +1773,30 @@ public:
         auto rank{ resultType.getRank() };
         bool hasBatch = (rank == 3);
 
-        auto totalRows{ arith::ConstantIndexOp::create(
-            rewriter, loc, resultType.getDimSize(rank - 1)) };
+        auto totalRows{ arith::ConstantIndexOp::create(rewriter, loc,
+                                                       resultType.getDimSize(rank - 1)) };
 
         Value currC = zeroedC;
 
         if (hasBatch) {
             auto c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
             auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
-            Value batchSize = arith::ConstantIndexOp::create(rewriter, loc, resultType.getDimSize(0));
+            Value batchSize =
+                arith::ConstantIndexOp::create(rewriter, loc, resultType.getDimSize(0));
 
-            auto bLoop = scf::ForOp::create(
-                rewriter, loc, c0, batchSize, c1, ValueRange{ currC },
-                [&](OpBuilder& b, Location loc, Value bIdx, ValueRange bArgs) {
-                    SmallVector<Value> batchIndices = { bIdx };
-                    Value loopC = diaTimesDiaToDiaKernel(
-                        b, loc, op, A, B, bArgs[0], elementType,
-                        totalRows, lA, lB, uA, uB, lC, batchIndices);
-                    scf::YieldOp::create(b, loc, ValueRange{ loopC });
-                });
+            auto bLoop =
+                scf::ForOp::create(rewriter, loc, c0, batchSize, c1, ValueRange{ currC },
+                                   [&](OpBuilder& b, Location loc, Value bIdx, ValueRange bArgs) {
+                                       SmallVector<Value> batchIndices = { bIdx };
+                                       Value loopC = diaTimesDiaToDiaKernel(
+                                           b, loc, op, A, B, bArgs[0], elementType, totalRows, lA,
+                                           lB, uA, uB, lC, batchIndices);
+                                       scf::YieldOp::create(b, loc, ValueRange{ loopC });
+                                   });
             currC = bLoop.getResult(0);
         } else {
-            currC = diaTimesDiaToDiaKernel(
-                rewriter, loc, op, A, B, currC, elementType,
-                totalRows, lA, lB, uA, uB, lC, {});
+            currC = diaTimesDiaToDiaKernel(rewriter, loc, op, A, B, currC, elementType, totalRows,
+                                           lA, lB, uA, uB, lC, {});
         }
 
         currC.getDefiningOp()->setAttr("metadata", op->getAttr("metadata"));
@@ -1665,7 +1807,6 @@ public:
 
     LogicalResult diaTimesDenseToDiaBandedElementwiseToSCF(
         dia::ElementwiseOp op, PatternRewriter& rewriter, const BandedSubMatrix& bandResult) const {
-
         Location loc{ op.getLoc() };
         Value A{ op.getInputs()[0] };
         Value B{ op.getInputs()[1] };
@@ -1702,22 +1843,22 @@ public:
         if (hasBatch) {
             auto c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
             auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
-            Value batchSize = arith::ConstantIndexOp::create(rewriter, loc, outputType.getDimSize(0));
+            Value batchSize =
+                arith::ConstantIndexOp::create(rewriter, loc, outputType.getDimSize(0));
 
-            auto bLoop = scf::ForOp::create(
-                rewriter, loc, c0, batchSize, c1, ValueRange{ currC },
-                [&](OpBuilder& b, Location loc, Value bIdx, ValueRange bArgs) {
-                    SmallVector<Value> batchIndices = { bIdx };
-                    Value loopC = diaTimesDenseToDiaKernel(
-                        b, loc, op, A, B, bArgs[0], elementType,
-                        totalRows, totalCols, lA, uA, lC, uC, batchIndices);
-                    scf::YieldOp::create(b, loc, ValueRange{ loopC });
-                });
+            auto bLoop =
+                scf::ForOp::create(rewriter, loc, c0, batchSize, c1, ValueRange{ currC },
+                                   [&](OpBuilder& b, Location loc, Value bIdx, ValueRange bArgs) {
+                                       SmallVector<Value> batchIndices = { bIdx };
+                                       Value loopC = diaTimesDenseToDiaKernel(
+                                           b, loc, op, A, B, bArgs[0], elementType, totalRows,
+                                           totalCols, lA, uA, lC, uC, batchIndices);
+                                       scf::YieldOp::create(b, loc, ValueRange{ loopC });
+                                   });
             currC = bLoop.getResult(0);
         } else {
-            currC = diaTimesDenseToDiaKernel(
-                rewriter, loc, op, A, B, currC, elementType,
-                totalRows, totalCols, lA, uA, lC, uC, {});
+            currC = diaTimesDenseToDiaKernel(rewriter, loc, op, A, B, currC, elementType, totalRows,
+                                             totalCols, lA, uA, lC, uC, {});
         }
 
         currC.getDefiningOp()->setAttr("metadata", op->getAttr("metadata"));
@@ -1727,12 +1868,11 @@ public:
 
     LogicalResult denseTimesDenseToDiaBandedElementwiseToSCF(
         dia::ElementwiseOp op, PatternRewriter& rewriter, const BandedSubMatrix& bandResult) const {
-        
         Location loc = op.getLoc();
         Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
         Value C = op.getOutput();
-        
+
         auto denseType = cast<RankedTensorType>(A.getType());
         auto elementType = denseType.getElementType();
         auto rank = denseType.getRank();
@@ -1745,8 +1885,10 @@ public:
         Value zeroedC =
             linalg::FillOp::create(rewriter, loc, ValueRange{ zero }, ValueRange{ C }).getResult(0);
 
-        auto totalRows = arith::ConstantIndexOp::create(rewriter, loc, denseType.getDimSize(rank - 2));
-        auto totalCols = arith::ConstantIndexOp::create(rewriter, loc, denseType.getDimSize(rank - 1));
+        auto totalRows =
+            arith::ConstantIndexOp::create(rewriter, loc, denseType.getDimSize(rank - 2));
+        auto totalCols =
+            arith::ConstantIndexOp::create(rewriter, loc, denseType.getDimSize(rank - 1));
 
         bool hasBatch = (rank == 3);
         Value currC = zeroedC;
@@ -1754,22 +1896,22 @@ public:
         if (hasBatch) {
             auto c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
             auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
-            Value batchSize = arith::ConstantIndexOp::create(rewriter, loc, denseType.getDimSize(0));
+            Value batchSize =
+                arith::ConstantIndexOp::create(rewriter, loc, denseType.getDimSize(0));
 
-            auto bLoop = scf::ForOp::create(
-                rewriter, loc, c0, batchSize, c1, ValueRange{ currC },
-                [&](OpBuilder& b, Location loc, Value bIdx, ValueRange bArgs) {
-                    SmallVector<Value> batchIndices = { bIdx };
-                    Value loopC = denseTimesDenseToDiaKernel(
-                        b, loc, op, A, B, bArgs[0], elementType,
-                        totalRows, totalCols, lC, uC, batchIndices);
-                    scf::YieldOp::create(b, loc, ValueRange{ loopC });
-                });
+            auto bLoop =
+                scf::ForOp::create(rewriter, loc, c0, batchSize, c1, ValueRange{ currC },
+                                   [&](OpBuilder& b, Location loc, Value bIdx, ValueRange bArgs) {
+                                       SmallVector<Value> batchIndices = { bIdx };
+                                       Value loopC = denseTimesDenseToDiaKernel(
+                                           b, loc, op, A, B, bArgs[0], elementType, totalRows,
+                                           totalCols, lC, uC, batchIndices);
+                                       scf::YieldOp::create(b, loc, ValueRange{ loopC });
+                                   });
             currC = bLoop.getResult(0);
         } else {
-            currC = denseTimesDenseToDiaKernel(
-                rewriter, loc, op, A, B, currC, elementType,
-                totalRows, totalCols, lC, uC, {});
+            currC = denseTimesDenseToDiaKernel(rewriter, loc, op, A, B, currC, elementType,
+                                               totalRows, totalCols, lC, uC, {});
         }
 
         if (auto metadata = op->getAttr("metadata")) {
@@ -1782,7 +1924,6 @@ public:
 
     LogicalResult denseTimesDiaToDiaBandedElementwiseToSCF(
         dia::ElementwiseOp op, PatternRewriter& rewriter, const BandedSubMatrix& bandResult) const {
-
         Location loc{ op.getLoc() };
         Value A{ op.getInputs()[0] };
         Value B{ op.getInputs()[1] };
@@ -1819,22 +1960,22 @@ public:
         if (hasBatch) {
             auto c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
             auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
-            Value batchSize = arith::ConstantIndexOp::create(rewriter, loc, outputType.getDimSize(0));
+            Value batchSize =
+                arith::ConstantIndexOp::create(rewriter, loc, outputType.getDimSize(0));
 
-            auto bLoop = scf::ForOp::create(
-                rewriter, loc, c0, batchSize, c1, ValueRange{ currC },
-                [&](OpBuilder& b, Location loc, Value bIdx, ValueRange bArgs) {
-                    SmallVector<Value> batchIndices = { bIdx };
-                    Value loopC = denseTimesDiaToDiaKernel(
-                        b, loc, op, A, B, bArgs[0], elementType,
-                        totalRows, totalCols, lB, uB, lC, uC, batchIndices);
-                    scf::YieldOp::create(b, loc, ValueRange{ loopC });
-                });
+            auto bLoop =
+                scf::ForOp::create(rewriter, loc, c0, batchSize, c1, ValueRange{ currC },
+                                   [&](OpBuilder& b, Location loc, Value bIdx, ValueRange bArgs) {
+                                       SmallVector<Value> batchIndices = { bIdx };
+                                       Value loopC = denseTimesDiaToDiaKernel(
+                                           b, loc, op, A, B, bArgs[0], elementType, totalRows,
+                                           totalCols, lB, uB, lC, uC, batchIndices);
+                                       scf::YieldOp::create(b, loc, ValueRange{ loopC });
+                                   });
             currC = bLoop.getResult(0);
         } else {
-            currC = denseTimesDiaToDiaKernel(
-                rewriter, loc, op, A, B, currC, elementType,
-                totalRows, totalCols, lB, uB, lC, uC, {});
+            currC = denseTimesDiaToDiaKernel(rewriter, loc, op, A, B, currC, elementType, totalRows,
+                                             totalCols, lB, uB, lC, uC, {});
         }
 
         if (auto metadata = op->getAttr("metadata")) {
@@ -1875,7 +2016,6 @@ public:
 
     LogicalResult diaTimesDenseToDenseBandedElementwiseToSCF(
         dia::ElementwiseOp op, PatternRewriter& rewriter, const BandedSubMatrix& bandResult) const {
-
         Location loc{ op.getLoc() };
         Value A{ op.getInputs()[0] };
         Value B{ op.getInputs()[1] };
@@ -1912,22 +2052,22 @@ public:
         if (hasBatch) {
             auto c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
             auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
-            Value batchSize = arith::ConstantIndexOp::create(rewriter, loc, outputType.getDimSize(0));
+            Value batchSize =
+                arith::ConstantIndexOp::create(rewriter, loc, outputType.getDimSize(0));
 
-            auto bLoop = scf::ForOp::create(
-                rewriter, loc, c0, batchSize, c1, ValueRange{ currC },
-                [&](OpBuilder& b, Location loc, Value bIdx, ValueRange bArgs) {
-                    SmallVector<Value> batchIndices = { bIdx };
-                    Value loopC = diaTimesDenseToDenseKernel(
-                        b, loc, op, A, B, bArgs[0], elementType,
-                        totalRows, totalCols, lA, uA, lC, uC, batchIndices);
-                    scf::YieldOp::create(b, loc, ValueRange{ loopC });
-                });
+            auto bLoop =
+                scf::ForOp::create(rewriter, loc, c0, batchSize, c1, ValueRange{ currC },
+                                   [&](OpBuilder& b, Location loc, Value bIdx, ValueRange bArgs) {
+                                       SmallVector<Value> batchIndices = { bIdx };
+                                       Value loopC = diaTimesDenseToDenseKernel(
+                                           b, loc, op, A, B, bArgs[0], elementType, totalRows,
+                                           totalCols, lA, uA, lC, uC, batchIndices);
+                                       scf::YieldOp::create(b, loc, ValueRange{ loopC });
+                                   });
             currC = bLoop.getResult(0);
         } else {
-            currC = diaTimesDenseToDenseKernel(
-                rewriter, loc, op, A, B, currC, elementType,
-                totalRows, totalCols, lA, uA, lC, uC, {});
+            currC = diaTimesDenseToDenseKernel(rewriter, loc, op, A, B, currC, elementType,
+                                               totalRows, totalCols, lA, uA, lC, uC, {});
         }
 
         if (auto metadata = op->getAttr("metadata")) {
@@ -1940,7 +2080,6 @@ public:
 
     LogicalResult denseTimesDiaToDenseBandedElementwiseToSCF(
         dia::ElementwiseOp op, PatternRewriter& rewriter, const BandedSubMatrix& bandResult) const {
-
         Location loc{ op.getLoc() };
         Value A{ op.getInputs()[0] };
         Value B{ op.getInputs()[1] };
@@ -1977,22 +2116,22 @@ public:
         if (hasBatch) {
             auto c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
             auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
-            Value batchSize = arith::ConstantIndexOp::create(rewriter, loc, outputType.getDimSize(0));
+            Value batchSize =
+                arith::ConstantIndexOp::create(rewriter, loc, outputType.getDimSize(0));
 
-            auto bLoop = scf::ForOp::create(
-                rewriter, loc, c0, batchSize, c1, ValueRange{ currC },
-                [&](OpBuilder& b, Location loc, Value bIdx, ValueRange bArgs) {
-                    SmallVector<Value> batchIndices = { bIdx };
-                    Value loopC = denseTimesDiaToDenseKernel(
-                        b, loc, op, A, B, bArgs[0], elementType,
-                        totalRows, totalCols, lB, uB, lC, uC, batchIndices);
-                    scf::YieldOp::create(b, loc, ValueRange{ loopC });
-                });
+            auto bLoop =
+                scf::ForOp::create(rewriter, loc, c0, batchSize, c1, ValueRange{ currC },
+                                   [&](OpBuilder& b, Location loc, Value bIdx, ValueRange bArgs) {
+                                       SmallVector<Value> batchIndices = { bIdx };
+                                       Value loopC = denseTimesDiaToDenseKernel(
+                                           b, loc, op, A, B, bArgs[0], elementType, totalRows,
+                                           totalCols, lB, uB, lC, uC, batchIndices);
+                                       scf::YieldOp::create(b, loc, ValueRange{ loopC });
+                                   });
             currC = bLoop.getResult(0);
         } else {
-            currC = denseTimesDiaToDenseKernel(
-                rewriter, loc, op, A, B, currC, elementType,
-                totalRows, totalCols, lB, uB, lC, uC, {});
+            currC = denseTimesDiaToDenseKernel(rewriter, loc, op, A, B, currC, elementType,
+                                               totalRows, totalCols, lB, uB, lC, uC, {});
         }
 
         if (auto metadata = op->getAttr("metadata")) {
@@ -2005,7 +2144,6 @@ public:
 
     LogicalResult denseTimesDenseToDenseBandedElementwiseToLinalg(
         dia::ElementwiseOp op, PatternRewriter& rewriter, const BandedSubMatrix& bandResult) const {
-        
         Location loc{ op.getLoc() };
         Value A{ op.getInputs()[0] };
         Value B{ op.getInputs()[1] };
@@ -2037,7 +2175,6 @@ public:
         rewriter.replaceOp(op, currC);
         return success();
     }
-
 
     LogicalResult matchAndRewrite(dia::ElementwiseOp op, PatternRewriter& rewriter) const override {
         auto dict = op->getAttrDictionary();
