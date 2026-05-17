@@ -123,6 +123,8 @@ def build_pipeline_flags(cfg):
             tag += "R"
         elif c == "dense-softmax":
             flags.append("--dense-softmax-rewrite")
+        elif c == "ikj-loop":
+            flags.append("--linalg-ikj-loop")
 
     return flags, tag if tag and "baseline" not in cfg[0] else "baseline"
 
@@ -257,6 +259,7 @@ def run(
                     "batch_bertlike_dense.mlir",
                     "chain100_dense.mlir",
                     "sparse_attention_baseline.mlir",
+                    "kalman_filter.mlir",
                 ]
             )
             else bandwidths

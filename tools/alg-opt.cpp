@@ -13,5 +13,5 @@ int main(int argc, char** argv) {
     mlir::bpa::registerBandedPasses();
 
     return mlir::asMainReturnCode(
-        mlir::MlirOptMain(argc, argv, "Algebraic Structure Rewrite Pass Driver", registry));
+        mlir::MlirOptMain(argc, argv, "Bandedness Propagation Analysis Pass Driver", registry));
 }

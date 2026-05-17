@@ -1,5 +1,10 @@
 include "mlir/Pass/PassBase.td"
 
+def LinalgMatmulRewrite: Pass<"linalg-ikj-loop", "mlir::func::FuncOp"> {
+  let summary = "Rewrite linalg.matmul to scf using ikj loop ordering";
+  let dependentDialects = ["tensor::TensorDialect",];
+}
+
 def DenseSoftmaxRewrite: Pass<"dense-softmax-rewrite", "mlir::func::FuncOp"> {
   let summary = "Lower a dense softmax to linalg";
   let dependentDialects = ["tensor::TensorDialect",];

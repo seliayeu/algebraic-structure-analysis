@@ -3,6 +3,7 @@
 #include "Transform/BandedPropagation.h"
 #include "Transform/BandedRewrite.h"
 #include "Transform/DenseSoftmaxRewrite.h"
+#include "Transform/LinalgMatmulRewrite.h"
 
 namespace mlir::bpa {
 #define GEN_PASS_REGISTRATION
