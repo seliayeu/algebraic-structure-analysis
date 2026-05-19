@@ -49,6 +49,7 @@ def batch_bertlike(runs_count: int = 5):
 
     configs = [
         ("batch_bertlike_dense.mlir", None),
+        ("batch_bertlike_dense.mlir", "ikj-loop"),
         ("batch_bertlike_dense.mlir", "analysis", "rewrite"),
         ("batch_bertlike_dia.mlir", "analysis", "rewrite"),
         ("batch_bertlike_dia.mlir", "analysis-detect", "rewrite"),
