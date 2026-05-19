@@ -35,15 +35,15 @@ def kalman_filter(runs_count: int = 5):
     )
 
     result_path = "./results/kalman_filter.csv"
-    figures.bandwidth_plot(
-        result_path,
-        benchmark_name,
-        "Kalman Filter Benchmark",
-        color_palette=color_palette,
-    )
+    # figures.bandwidth_plot(
+    #     result_path,
+    #     benchmark_name,
+    #     "Kalman Filter Benchmark",
+    #     color_palette=color_palette,
+    # )
 
 
-def batch_bertlike(runs_count: int = 5):
+def batch_bertlike(runs_count: int = 5, plot=True):
     benchmark_name = "batch_bertlike"
     bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
 
@@ -74,12 +74,12 @@ def batch_bertlike(runs_count: int = 5):
         runs_count=runs_count,
     )
 
-    figures.bandwidth_plot(
-        result_path,
-        benchmark_name,
-        "Batch Bert-Like Benchmark",
-        color_palette=color_palette,
-    )
+    # figures.bandwidth_plot(
+    #     result_path,
+    #     benchmark_name,
+    #     "Batch Bert-Like Benchmark",
+    #     color_palette=color_palette,
+    # )
 
 
 def sparse_attention(runs_count: int = 5):
@@ -113,12 +113,13 @@ def sparse_attention(runs_count: int = 5):
         runs_count=runs_count,
     )
 
-    figures.bandwidth_plot(
-        result_path,
-        benchmark_name,
-        "Sparse Attention Benchmark",
-        color_palette=color_palette,
-    )
+    # figures.bandwidth_plot(
+    #     result_path,
+    #     benchmark_name,
+    #     "Sparse Attention Benchmark",
+    #     color_palette=color_palette,
+    # )
+    #
 
 
 def chained_matmul(runs_count: int = 5):
@@ -153,12 +154,14 @@ def chained_matmul(runs_count: int = 5):
         runs_count=runs_count,
     )
 
-    figures.bandwidth_plot(
-        result_path,
-        benchmark_name,
-        "Batch Bert-Like Benchmark",
-        color_palette=color_palette,
-    )
+    # figures.bandwidth_plot(
+    #     result_path,
+    #     benchmark_name,
+    #     "Batch Bert-Like Benchmark",
+    #     color_palette=color_palette,
+    # )
+    #
+    #
 
 
 def comptime_experiment(runs_count: int = 5):
