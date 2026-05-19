@@ -10,6 +10,7 @@ def kalman_filter(runs_count: int = 5):
 
     configs = [
         ("kalman_filter_dense.mlir", None),
+        ("kalman_filter_dense.mlir", "ikj-loop"),
         ("kalman_filter_dense.mlir", "analysis", "rewrite"),
         ("kalman_filter_dia.mlir", "analysis", "rewrite"),
         ("kalman_filter_dia.mlir", "analysis-detect", "rewrite"),
@@ -47,9 +48,10 @@ def batch_bertlike(runs_count: int = 5):
     bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
 
     configs = [
-        #("batch_bertlike_dense.mlir", None),
-        #("batch_bertlike_dense.mlir", "analysis", "rewrite"),
-        #("batch_bertlike_dia.mlir", "analysis", "rewrite"),
+        ("batch_bertlike_dense.mlir", None),
+        ("batch_bertlike_dense.mlir", "ikj-loop"),
+        ("batch_bertlike_dense.mlir", "analysis", "rewrite"),
+        ("batch_bertlike_dia.mlir", "analysis", "rewrite"),
         ("batch_bertlike_dia.mlir", "analysis-detect", "rewrite"),
         ("batch_bertlike_dia_inputs.mlir", "analysis", "rewrite"),
         ("batch_bertlike_dia_inputs.mlir", "analysis-detect", "rewrite"),
@@ -87,6 +89,7 @@ def sparse_attention(runs_count: int = 5):
 
     configs = [
         ("sparse_attention_baseline.mlir", "dense-softmax"),
+        ("sparse_attention_baseline.mlir", "dense-softmax", "ikj-loop"),
         ("sparse_attention_dense.mlir", "analysis", "rewrite"),
         ("sparse_attention_dia.mlir", "analysis", "rewrite"),
         ("sparse_attention_dia.mlir", "analysis-detect", "rewrite"),
@@ -125,6 +128,7 @@ def chained_matmul(runs_count: int = 5):
 
     configs = [
         ("chain100_dense.mlir", None),
+        ("chain100_dense.mlir", "ikj-loop"),
         ("chain100_dense.mlir", "analysis", "rewrite"),
         ("chain100_dia.mlir", "analysis", "rewrite"),
         ("chain100_dia.mlir", "analysis-detect", "rewrite"),
