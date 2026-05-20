@@ -10,7 +10,7 @@ func.func @kernel() -> f32 {
 
 
   %mask_empty  = tensor.empty() : tensor<Yx1024xf32>
-  %mask = linalg.fill {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%mask_empty: tensor<Yx1024xf32>) -> tensor<Yx1024xf32>
+  %mask = linalg.fill {metadata = {dia = true, lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%mask_empty: tensor<Yx1024xf32>) -> tensor<Yx1024xf32>
 
   %factor_const = arith.constant 0.03125: f32
   %factor_empty = tensor.empty(): tensor<2047x1024xf32>
