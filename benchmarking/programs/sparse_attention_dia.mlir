@@ -1,12 +1,19 @@
 func.func @kernel() -> f32 {
-  %Q  = tensor.empty() {metadata = {lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}}: tensor<1024x1024xf32>
-  %K  = tensor.empty() {metadata = {lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}}: tensor<1024x1024xf32>
-  %V  = tensor.empty() {metadata = {lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}}: tensor<1024x1024xf32>
+  %cf1 = arith.constant 1.0 : f32
+  %Q_empty  = tensor.empty(): tensor<1024x1024xf32>
+  %K_empty  = tensor.empty(): tensor<1024x1024xf32>
+  %V_empty  = tensor.empty(): tensor<1024x1024xf32>
 
-  %mask  = tensor.empty() {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} : tensor<1024x1024xf32>
-  %factor = arith.constant dense<0.03125> : tensor<1024x1024xf32>
+  %Q  = linalg.fill {metadata = {lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%Q_empty : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+  %K  = linalg.fill {metadata = {lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%K_empty : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+  %V  = linalg.fill {metadata = {lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%V_empty : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
 
-  %zero  = arith.constant 0.0 : f32
+  %mask_empty  = tensor.empty() : tensor<1024x1024xf32>
+  %mask = linalg.fill {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%mask_empty: tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+
+  %factor_const = arith.constant 0.03125: f32
+  %factor_empty = tensor.empty(): tensor<1024x1024xf32>
+  %factor = linalg.fill ins(%factor_const: f32) outs(%factor_empty: tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
   %zidx = arith.constant 0 : index
 
   // K^t
@@ -47,13 +54,6 @@ func.func @kernel() -> f32 {
       outs(%outZ: tensor<?x1024xf32>) -> tensor<?x1024xf32>
 
 
-  // %dim = tensor.dim %out, %zidx: tensor<?x1024xf32>
-  // %memref = memref.alloc(%dim) : memref<?x1024xf32>
-  // bufferization.materialize_in_destination %out in writable %memref
-  //     : (tensor<?x1024xf32>, memref<?x1024xf32>) -> ()
-  // %cast = memref.cast %memref : memref<?x1024xf32> to memref<*xf32>
-  // call @printMemrefF32(%cast) : (memref<*xf32>) -> ()
-  // memref.dealloc %memref : memref<?x1024xf32>
   %result = tensor.extract %out[%zidx, %zidx]: tensor<?x1024xf32>
 
   return %result: f32
