@@ -1,10 +1,19 @@
 func.func @kernel() -> f32 {
-  %Q  = tensor.empty() : tensor<1024x1024xf32>
-  %K  = tensor.empty() : tensor<1024x1024xf32>
-  %V  = tensor.empty() : tensor<1024x1024xf32>
+  %cf1 = arith.constant 1.0 : f32
+  %Q_empty  = tensor.empty() : tensor<1024x1024xf32>
+  %K_empty  = tensor.empty() : tensor<1024x1024xf32>
+  %V_empty  = tensor.empty() : tensor<1024x1024xf32>
+  
+  %Q  = linalg.fill ins(%cf1 : f32) outs(%Q_empty : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+  %K  = linalg.fill ins(%cf1 : f32) outs(%K_empty : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+  %V  = linalg.fill ins(%cf1 : f32) outs(%V_empty : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
 
-  %mask  = tensor.empty() : tensor<1024x1024xf32>
-  %factor = arith.constant dense<0.03125> : tensor<1024x1024xf32>
+  %mask_empty  = tensor.empty() : tensor<1024x1024xf32>
+  %mask = linalg.fill ins(%cf1 : f32) outs(%mask_empty: tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+
+  %factor_const = arith.constant 0.03125: f32
+  %factor_empty = tensor.empty(): tensor<1024x1024xf32>
+  %factor = linalg.fill ins(%factor_const: f32) outs(%factor_empty: tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
 
   %zero  = arith.constant 0.0 : f32
 

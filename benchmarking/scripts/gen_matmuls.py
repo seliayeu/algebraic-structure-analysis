@@ -24,12 +24,15 @@ def dia_program(K: int, N: int) -> str:
 
     lines = ["func.func @kernel() -> f32 {"]
     lines.append("  %c0 = arith.constant 0 : index")
+    lines.append("  %cf1 = arith.constant 1.0 : f32")
     for i in range(1, K + 1):
         lines.append(f"  %e{i} = tensor.empty(%c0) : {out_t}")
-    lines.append(f"  %input = arith.constant {{metadata = {md}}} dense<1.0> : {weight_t}")
+    lines.append(f"  %input_empty = tensor.empty() : {weight_t}")
     for i in range(1, K + 1):
-        v = 1.0 + i * 0.01
-        lines.append(f"  %W{i} = arith.constant {{metadata = {md}}} dense<{v:.4f}> : {weight_t}")
+        lines.append(f"  %W{i}_empty = tensor.empty() : {weight_t}")
+    lines.append(f"  %input = linalg.fill {{metadata = {md}}} ins(%cf1 : f32) outs(%input_empty : {weight_t}) -> {weight_t}")
+    for i in range(1, K + 1):
+        lines.append(f"  %W{i} = linalg.fill {{metadata = {md}}} ins(%cf1 : f32) outs(%W{i}_empty : {weight_t}) -> {weight_t}")
     lines.append(
         f"  %m1 = dia.matmul ins(%input, %W1 : {weight_t}, {weight_t}) "
         f"outs(%e1 : {out_t}) -> {out_t}"
@@ -53,12 +56,15 @@ def dia_inputs_program(K: int, N: int) -> str:
 
     lines = ["func.func @kernel() -> f32 {"]
     lines.append("  %c0 = arith.constant 0 : index")
+    lines.append("  %cf1 = arith.constant 1.0 : f32")
     for i in range(1, K + 1):
         lines.append(f"  %e{i} = tensor.empty(%c0) : {out_t}")
-    lines.append(f"  %input = arith.constant {{metadata = {md}}} dense<1.0> : {weight_t}")
+    lines.append(f"  %input_empty = tensor.empty() : {weight_t}")
     for i in range(1, K + 1):
-        v = 1.0 + i * 0.01
-        lines.append(f"  %W{i} = arith.constant {{metadata = {md}}} dense<{v:.4f}> : {weight_t}")
+        lines.append(f"  %W{i}_empty = tensor.empty() : {weight_t}")
+    lines.append(f"  %input = linalg.fill {{metadata = {md}}} ins(%cf1 : f32) outs(%input_empty : {weight_t}) -> {weight_t}")
+    for i in range(1, K + 1):
+        lines.append(f"  %W{i} = linalg.fill {{metadata = {md}}} ins(%cf1 : f32) outs(%W{i}_empty : {weight_t}) -> {weight_t}")
     lines.append(
         f"  %m1 = dia.matmul ins(%input, %W1 : {weight_t}, {weight_t}) "
         f"outs(%e1 : {out_t}) -> {out_t}"
@@ -80,12 +86,15 @@ def dense_program(K: int, N: int) -> str:
     t = f"tensor<{N}x{N}xf32>"
 
     lines = ["func.func @kernel() -> f32 {"]
+    lines.append("  %cf1 = arith.constant 1.0 : f32")
     for i in range(1, K + 1):
         lines.append(f"  %e{i} = arith.constant dense<0.0> : {t}")
-    lines.append(f"  %input = arith.constant {{metadata = {md}}} dense<1.0> : {t}")
+    lines.append(f"  %input_empty = tensor.empty() : {t}")
     for i in range(1, K + 1):
-        v = 1.0 + i * 0.01
-        lines.append(f"  %W{i} = arith.constant {{metadata = {md}}} dense<{v:.4f}> : {t}")
+        lines.append(f"  %W{i}_empty = tensor.empty() : {t}")
+    lines.append(f"  %input = linalg.fill {{metadata = {md}}} ins(%cf1 : f32) outs(%input_empty : {t}) -> {t}")
+    for i in range(1, K + 1):
+        lines.append(f"  %W{i} = linalg.fill {{metadata = {md}}} ins(%cf1 : f32) outs(%W{i}_empty : {t}) -> {t}")
     lines.append(
         f"  %m1 = linalg.matmul ins(%input, %W1 : {t}, {t}) "
         f"outs(%e1 : {t}) -> {t}"
