@@ -4,9 +4,9 @@ func.func @kernel() -> f32 {
   %K_empty  = tensor.empty(): tensor<2047x1024xf32>
   %V_empty  = tensor.empty(): tensor<2047x1024xf32>
 
-  %Q  = linalg.fill {metadata = {lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%Q_empty : tensor<2047x1024xf32>) -> tensor<2047x1024xf32>
-  %K  = linalg.fill {metadata = {lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%K_empty : tensor<2047x1024xf32>) -> tensor<2047x1024xf32>
-  %V  = linalg.fill {metadata = {lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%V_empty : tensor<2047x1024xf32>) -> tensor<2047x1024xf32>
+  %Q  = linalg.fill {metadata = {dia = true, lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%Q_empty : tensor<2047x1024xf32>) -> tensor<2047x1024xf32>
+  %K  = linalg.fill {metadata = {dia = true, lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%K_empty : tensor<2047x1024xf32>) -> tensor<2047x1024xf32>
+  %V  = linalg.fill {metadata = {dia = true, lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%V_empty : tensor<2047x1024xf32>) -> tensor<2047x1024xf32>
 
 
   %mask_empty  = tensor.empty() : tensor<Yx1024xf32>
