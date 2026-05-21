@@ -20,8 +20,8 @@ def kalman_filter(runs_count: int = 5):
         ("kalman_filter_dense.mlir", "ARL"),
         ("kalman_filter_dia.mlir", "ARL"),
         ("kalman_filter_dia.mlir", "DRL"),
-        ("kalman_filter_dia_input.mlir", "ARL"),
-        ("kalman_filter_dia_input.mlir", "DRL"),
+        ("kalman_filter_dia_inputs.mlir", "ARL"),
+        ("kalman_filter_dia_inputs.mlir", "DRL"),
     ]
 
     result_path = bench.run(
@@ -70,8 +70,8 @@ def sparse_attention(runs_count: int = 5):
         ("sparse_attention_dense.mlir", "ARL"),
         ("sparse_attention_dia.mlir", "ARL"),
         ("sparse_attention_dia.mlir", "DRL"),
-        ("sparse_attention_dia_input.mlir", "ARL"),
-        ("sparse_attention_dia_input.mlir", "DRL"),
+        ("sparse_attention_dia_inputs.mlir", "ARL"),
+        ("sparse_attention_dia_inputs.mlir", "DRL"),
     ]
 
     result_path = bench.run(
@@ -90,13 +90,13 @@ def chained_matmul(runs_count: int = 5):
     bandwidths = [1023, 512, 256, 128, 64, 32, 16, 0]
 
     configs = [
-        ("chain100_dense.mlir", None),
-        ("chain100_dense.mlir", "L"),
-        ("chain100_dense.mlir", "ARL"),
-        ("chain100_dia.mlir", "ARL"),
-        ("chain100_dia.mlir", "DRL"),
-        ("chain100_dia_inputs.mlir", "ARL"),
-        ("chain100_dia_inputs.mlir", "DRL"),
+        ("chain10_dense.mlir", None),
+        ("chain10_dense.mlir", "L"),
+        ("chain10_dense.mlir", "ARL"),
+        ("chain10_dia.mlir", "ARL"),
+        ("chain10_dia.mlir", "DRL"),
+        ("chain10_dia_inputs.mlir", "ARL"),
+        ("chain10_dia_inputs.mlir", "DRL"),
     ]
 
     result_path = bench.run(

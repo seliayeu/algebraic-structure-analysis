@@ -259,6 +259,8 @@ def run(
         # bw doesn't affect baselines
         if tag == "baseline" or tag == "baseline_opt":
             bw_list = [0]
+        else:
+            bw_list = bandwidths
 
         for bw in bw_list:
             current += 1
