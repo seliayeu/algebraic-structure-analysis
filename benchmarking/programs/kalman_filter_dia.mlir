@@ -1,7 +1,13 @@
 func.func @kernel() -> f32{
-    %A  = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0,1]}} dense<1.0> : tensor<1024x1024xf32>
-    %P0 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0,1]}} dense<1.1> : tensor<1024x1024xf32>
-    %Q  = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0,1]}} dense<1.2> : tensor<1024x1024xf32>
+    %cf1 = arith.constant 1.0 : f32
+    %A_empty  = tensor.empty(): tensor<1024x1024xf32>
+    %P0_empty = tensor.empty(): tensor<1024x1024xf32>
+    %Q_empty  = tensor.empty(): tensor<1024x1024xf32>
+
+    %A  = linalg.fill {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%A_empty : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+    %P0 = linalg.fill {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%P0_empty : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+    %Q  = linalg.fill {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%Q_empty : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+
 
     %c0 = arith.constant 0 : index
     %e0 = tensor.empty() : tensor<1024x1024xf32>

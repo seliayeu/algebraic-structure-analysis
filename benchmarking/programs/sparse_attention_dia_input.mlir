@@ -1,10 +1,20 @@
 func.func @kernel() -> f32 {
-  %Q  = arith.constant {metadata = {dia = true, lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} dense<1.0>: tensor<2047x1024xf32>
-  %K  = arith.constant {metadata = {dia = true, lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} dense<1.0>: tensor<2047x1024xf32>
-  %V  = arith.constant {metadata = {dia = true, lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} dense<1.0>: tensor<2047x1024xf32>
+  %cf1 = arith.constant 1.0 : f32
+  %Q_empty  = tensor.empty(): tensor<2047x1024xf32>
+  %K_empty  = tensor.empty(): tensor<2047x1024xf32>
+  %V_empty  = tensor.empty(): tensor<2047x1024xf32>
 
-  %mask  = arith.constant {metadata = {dia = true, lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} dense<1.0>: tensor<Yx1024xf32>
-  %factor = arith.constant {metadata = {dia = true, lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} dense<0.03125> : tensor<2047x1024xf32>
+  %Q  = linalg.fill {metadata = {dia = true, lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%Q_empty : tensor<2047x1024xf32>) -> tensor<2047x1024xf32>
+  %K  = linalg.fill {metadata = {dia = true, lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%K_empty : tensor<2047x1024xf32>) -> tensor<2047x1024xf32>
+  %V  = linalg.fill {metadata = {dia = true, lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%V_empty : tensor<2047x1024xf32>) -> tensor<2047x1024xf32>
+
+
+  %mask_empty  = tensor.empty() : tensor<Yx1024xf32>
+  %mask = linalg.fill {metadata = {dia = true, lowerBw = X : i64, upperBw = X : i64, propertyDims = [0, 1]}} ins(%cf1 : f32) outs(%mask_empty: tensor<Yx1024xf32>) -> tensor<Yx1024xf32>
+
+  %factor_const = arith.constant 0.03125: f32
+  %factor_empty = tensor.empty(): tensor<2047x1024xf32>
+  %factor = linalg.fill {metadata = {dia = true, lowerBw = 1023 : i64, upperBw = 1023 : i64, propertyDims = [0, 1]}} ins(%factor_const: f32) outs(%factor_empty: tensor<2047x1024xf32>) -> tensor<2047x1024xf32>
 
   %zero  = arith.constant 0.0 : f32
   %zidx = arith.constant 0 : index

@@ -125,6 +125,7 @@ def build_pipeline_flags(cfg):
             flags.append("--dense-softmax-rewrite")
         elif c == "ikj-loop":
             flags.append("--linalg-ikj-loop")
+            tag += "baseline_opt"
 
     return flags, tag if tag and "baseline" not in cfg[0] else "baseline"
 

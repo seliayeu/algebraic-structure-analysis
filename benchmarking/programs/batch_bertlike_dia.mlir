@@ -1,24 +1,33 @@
 func.func @kernel() -> f32 {
+  %cf1 = arith.constant 1.0 : f32
   %c0 = arith.constant 0 : index
 
-  %e1 = tensor.empty(%c0) : tensor<4x?x1024xf32>
-  %e2 = tensor.empty(%c0) : tensor<4x?x1024xf32>
-  %e3 = tensor.empty(%c0) : tensor<4x?x1024xf32>
-  %e4 = tensor.empty(%c0) : tensor<4x?x1024xf32>
-  %e5 = tensor.empty(%c0) : tensor<4x?x1024xf32>
-  %e6 = tensor.empty(%c0) : tensor<4x?x1024xf32>
-  %e7 = tensor.empty(%c0) : tensor<4x?x1024xf32>
-  %e8 = tensor.empty(%c0) : tensor<4x?x1024xf32>
-  %e9 = tensor.empty(%c0) : tensor<4x?x1024xf32>
-  %e10 = tensor.empty(%c0) : tensor<4x?x1024xf32>
+  %e1 = tensor.empty(%c0): tensor<4x?x1024xf32>
+  %e2 = tensor.empty(%c0): tensor<4x?x1024xf32>
+  %e3 = tensor.empty(%c0): tensor<4x?x1024xf32>
+  %e4 = tensor.empty(%c0): tensor<4x?x1024xf32>
+  %e5 = tensor.empty(%c0): tensor<4x?x1024xf32>
+  %e6 = tensor.empty(%c0): tensor<4x?x1024xf32>
+  %e7 = tensor.empty(%c0): tensor<4x?x1024xf32>
+  %e8 = tensor.empty(%c0): tensor<4x?x1024xf32>
+  %e9 = tensor.empty(%c0): tensor<4x?x1024xf32>
+  %e10 = tensor.empty(%c0): tensor<4x?x1024xf32>
 
-  %input = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} dense<1.7> : tensor<4x1024x1024xf32>
-  %W1 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} dense<1.6> : tensor<4x1024x1024xf32>
-  %W2 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} dense<1.5> : tensor<4x1024x1024xf32>
-  %W3 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} dense<1.4> : tensor<4x1024x1024xf32>
-  %W4 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} dense<1.3> : tensor<4x1024x1024xf32>
-  %W5 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} dense<1.2> : tensor<4x1024x1024xf32>
-  %W6 = arith.constant {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} dense<1.1> : tensor<4x1024x1024xf32>
+  %input_empty = tensor.empty(): tensor<4x1024x1024xf32>
+  %W1_empty = tensor.empty(): tensor<4x1024x1024xf32>
+  %W2_empty = tensor.empty(): tensor<4x1024x1024xf32>
+  %W3_empty = tensor.empty(): tensor<4x1024x1024xf32>
+  %W4_empty = tensor.empty(): tensor<4x1024x1024xf32>
+  %W5_empty = tensor.empty(): tensor<4x1024x1024xf32>
+  %W6_empty = tensor.empty(): tensor<4x1024x1024xf32>
+
+  %input = linalg.fill {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} ins(%cf1 : f32) outs(%input_empty: tensor<4x1024x1024xf32>) -> tensor<4x1024x1024xf32>
+  %W1 = linalg.fill {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} ins(%cf1 : f32) outs(%W1_empty: tensor<4x1024x1024xf32>) -> tensor<4x1024x1024xf32>
+  %W2 = linalg.fill {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} ins(%cf1 : f32) outs(%W2_empty: tensor<4x1024x1024xf32>) -> tensor<4x1024x1024xf32>
+  %W3 = linalg.fill {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} ins(%cf1 : f32) outs(%W3_empty: tensor<4x1024x1024xf32>) -> tensor<4x1024x1024xf32>
+  %W4 = linalg.fill {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} ins(%cf1 : f32) outs(%W4_empty: tensor<4x1024x1024xf32>) -> tensor<4x1024x1024xf32>
+  %W5 = linalg.fill {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} ins(%cf1 : f32) outs(%W5_empty: tensor<4x1024x1024xf32>) -> tensor<4x1024x1024xf32>
+  %W6 = linalg.fill {metadata = {lowerBw = X : i64, upperBw = X : i64, propertyDims = [1, 2]}} ins(%cf1 : f32) outs(%W6_empty: tensor<4x1024x1024xf32>) -> tensor<4x1024x1024xf32>
 
   %m1 = dia.batch_matmul ins(%input, %W1 : tensor<4x1024x1024xf32>, tensor<4x1024x1024xf32>) outs(%e1 : tensor<4x?x1024xf32>) -> tensor<4x?x1024xf32>
   %m2 = dia.batch_matmul ins(%input, %W2 : tensor<4x1024x1024xf32>, tensor<4x1024x1024xf32>) outs(%e2 : tensor<4x?x1024xf32>) -> tensor<4x?x1024xf32>
