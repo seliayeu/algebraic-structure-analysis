@@ -109,25 +109,32 @@ def replace_bandwidth(src: Path, dst: Path, bw: int):
 
 def build_pipeline_flags(cfg):
     flags = []
-    tag = ""
+    tag = "baseline"
 
-    for c in cfg[1:]:
-        if c == "analysis":
-            flags.append("--banded-analysis")
-            tag += "A"
-        elif c == "analysis-detect":
-            flags.append("--banded-analysis=detect-dia=true")
-            tag += "AD"
-        elif c == "rewrite":
-            flags.append("--banded-rewrite")
-            tag += "R"
-        elif c == "dense-softmax":
-            flags.append("--dense-softmax-rewrite")
-        elif c == "ikj-loop":
-            flags.append("--linalg-ikj-loop")
-            tag += "baseline_opt"
+    flag_config = cfg[1]
+    if flag_config:
+        tag = ""
+        for flag in flag_config:
+            if flag == "A":
+                flags.append("--banded-analysis")
+                tag += "A"
+            elif flag == "R":
+                flags.append("--banded-rewrite")
+                tag += "R"
+            elif flag == "D":
+                flags.append("--banded-analysis=detect-dia=true")
+                tag += "AD"
+            elif flag == "L":
+                flags.append("--linalg-ikj-loop")
+            elif flag == "S":
+                flags.append("--dense-softmax-rewrite")
+        if not tag:
+            if "--linalg-ikj-loop" in flags:
+                tag = "baseline_opt"
+            else:
+                tag = "baseline"
 
-    return flags, tag if tag and "baseline" not in cfg[0] else "baseline"
+    return flags, tag
 
 
 def lower_to_llvm(mlir_file: Path, flags: List[str]):
@@ -249,22 +256,11 @@ def run(
         logger.info(f"   Flags: {' '.join(flags) if flags else 'none'}")
         logger.info("-" * 60)
 
-        # batch bertlike and chain100 takes a long time to run
-        # baseline should be constant
-        bw_list = (
-            [0]
-            if tag == "baseline"
-            and (
-                file_name
-                in [
-                    "batch_bertlike_dense.mlir",
-                    "chain100_dense.mlir",
-                    "sparse_attention_baseline.mlir",
-                    "kalman_filter.mlir",
-                ]
-            )
-            else bandwidths
-        )
+        # bw doesn't affect baselines
+        if tag == "baseline" or tag == "baseline_opt":
+            bw_list = [0]
+        else:
+            bw_list = bandwidths
 
         for bw in bw_list:
             current += 1
