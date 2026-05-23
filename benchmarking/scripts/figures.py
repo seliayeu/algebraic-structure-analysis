@@ -5,6 +5,14 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from typing import List, Dict, Optional
 
+pattern_map = {
+    "dense": "x",
+    "dia": "/",
+    "hybrid": "\\",
+    "dia-inputs": "+",
+    "hybrid-dia-inputs": "|",
+}
+
 
 def create_comptime_plot(
     csv_path="./results/compilation_time.csv",
@@ -402,16 +410,17 @@ def create_grouped_memory_plot(
     save_png_and_svg: bool = True,
     color_palette: Optional[Dict[str, str]] = None,
 ):
-    if color_palette is None:
-        color_palette = {
-            "baseline": "#ef4444",
-            "bpa-dense": "#A5B4FC",
-            "bpa-dia": "#C4B5FD",
-            "bpa-hybrid": "#6EE7B7",
-        }
+    color_palette = {
+        "dia-inputs": "#9467bd",
+        "hybrid-dia-inputs": "#8c564b",
+        "baseline": "#ef4444",
+        "dense": "#A5B4FC",
+        "dia": "#C4B5FD",
+        "hybrid": "#6EE7B7",
+    }
 
-    n_rows = 2
-    n_cols = 4
+    n_rows = 4
+    n_cols = 2
 
     fig = make_subplots(
         rows=n_rows,
@@ -438,26 +447,36 @@ def create_grouped_memory_plot(
         )
 
         baseline = df[df["config"] == "baseline"]
+
         ar_dense = df[
             (df["config"] == "AR") & (df["file_name"].str.contains("dense", na=False))
         ]
         ar_dia = df[
-            (df["config"] == "AR") & (df["file_name"].str.contains("dia", na=False))
+            (df["config"] == "AR")
+            & (df["file_name"].str.contains("dia.mlir", na=False))
         ]
         ard_dia = df[
-            (df["config"] == "ADR") & (df["file_name"].str.contains("dia", na=False))
+            (df["config"] == "ADR")
+            & (df["file_name"].str.contains("dia.mlir", na=False))
+        ]
+        ar_dia_inputs = df[
+            (df["config"] == "AR")
+            & (df["file_name"].str.contains("dia_inputs.mlir", na=False))
+        ]
+        ard_dia_inputs = df[
+            (df["config"] == "ADR")
+            & (df["file_name"].str.contains("dia_inputs.mlir", na=False))
         ]
 
+        group_space = 1.5
         bw_values = sorted(df["bw"].unique())
         n_bandwidths = len(bw_values)
-
-        x_positions = list(range(n_bandwidths))
 
         if not baseline.empty:
             baseline_mean = baseline["max_rss_gb"].mean()
 
             x_min = -0.5
-            x_max = n_bandwidths - 0.5
+            x_max = group_space * n_bandwidths - 0.65
 
             fig.add_trace(
                 go.Scatter(
@@ -475,9 +494,15 @@ def create_grouped_memory_plot(
             )
 
         bar_configs = [
-            ("bpa-dense", ar_dense, color_palette["bpa-dense"]),
-            ("bpa-dia", ar_dia, color_palette["bpa-dia"]),
-            ("bpa-hybrid", ard_dia, color_palette["bpa-hybrid"]),
+            ("dense", ar_dense, color_palette["dense"]),
+            ("dia", ar_dia, color_palette["dia"]),
+            ("hybrid", ard_dia, color_palette["hybrid"]),
+            ("dia-inputs", ar_dia_inputs, color_palette["dia-inputs"]),
+            (
+                "hybrid-dia-inputs",
+                ard_dia_inputs,
+                color_palette["hybrid-dia-inputs"],
+            ),
         ]
 
         for config_idx, (name, data, color) in enumerate(bar_configs):
@@ -492,7 +517,7 @@ def create_grouped_memory_plot(
 
             for bw_idx, bw in enumerate(bw_values):
                 if bw in bw_to_memory:
-                    x_pos.append(bw_idx + (config_idx - 1) * bar_width)
+                    x_pos.append(bw_idx * group_space + (config_idx - 1) * bar_width)
                     y_values.append(bw_to_memory[bw])
                     customdata.append(bw)
 
@@ -511,12 +536,14 @@ def create_grouped_memory_plot(
                         hovertemplate=f"<b>{name}</b><br>Bandwidth: %{{customdata}}<br>Memory: %{{y:.1f}} MB<br><extra></extra>",
                         customdata=customdata,
                         showlegend=(idx == 0),
+                        marker_pattern_shape=pattern_map[name],
+                        marker_pattern_solidity=0.1,
                     ),
                     row=row,
                     col=col,
                 )
 
-        tick_positions = x_positions
+        tick_positions = [i * group_space for i in range(n_bandwidths)]
         tick_labels = [str(bw) for bw in bw_values]
 
         fig.update_xaxes(
@@ -652,16 +679,18 @@ def create_grouped_runtime_plot(
     save_png_and_svg: bool = True,
     color_palette: Optional[Dict[str, str]] = None,
 ):
-    if color_palette is None:
-        color_palette = {
-            "baseline": "#ef4444",
-            "bpa-dense": "#F4A460",
-            "bpa-dia": "#87CEEB",
-            "bpa-hybrid": "#98FB98",
-        }
+    color_palette = {
+        "baseline": "#7f7f7f",
+        "baseline_opt": "#ef4444",
+        "dense": "#F4A460",
+        "dia": "#87CEEB",
+        "hybrid": "#98FB98",
+        "dia-inputs": "#9467bd",
+        "hybrid-dia-inputs": "#8c564b",
+    }
 
     n_rows = 2
-    n_cols = 4
+    n_cols = 2
 
     fig = make_subplots(
         rows=n_rows,
@@ -686,14 +715,26 @@ def create_grouped_runtime_plot(
         )
 
         baseline = df[df["config"] == "baseline"]
+        baseline_opt = df[(df["config"] == "baseline_opt")]
+
         ar_dense = df[
             (df["config"] == "AR") & (df["file_name"].str.contains("dense", na=False))
         ]
         ar_dia = df[
-            (df["config"] == "AR") & (df["file_name"].str.contains("dia", na=False))
+            (df["config"] == "AR")
+            & (df["file_name"].str.contains("dia.mlir", na=False))
         ]
         ard_dia = df[
-            (df["config"] == "ADR") & (df["file_name"].str.contains("dia", na=False))
+            (df["config"] == "ADR")
+            & (df["file_name"].str.contains("dia.mlir", na=False))
+        ]
+        ar_dia_inputs = df[
+            (df["config"] == "AR")
+            & (df["file_name"].str.contains("dia_inputs.mlir", na=False))
+        ]
+        ard_dia_inputs = df[
+            (df["config"] == "ADR")
+            & (df["file_name"].str.contains("dia_inputs.mlir", na=False))
         ]
 
         bw_values = sorted(df["bw"].unique())
@@ -701,40 +742,54 @@ def create_grouped_runtime_plot(
 
         x_positions = list(range(n_bandwidths))
 
-        if not baseline.empty:
-            baseline_times = []
-            baseline_bws = []
-            for bw in bw_values:
-                baseline_subset = baseline[baseline["bw"] == bw]
-                if not baseline_subset.empty:
-                    baseline_bws.append(bw)
-                    baseline_times.append(baseline_subset["avg_time_s"].values[0])
+        group_space = 1.5
+        x_min = -0.5
+        x_max = group_space * n_bandwidths - 0.65
 
-            if baseline_times:
-                x_min = -0.5
-                x_max = n_bandwidths - 0.5
-
-                fig.add_trace(
-                    go.Scatter(
-                        x=[x_min, x_max],
-                        y=[baseline_times[0], baseline_times[0]],
-                        mode="lines",
-                        name="baseline",
-                        legendgroup="baseline",
-                        line=dict(
-                            color=color_palette["baseline"], width=2.0, dash="dash"
-                        ),
-                        hovertemplate=f"<b>baseline</b><br>Time: {baseline_times[0]:.4f} s<br><extra></extra>",
-                        showlegend=(idx == 0),
-                    ),
-                    row=row,
-                    col=col,
-                )
+        # baseline
+        fig.add_trace(
+            go.Scatter(
+                x=[x_min, x_max],
+                y=[baseline["avg_time_s"].values[0], baseline["avg_time_s"].values[0]],
+                mode="lines",
+                name="baseline",
+                legendgroup="baseline",
+                line=dict(color=color_palette["baseline"], width=2.0, dash="dash"),
+                hovertemplate=f"<b>baseline</b><br>Time: {baseline['avg_time_s'].values[0]:.4f} s<br><extra></extra>",
+                showlegend=(idx == 0),
+            ),
+            row=row,
+            col=col,
+        )
+        # baseline opt
+        fig.add_trace(
+            go.Scatter(
+                x=[x_min, x_max],
+                y=[
+                    baseline_opt["avg_time_s"].values[0],
+                    baseline_opt["avg_time_s"].values[0],
+                ],
+                mode="lines",
+                name="baseline",
+                legendgroup="baseline_opt",
+                line=dict(color=color_palette["baseline_opt"], width=2.0, dash="dot"),
+                hovertemplate=f"<b>baseline_opt</b><br>Time: {baseline_opt['avg_time_s'].values[0]:.4f} s<br><extra></extra>",
+                showlegend=(idx == 0),
+            ),
+            row=row,
+            col=col,
+        )
 
         bar_configs = [
-            ("bpa-dense", ar_dense, color_palette["bpa-dense"]),
-            ("bpa-dia", ar_dia, color_palette["bpa-dia"]),
-            ("bpa-hybrid", ard_dia, color_palette["bpa-hybrid"]),
+            ("dense", ar_dense, color_palette["dense"]),
+            ("dia", ar_dia, color_palette["dia"]),
+            ("hybrid", ard_dia, color_palette["hybrid"]),
+            ("dia-inputs", ar_dia_inputs, color_palette["dia-inputs"]),
+            (
+                "hybrid-dia-inputs",
+                ard_dia_inputs,
+                color_palette["hybrid-dia-inputs"],
+            ),
         ]
 
         for config_idx, (name, data, color) in enumerate(bar_configs):
@@ -749,7 +804,7 @@ def create_grouped_runtime_plot(
 
             for bw_idx, bw in enumerate(bw_values):
                 if bw in bw_to_time:
-                    x_pos.append(bw_idx + (config_idx - 1) * bar_width)
+                    x_pos.append(bw_idx * group_space + (config_idx - 1) * bar_width)
                     y_values.append(bw_to_time[bw])
                     customdata.append(bw)
 
@@ -768,12 +823,14 @@ def create_grouped_runtime_plot(
                         hovertemplate=f"<b>{name}</b><br>Bandwidth: %{{customdata}}<br>Time: %{{y:.4f}} s<br><extra></extra>",
                         customdata=customdata,
                         showlegend=(idx == 0),
+                        marker_pattern_shape=pattern_map[name],
+                        marker_pattern_solidity=0.1,
                     ),
                     row=row,
                     col=col,
                 )
 
-        tick_positions = x_positions
+        tick_positions = [i * group_space for i in range(n_bandwidths)]
         tick_labels = [str(bw) for bw in bw_values]
 
         fig.update_xaxes(
@@ -795,7 +852,7 @@ def create_grouped_runtime_plot(
         )
 
         fig.update_yaxes(
-            # type="log",
+            type="log",
             title_font={"family": "serif", "size": 10, "weight": "normal"},
             tickfont={"family": "serif", "size": 12},
             showgrid=False,
@@ -895,13 +952,13 @@ def create_grouped_runtime_plot(
 if __name__ == "__main__":
     benchmark_files = [
         "./results/kalman_filter.csv",
-        # "./results/kalman_filter_dia_inputs.csv",
+        # "./results/kalman_filter_dia_input.csv",
         "./results/sparse_attention.csv",
-        # "./results/sparse_attention_dia_inputs.csv",
+        # "./results/sparse_attention_dia_input.csv",
         "./results/batch_bertlike.csv",
-        # "./results/batch_bertlike_dia_inputs.csv",
+        # "./results/batch_bertlike_dia_input.csv",
         "./results/chain.csv",
-        # "./results/chain_dia_inputs.csv",
+        # "./results/chain_dia_input.csv",
     ]
 
     fig = create_grouped_memory_plot(
