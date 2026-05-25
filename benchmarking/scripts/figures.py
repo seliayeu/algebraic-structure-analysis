@@ -411,15 +411,16 @@ def create_grouped_memory_plot(
     color_palette: Optional[Dict[str, str]] = None,
 ):
     color_palette = {
-        "dia-inputs": "#9467bd",
-        "hybrid-dia-inputs": "#8c564b",
-        "baseline": "#ef4444",
+        "dia-inputs": "rgb(229,196,148)",
+        "hybrid-dia-inputs": "rgb(217,95,2)",
+        # "baseline": "#ef4444",
+        "baseline": "#7f7f7f",
         "dense": "#A5B4FC",
         "dia": "#C4B5FD",
-        "hybrid": "#6EE7B7",
+        "hybrid": "rgb(77,175,74)",
     }
 
-    n_rows = 4
+    n_rows = 2
     n_cols = 2
 
     fig = make_subplots(
@@ -484,6 +485,7 @@ def create_grouped_memory_plot(
                     y=[baseline_mean, baseline_mean],
                     mode="lines",
                     name="baseline",
+                    legend="legend1",
                     legendgroup="baseline",
                     line=dict(color=color_palette["baseline"], width=2.5, dash="dash"),
                     hovertemplate=f"<b>baseline</b><br>Mean: {baseline_mean:.1f} MB<br><extra></extra>",
@@ -535,6 +537,7 @@ def create_grouped_memory_plot(
                         width=bar_width,
                         hovertemplate=f"<b>{name}</b><br>Bandwidth: %{{customdata}}<br>Memory: %{{y:.1f}} MB<br><extra></extra>",
                         customdata=customdata,
+                        legend="legend2",
                         showlegend=(idx == 0),
                         marker_pattern_shape=pattern_map[name],
                         marker_pattern_solidity=0.1,
@@ -603,7 +606,7 @@ def create_grouped_memory_plot(
         xref="paper",
         yref="paper",
         x=0.5,
-        y=-0.10,
+        y=-0.11,
         xanchor="center",
         yanchor="middle",
         showarrow=False,
@@ -631,13 +634,21 @@ def create_grouped_memory_plot(
             "xanchor": "center",
         },
         showlegend=True,
-        legend={
+        legend1={
             "orientation": "h",
             "yanchor": "bottom",
-            "y": -0.19,
+            "y": -0.22,
             "xanchor": "center",
-            "x": 0.4,
-            "title": {"font": {"family": "serif", "size": 9}},
+            "x": 0.5,
+            "font": {"family": "serif", "size": 12},
+            "bgcolor": "rgba(255, 255, 255, 0.95)",
+        },
+        legend2={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": -0.30,
+            "xanchor": "center",
+            "x": 0.5,
             "font": {"family": "serif", "size": 12},
             "bgcolor": "rgba(255, 255, 255, 0.95)",
         },
@@ -684,9 +695,9 @@ def create_grouped_runtime_plot(
         "baseline_opt": "#ef4444",
         "dense": "#F4A460",
         "dia": "#87CEEB",
-        "hybrid": "#98FB98",
-        "dia-inputs": "#9467bd",
-        "hybrid-dia-inputs": "#8c564b",
+        "hybrid": "rgb(77,175,74)",
+        "dia-inputs": "#BDA6CE",
+        "hybrid-dia-inputs": "#6d29ff",
     }
 
     n_rows = 2
@@ -740,8 +751,6 @@ def create_grouped_runtime_plot(
         bw_values = sorted(df["bw"].unique())
         n_bandwidths = len(bw_values)
 
-        x_positions = list(range(n_bandwidths))
-
         group_space = 1.5
         x_min = -0.5
         x_max = group_space * n_bandwidths - 0.65
@@ -754,6 +763,7 @@ def create_grouped_runtime_plot(
                 mode="lines",
                 name="baseline",
                 legendgroup="baseline",
+                legend="legend1",
                 line=dict(color=color_palette["baseline"], width=2.0, dash="dash"),
                 hovertemplate=f"<b>baseline</b><br>Time: {baseline['avg_time_s'].values[0]:.4f} s<br><extra></extra>",
                 showlegend=(idx == 0),
@@ -770,7 +780,8 @@ def create_grouped_runtime_plot(
                     baseline_opt["avg_time_s"].values[0],
                 ],
                 mode="lines",
-                name="baseline",
+                name="baseline-ikj",
+                legend="legend1",
                 legendgroup="baseline_opt",
                 line=dict(color=color_palette["baseline_opt"], width=2.0, dash="dot"),
                 hovertemplate=f"<b>baseline_opt</b><br>Time: {baseline_opt['avg_time_s'].values[0]:.4f} s<br><extra></extra>",
@@ -822,6 +833,7 @@ def create_grouped_runtime_plot(
                         width=bar_width,
                         hovertemplate=f"<b>{name}</b><br>Bandwidth: %{{customdata}}<br>Time: %{{y:.4f}} s<br><extra></extra>",
                         customdata=customdata,
+                        legend="legend2",
                         showlegend=(idx == 0),
                         marker_pattern_shape=pattern_map[name],
                         marker_pattern_solidity=0.1,
@@ -868,7 +880,8 @@ def create_grouped_runtime_plot(
         fig.add_annotation(
             text=" " + benchmark_name + " ",
             x=0.02,
-            y=0.70 if benchmark_name in ["Kalman Filter", "Sparse Attention"] else 1.99,
+            # y=0.70 if benchmark_name in ["Kalman Filter", "Sparse Attention"] else 1.99,
+            y=0.70,
             xref=f"x{idx + 1}",
             yref=f"y{idx + 1}",
             xanchor="left",
@@ -887,7 +900,7 @@ def create_grouped_runtime_plot(
         xref="paper",
         yref="paper",
         x=0.5,
-        y=-0.10,
+        y=-0.11,
         xanchor="center",
         yanchor="middle",
         showarrow=False,
@@ -915,13 +928,23 @@ def create_grouped_runtime_plot(
             "xanchor": "center",
         },
         showlegend=True,
-        legend={
+        legend1={
             "orientation": "h",
             "yanchor": "bottom",
-            "y": -0.19,
+            "y": -0.22,
             "xanchor": "center",
-            "x": 0.4,
-            "title": {"font": {"family": "serif", "size": 9}},
+            "x": 0.5,
+            "font": {"family": "serif", "size": 12},
+            "bgcolor": "rgba(255, 255, 255, 0.95)",
+        },
+        legend2={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": -0.30,
+            "xanchor": "center",
+            "x": 0.5,
+            "entrywidthmode": "pixels",
+            "entrywidth": 0,
             "font": {"family": "serif", "size": 12},
             "bgcolor": "rgba(255, 255, 255, 0.95)",
         },
