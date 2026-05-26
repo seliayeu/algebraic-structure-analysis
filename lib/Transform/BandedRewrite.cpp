@@ -211,7 +211,7 @@ struct MatMulPattern : public OpRewritePattern<linalg::MatmulOp> {
         auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
         const uint64_t MAX = resultType.getDimSize(1) - 1;
 
-        if (isFullyDense(bandA, bandB, opBandInfo, MAX)) return failure();
+        // if (isFullyDense(bandA, bandB, opBandInfo, MAX)) return failure();
 
         if (bandA.isDiagonal() && bandB.isDiagonal() && opBandInfo.isDiagonal())
             return denseTimesDenseToDenseDiagMatmulToLinalg(op, rewriter);
