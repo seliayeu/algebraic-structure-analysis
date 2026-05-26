@@ -59,6 +59,12 @@ def create_comptime_plot(
         "runtime_avg": "#71b5a0",
     }
 
+    pattern_map = {
+        "total_lowering_time": "x",
+        "analysis_time_avg": "/",
+        "runtime_avg": "\\",
+    }
+
     fig = go.Figure()
 
     n_configs = len(configs)
@@ -94,6 +100,8 @@ def create_comptime_plot(
                         width=bar_width * 0.85,
                         showlegend=(ops_idx == 0 and config_idx == 0),
                         legendgroup=comp,
+                        marker_pattern_shape=pattern_map[comp],
+                        marker_pattern_solidity=0.1,
                         hovertemplate=(
                             f"<b>{config_label}</b><br>"
                             + f"Benchmark: {ops}<br>"
@@ -998,3 +1006,10 @@ if __name__ == "__main__":
         show_title=False,
         save_png_and_svg=True,
     )
+
+    # fig = create_comptime_plot(
+    #     csv_path="./results/compilation_time.csv",
+    #     output_prefix="comp_time",
+    #     show_title=False,
+    #     save_png_and_svg=True,
+    # )
