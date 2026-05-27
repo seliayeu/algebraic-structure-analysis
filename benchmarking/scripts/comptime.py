@@ -245,7 +245,7 @@ def run_experiment(
     configs: List[Tuple[str, List[str]]],
     sizes: List[int],
     ops_range: List[int],
-    bw: int = 1,
+    bandwidth: List[int],
     warmup: int = 1,
     runs_count: int = 5,
     program_dir="./benchmarking/programs",
@@ -254,7 +254,7 @@ def run_experiment(
     csv_path.write_text("")
     header = False
 
-    total_configs = len(configs) * len(ops_range)
+    total_configs = len(configs) * len(ops_range) * len(bandwidth)
     current = 0
 
     for cfg_name, flags in configs:
@@ -263,50 +263,51 @@ def run_experiment(
         logger.info(f"   Flags: {' '.join(flags) if flags else 'none'}")
         logger.info("-" * 60)
         for size in sizes:
-            for ops in ops_range:
-                current += 1
+            for bw in bandwidth:
+                for ops in ops_range:
+                    current += 1
 
-                logger.info("")
-                logger.info(f"[{current}/{total_configs}] Number of ops: {ops}")
+                    logger.info("")
+                    logger.info(f"[{current}/{total_configs}] Number of ops: {ops}")
 
-                spec = ProgramSpec(ops, size, bw, ops * 31 + size)
-                mlir = generate_chain(spec)
+                    spec = ProgramSpec(ops, size, bw, ops * 31 + size)
+                    mlir = generate_chain(spec)
 
-                base = TMP_DIR / f"{cfg_name}_{size}_{ops}_{bw}"
-                mlir_file = base.with_suffix(".mlir")
-                mlir_file.write_text(mlir)
-                mlir_out, a_t, l_t = compile_pipeline(
-                    mlir_file, flags, warmup=warmup, runs_count=runs_count
-                )
-                llvm_ir = run_cmd(
-                    ["mlir-translate", "--mlir-to-llvmir"], input_text=mlir_out
-                )
-                obj = base.with_suffix(".o")
-                exe = base.with_suffix(".out")
-                compile_ll(llvm_ir, obj)
-                build_executable(obj, exe)
-                runtime_total, runtime_avg = run_exe(exe, warmup, runs_count)
-                row = {
-                    "config": cfg_name,
-                    "size": size,
-                    "ops": ops,
-                    "bw": bw,
-                    "analysis_time_avg": a_t,
-                    "total_lowering_time_avg": l_t,
-                    "runtime_avg": runtime_avg,
-                    "runtime_total": runtime_total,
-                }
-                with open(csv_path, "a", newline="") as f:
-                    writer = csv.DictWriter(f, fieldnames=row.keys())
-                    if not header:
-                        writer.writeheader()
-                        header = True
-                    writer.writerow(row)
+                    base = TMP_DIR / f"{cfg_name}_{size}_{ops}_{bw}"
+                    mlir_file = base.with_suffix(".mlir")
+                    mlir_file.write_text(mlir)
+                    mlir_out, a_t, l_t = compile_pipeline(
+                        mlir_file, flags, warmup=warmup, runs_count=runs_count
+                    )
+                    llvm_ir = run_cmd(
+                        ["mlir-translate", "--mlir-to-llvmir"], input_text=mlir_out
+                    )
+                    obj = base.with_suffix(".o")
+                    exe = base.with_suffix(".out")
+                    compile_ll(llvm_ir, obj)
+                    build_executable(obj, exe)
+                    runtime_total, runtime_avg = run_exe(exe, warmup, runs_count)
+                    row = {
+                        "config": cfg_name,
+                        "size": size,
+                        "ops": ops,
+                        "bw": bw,
+                        "analysis_time_avg": a_t,
+                        "total_lowering_time_avg": l_t,
+                        "runtime_avg": runtime_avg,
+                        "runtime_total": runtime_total,
+                    }
+                    with open(csv_path, "a", newline="") as f:
+                        writer = csv.DictWriter(f, fieldnames=row.keys())
+                        if not header:
+                            writer.writeheader()
+                            header = True
+                        writer.writerow(row)
 
     file_pattern = [
         ("kalman_filter_dense.mlir", "1024"),
         ("sparse_attention_dense.mlir", "1024"),
-        ("batch_bertlike_dense.mlir", "2048"),
+        ("batch_bertlike_dense.mlir", "1024"),
         ("chain100_dense.mlir", "1024"),
     ]
 
@@ -316,46 +317,49 @@ def run_experiment(
         logger.info(f"   Flags: {' '.join(flags) if flags else 'none'}")
         logger.info("-" * 60)
         for size in sizes:
-            for file_name, original_size in file_pattern:
-                src = Path(program_dir) / file_name
-                name = f"{file_name.replace('.mlir', '')}_{size}_{bw}"
-                base = TMP_DIR / name
+            for bw in bandwidth:
+                for file_name, original_size in file_pattern:
+                    src = Path(program_dir) / file_name
+                    name = f"{file_name.replace('.mlir', '')}_{size}_{bw}"
+                    base = TMP_DIR / name
 
-                mlir_file = base.with_suffix(".mlir")
+                    mlir_file = base.with_suffix(".mlir")
 
-                replace_file_template(src, mlir_file, "X", str(bw))
-                replace_file_template(mlir_file, mlir_file, original_size, str(size))
-                replace_file_template(
-                    mlir_file, mlir_file, str(int(original_size) - 1), str(size - 1)
-                )
+                    replace_file_template(src, mlir_file, "X", str(bw))
+                    replace_file_template(
+                        mlir_file, mlir_file, original_size, str(size)
+                    )
+                    replace_file_template(
+                        mlir_file, mlir_file, str(int(original_size) - 1), str(size - 1)
+                    )
 
-                mlir_out, a_t, l_t = compile_pipeline(
-                    mlir_file, flags, warmup=warmup, runs_count=runs_count
-                )
-                llvm_ir = run_cmd(
-                    ["mlir-translate", "--mlir-to-llvmir"], input_text=mlir_out
-                )
-                obj = base.with_suffix(".o")
-                exe = base.with_suffix(".out")
-                compile_ll(llvm_ir, obj)
-                build_executable(obj, exe)
-                runtime_total, runtime_avg = run_exe(exe, warmup, runs_count)
-                row = {
-                    "config": cfg_name,
-                    "size": size,
-                    "ops": file_name.split("_dense")[0].replace("_", " "),
-                    "bw": bw,
-                    "analysis_time_avg": a_t,
-                    "total_lowering_time_avg": l_t,
-                    "runtime_avg": runtime_avg,
-                    "runtime_total": runtime_total,
-                }
-                with open(csv_path, "a", newline="") as f:
-                    writer = csv.DictWriter(f, fieldnames=row.keys())
-                    if not header:
-                        writer.writeheader()
-                        header = True
-                    writer.writerow(row)
+                    mlir_out, a_t, l_t = compile_pipeline(
+                        mlir_file, flags, warmup=warmup, runs_count=runs_count
+                    )
+                    llvm_ir = run_cmd(
+                        ["mlir-translate", "--mlir-to-llvmir"], input_text=mlir_out
+                    )
+                    obj = base.with_suffix(".o")
+                    exe = base.with_suffix(".out")
+                    compile_ll(llvm_ir, obj)
+                    build_executable(obj, exe)
+                    runtime_total, runtime_avg = run_exe(exe, warmup, runs_count)
+                    row = {
+                        "config": cfg_name,
+                        "size": size,
+                        "ops": file_name.split("_dense")[0].replace("_", " "),
+                        "bw": bw,
+                        "analysis_time_avg": a_t,
+                        "total_lowering_time_avg": l_t,
+                        "runtime_avg": runtime_avg,
+                        "runtime_total": runtime_total,
+                    }
+                    with open(csv_path, "a", newline="") as f:
+                        writer = csv.DictWriter(f, fieldnames=row.keys())
+                        if not header:
+                            writer.writeheader()
+                            header = True
+                        writer.writerow(row)
 
     return csv_path
 
