@@ -46,6 +46,20 @@ def create_comptime_plot(
         "200",
     ]
 
+    ops_names = [
+        "Kalman<br>Filter",
+        "Sparse<br>Attention",
+        "Bertlike",
+        "Chain<br>Matmul",
+        "20",
+        "30",
+        "50",
+        "100",
+        "200",
+    ]
+
+    bw_values = [0, 64, 127]
+
     components = ["total_lowering_time", "analysis_time_avg", "runtime_avg"]
     component_labels = {
         "total_lowering_time": "Compilation Time",
@@ -68,64 +82,61 @@ def create_comptime_plot(
     fig = go.Figure()
 
     n_configs = len(configs)
-    bar_width = 0.9 / n_configs
+    bar_width = 0.40
+    bw_group_width = n_configs * bar_width + 0.10
+    ops_group_width = len(bw_values) * bw_group_width + 0.3
 
+    x_centers = []
+    current_x = 0
     for ops_idx, ops in enumerate(ops_values):
-        group_center = ops_idx
+        group_center = current_x + (len(bw_values) * bw_group_width) / 2
+        x_centers.append(group_center)
 
-        for config_idx, config in enumerate(configs):
-            subset = df_processed[
-                (df_processed["config"] == config) & (df_processed["ops"] == ops)
-            ]
+        for bw_idx, bw in enumerate(bw_values):
+            bw_start = current_x + bw_idx * bw_group_width
+            for config_idx, config in enumerate(configs):
+                subset = df_processed[
+                    (df_processed["config"] == config)
+                    & (df_processed["ops"] == ops)
+                    & (df_processed["bw"] == bw)
+                ]
+                if subset.empty:
+                    continue
 
-            if subset.empty:
-                continue
+                config_label = config.replace("_", " ").title()
+                time_values = [subset[comp].values[0] for comp in components]
+                x_position = bw_start + (config_idx - n_configs/2 + 1) * bar_width
 
-            config_label = config.replace("_", " ").title()
-            time_values = [subset[comp].values[0] for comp in components]
-            x_position = group_center + (config_idx - n_configs / 2 + 0.5) * bar_width
-
-            base_value = 0
-            for comp_idx, (comp, time_val) in enumerate(zip(components, time_values)):
-                fig.add_trace(
-                    go.Bar(
-                        name=component_labels[comp],
-                        x=[x_position],
-                        y=[time_val],
-                        base=[base_value],
-                        marker_color=COLOR_PALETTE[comp],
-                        marker_line_color="black",
-                        marker_line_width=0.8,
-                        opacity=0.9,
-                        width=bar_width * 0.85,
-                        showlegend=(ops_idx == 0 and config_idx == 0),
-                        legendgroup=comp,
-                        marker_pattern_shape=pattern_map[comp],
-                        marker_pattern_solidity=0.1,
-                        hovertemplate=(
-                            f"<b>{config_label}</b><br>"
-                            + f"Benchmark: {ops}<br>"
-                            + f"<b>{component_labels[comp]}</b>: {time_val:.4f} s<br>"
-                            + f"<b>Total Time</b>: {sum(time_values):.4f} s<br>"
-                            + "<extra></extra>"
-                        ),
+                base_value = 0
+                for comp_idx, (comp, time_val) in enumerate(zip(components, time_values)):
+                    fig.add_trace(
+                        go.Bar(
+                            name=component_labels[comp],
+                            x=[x_position],
+                            y=[time_val],
+                            base=[base_value],
+                            marker_color=COLOR_PALETTE[comp],
+                            marker_line_color="black",
+                            marker_line_width=0.8,
+                            opacity=0.9,
+                            width=bar_width,# * 0.9,
+                            showlegend=(ops_idx == 0 and bw_idx == 0 and config_idx == 0),
+                            legendgroup=comp,
+                            marker_pattern_shape=pattern_map[comp],
+                            marker_pattern_solidity=0.1,
+                            hovertemplate=(
+                                f"<b>{config_label}</b><br>"
+                                + f"Benchmark: {ops}<br>"
+                                + f"Bandwidth: {bw}<br>"
+                                + f"<b>{component_labels[comp]}</b>: {time_val:.4f} s<br>"
+                                + f"<b>Total Time</b>: {sum(time_values):.4f} s<br>"
+                                + "<extra></extra>"
+                            ),
+                        )
                     )
-                )
-                base_value += time_val
+                    base_value += time_val
 
-    x_tick_positions = list(range(len(ops_values)))
-    ops_names = [
-        "Kalman<br>Filter",
-        "Sparse<br>Attention",
-        "Bertlike",
-        "Chain<br>Matmul",
-        "20",
-        "30",
-        "50",
-        "100",
-        "200",
-    ]
-    x_tick_labels = ops_names
+        current_x += ops_group_width
 
     layout_updates = {
         "title": {
@@ -149,8 +160,8 @@ def create_comptime_plot(
             },
             "tickfont": {"size": 11},
             "tickmode": "array",
-            "tickvals": x_tick_positions,
-            "ticktext": x_tick_labels,
+            "tickvals": x_centers,
+            "ticktext": ops_names,
             "gridcolor": "lightgray",
             "gridwidth": 0.5,
             "showgrid": False,
@@ -193,12 +204,11 @@ def create_comptime_plot(
             "font": {"size": 11},
         },
         "margin": {"l": 0, "r": 20, "t": 0, "b": 0},
-        "width": 700,
+        "width": 900,
         "height": 500,
     }
 
     fig.update_layout(**layout_updates)
-
     output_path = str(csv_path).split(".csv")[0]
     fig.write_html(
         f"{output_path}.html",
@@ -982,34 +992,34 @@ def create_grouped_runtime_plot(
 
 if __name__ == "__main__":
     benchmark_files = [
-        "./results/kalman_filter.csv",
+        "./270526/kalman_filter.csv",
         # "./results/kalman_filter_dia_input.csv",
-        "./results/sparse_attention.csv",
+        "./270526/sparse_attention.csv",
         # "./results/sparse_attention_dia_input.csv",
-        "./results/batch_bertlike.csv",
+        "./270526/batch_bertlike.csv",
         # "./results/batch_bertlike_dia_input.csv",
-        "./results/chain.csv",
+        "./270526/chain.csv",
         # "./results/chain_dia_input.csv",
     ]
-
-    fig = create_grouped_memory_plot(
-        csv_paths=benchmark_files,
-        output_prefix="memory_comparison",
-        figure_title="Memory Footprint Across Benchmarks",
-        show_title=False,
-        save_png_and_svg=True,
-    )
-    fig = create_grouped_runtime_plot(
-        csv_paths=benchmark_files,
-        output_prefix="runtime_comparison",
-        figure_title="Speedup Over Baseline",
-        show_title=False,
-        save_png_and_svg=True,
-    )
-
-    # fig = create_comptime_plot(
-    #     csv_path="./results/compilation_time.csv",
-    #     output_prefix="comp_time",
+    
+    # fig = create_grouped_memory_plot(
+    #     csv_paths=benchmark_files,
+    #     output_prefix="memory_comparison",
+    #     figure_title="Memory Footprint Across Benchmarks",
     #     show_title=False,
     #     save_png_and_svg=True,
     # )
+    # fig = create_grouped_runtime_plot(
+    #     csv_paths=benchmark_files,
+    #     output_prefix="runtime_comparison",
+    #     figure_title="Speedup Over Baseline",
+    #     show_title=False,
+    #     save_png_and_svg=True,
+    # )
+    #
+    fig = create_comptime_plot(
+        csv_path="./results/compilation_time.csv",
+        output_prefix="comp_time",
+        show_title=False,
+        save_png_and_svg=True,
+    )
