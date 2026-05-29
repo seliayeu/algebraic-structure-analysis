@@ -6,11 +6,11 @@ from plotly.subplots import make_subplots
 from typing import List, Dict, Optional
 
 pattern_map = {
-    "dense": "x",
-    "dia": "/",
-    "hybrid": "\\",
-    "dia-inputs": "+",
-    "hybrid-dia-inputs": "|",
+    "Dense": "x",
+    "Compressed": "/",
+    "Hybrid": "\\",
+    "Compressed-Inputs": "+",
+    "Hybrid-CI": "|",
 }
 
 
@@ -94,6 +94,8 @@ def create_comptime_plot(
 
         for bw_idx, bw in enumerate(bw_values):
             bw_start = current_x + bw_idx * bw_group_width
+            bw_center = bw_start + (n_configs * bar_width) / 2
+
             for config_idx, config in enumerate(configs):
                 subset = df_processed[
                     (df_processed["config"] == config)
@@ -105,10 +107,12 @@ def create_comptime_plot(
 
                 config_label = config.replace("_", " ").title()
                 time_values = [subset[comp].values[0] for comp in components]
-                x_position = bw_start + (config_idx - n_configs/2 + 1) * bar_width
+                x_position = bw_start + (config_idx - n_configs / 2 + 1) * bar_width
 
                 base_value = 0
-                for comp_idx, (comp, time_val) in enumerate(zip(components, time_values)):
+                for comp_idx, (comp, time_val) in enumerate(
+                    zip(components, time_values)
+                ):
                     fig.add_trace(
                         go.Bar(
                             name=component_labels[comp],
@@ -119,9 +123,10 @@ def create_comptime_plot(
                             marker_line_color="black",
                             marker_line_width=0.8,
                             opacity=0.9,
-                            width=bar_width,# * 0.9,
-                            showlegend=(ops_idx == 0 and bw_idx == 0 and config_idx == 0),
-                            legendgroup=comp,
+                            width=bar_width,
+                            showlegend=(
+                                ops_idx == 0 and bw_idx == 0 and config_idx == 0
+                            ),
                             marker_pattern_shape=pattern_map[comp],
                             marker_pattern_solidity=0.1,
                             hovertemplate=(
@@ -135,6 +140,26 @@ def create_comptime_plot(
                         )
                     )
                     base_value += time_val
+
+            bw_name = str(bw)
+            if bw_idx == 0:
+                bw_name = "(" + bw_name + ","
+            elif bw_idx == 1:
+                bw_name = bw_name + ", "
+            else:
+                bw_name = bw_name + ")"
+
+            fig.add_annotation(
+                x=bw_center,
+                y=-0.01,
+                xref="x",
+                yref="paper",
+                text=bw_name,
+                showarrow=False,
+                font=dict(family="Inter, Arial, sans-serif", size=9),
+                xanchor="center",
+                yanchor="top",
+            )
 
         current_x += ops_group_width
 
@@ -157,13 +182,11 @@ def create_comptime_plot(
                     "size": 13,
                     "weight": "normal",
                 },
+                "standoff": 50,
             },
-            "tickfont": {"size": 11},
             "tickmode": "array",
             "tickvals": x_centers,
-            "ticktext": ops_names,
-            "gridcolor": "lightgray",
-            "gridwidth": 0.5,
+            "ticktext": [""] * len(x_centers),
             "showgrid": False,
             "zeroline": False,
             "showline": True,
@@ -195,20 +218,36 @@ def create_comptime_plot(
         "plot_bgcolor": "white",
         "paper_bgcolor": "white",
         "legend": {
-            "orientation": "h",
+            "orientation": "v",
             "yanchor": "top",
-            "y": -0.16,
-            "xanchor": "center",
-            "x": 0.5,
-            "bgcolor": "rgba(255, 255, 255, 0.95)",
-            "font": {"size": 11},
+            "y": 0.98,
+            "xanchor": "left",
+            "x": 0.05,
+            "bgcolor": "rgba(255, 255, 255, 0.9)",
+            "bordercolor": "black",
+            "borderwidth": 0.8,
+            "font": {"size": 11, "family": "Inter, Arial, sans-serif"},
         },
-        "margin": {"l": 0, "r": 20, "t": 0, "b": 0},
+        "margin": {"l": 40, "r": 20, "t": 0, "b": 70},
         "width": 900,
         "height": 500,
     }
 
     fig.update_layout(**layout_updates)
+
+    for center, name in zip(x_centers, ops_names):
+        fig.add_annotation(
+            x=center,
+            y=-0.06,
+            xref="x",
+            yref="paper",
+            text=name,
+            showarrow=False,
+            font=dict(family="Inter, Arial, sans-serif", size=11),
+            xanchor="center",
+            yanchor="top",
+        )
+
     output_path = str(csv_path).split(".csv")[0]
     fig.write_html(
         f"{output_path}.html",
@@ -429,13 +468,13 @@ def create_grouped_memory_plot(
     color_palette: Optional[Dict[str, str]] = None,
 ):
     color_palette = {
-        "dia-inputs": "rgb(229,196,148)",
-        "hybrid-dia-inputs": "rgb(217,95,2)",
+        "Compressed-Inputs": "rgb(229,196,148)",
+        "Hybrid-CI": "rgb(217,95,2)",
         # "baseline": "#ef4444",
-        "baseline": "#7f7f7f",
-        "dense": "#A5B4FC",
-        "dia": "#C4B5FD",
-        "hybrid": "rgb(77,175,74)",
+        "Baseline": "#7f7f7f",
+        "Dense": "#A5B4FC",
+        "Compressed": "#C4B5FD",
+        "Hybrid": "rgb(77,175,74)",
     }
 
     n_rows = 2
@@ -502,10 +541,10 @@ def create_grouped_memory_plot(
                     x=[x_min, x_max],
                     y=[baseline_mean, baseline_mean],
                     mode="lines",
-                    name="baseline",
+                    name="Baseline",
                     legend="legend1",
-                    legendgroup="baseline",
-                    line=dict(color=color_palette["baseline"], width=2.5, dash="dash"),
+                    legendgroup="Baseline",
+                    line=dict(color=color_palette["Baseline"], width=2.5, dash="dash"),
                     hovertemplate=f"<b>baseline</b><br>Mean: {baseline_mean:.1f} MB<br><extra></extra>",
                     showlegend=(idx == 0),
                 ),
@@ -514,14 +553,14 @@ def create_grouped_memory_plot(
             )
 
         bar_configs = [
-            ("dense", ar_dense, color_palette["dense"]),
-            ("dia", ar_dia, color_palette["dia"]),
-            ("hybrid", ard_dia, color_palette["hybrid"]),
-            ("dia-inputs", ar_dia_inputs, color_palette["dia-inputs"]),
+            ("Dense", ar_dense, color_palette["Dense"]),
+            ("Compressed", ar_dia, color_palette["Compressed"]),
+            ("Hybrid", ard_dia, color_palette["Hybrid"]),
+            ("Compressed-Inputs", ar_dia_inputs, color_palette["Compressed-Inputs"]),
             (
-                "hybrid-dia-inputs",
+                "Hybrid-CI",
                 ard_dia_inputs,
-                color_palette["hybrid-dia-inputs"],
+                color_palette["Hybrid-CI"],
             ),
         ]
 
@@ -555,7 +594,13 @@ def create_grouped_memory_plot(
                         width=bar_width,
                         hovertemplate=f"<b>{name}</b><br>Bandwidth: %{{customdata}}<br>Memory: %{{y:.1f}} MB<br><extra></extra>",
                         customdata=customdata,
-                        legend="legend2",
+                        legend="legend1"
+                        if name
+                        in [
+                            "Dense",
+                            "Compressed",
+                        ]
+                        else "legend2",
                         showlegend=(idx == 0),
                         marker_pattern_shape=pattern_map[name],
                         marker_pattern_solidity=0.1,
@@ -603,7 +648,7 @@ def create_grouped_memory_plot(
 
         max_y = df["max_rss_gb"].max()
         fig.add_annotation(
-            text=" " + benchmark_name + " ",
+            text=benchmark_name,
             x=2.0,
             y=max_y * 0.9999,
             xref=f"x{idx + 1}",
@@ -617,6 +662,7 @@ def create_grouped_memory_plot(
             borderwidth=0.5,
             row=row,
             col=col,
+            borderpad=6,
         )
 
     fig.add_annotation(
@@ -657,7 +703,7 @@ def create_grouped_memory_plot(
             "yanchor": "bottom",
             "y": -0.22,
             "xanchor": "center",
-            "x": 0.5,
+            "x": 0.45,
             "font": {"family": "serif", "size": 12},
             "bgcolor": "rgba(255, 255, 255, 0.95)",
         },
@@ -666,7 +712,7 @@ def create_grouped_memory_plot(
             "yanchor": "bottom",
             "y": -0.30,
             "xanchor": "center",
-            "x": 0.5,
+            "x": 0.45,
             "font": {"family": "serif", "size": 12},
             "bgcolor": "rgba(255, 255, 255, 0.95)",
         },
@@ -709,13 +755,13 @@ def create_grouped_runtime_plot(
     color_palette: Optional[Dict[str, str]] = None,
 ):
     color_palette = {
-        "baseline": "#7f7f7f",
-        "baseline_opt": "#ef4444",
-        "dense": "#F4A460",
-        "dia": "#87CEEB",
-        "hybrid": "rgb(77,175,74)",
-        "dia-inputs": "#BDA6CE",
-        "hybrid-dia-inputs": "#6d29ff",
+        "Baseline": "#7f7f7f",
+        "Baseline_opt": "#ef4444",
+        "Dense": "#F4A460",
+        "Compressed": "#87CEEB",
+        "Hybrid": "rgb(77,175,74)",
+        "Compressed-Inputs": "#BDA6CE",
+        "Hybrid-CI": "#6d29ff",
     }
 
     n_rows = 2
@@ -779,10 +825,10 @@ def create_grouped_runtime_plot(
                 x=[x_min, x_max],
                 y=[baseline["avg_time_s"].values[0], baseline["avg_time_s"].values[0]],
                 mode="lines",
-                name="baseline",
+                name="Baseline",
                 legendgroup="baseline",
                 legend="legend1",
-                line=dict(color=color_palette["baseline"], width=2.0, dash="dash"),
+                line=dict(color=color_palette["Baseline"], width=2.0, dash="dash"),
                 hovertemplate=f"<b>baseline</b><br>Time: {baseline['avg_time_s'].values[0]:.4f} s<br><extra></extra>",
                 showlegend=(idx == 0),
             ),
@@ -798,10 +844,10 @@ def create_grouped_runtime_plot(
                     baseline_opt["avg_time_s"].values[0],
                 ],
                 mode="lines",
-                name="baseline-ikj",
+                name="Baseline-ikj",
                 legend="legend1",
                 legendgroup="baseline_opt",
-                line=dict(color=color_palette["baseline_opt"], width=2.0, dash="dot"),
+                line=dict(color=color_palette["Baseline_opt"], width=2.0, dash="dot"),
                 hovertemplate=f"<b>baseline_opt</b><br>Time: {baseline_opt['avg_time_s'].values[0]:.4f} s<br><extra></extra>",
                 showlegend=(idx == 0),
             ),
@@ -810,14 +856,14 @@ def create_grouped_runtime_plot(
         )
 
         bar_configs = [
-            ("dense", ar_dense, color_palette["dense"]),
-            ("dia", ar_dia, color_palette["dia"]),
-            ("hybrid", ard_dia, color_palette["hybrid"]),
-            ("dia-inputs", ar_dia_inputs, color_palette["dia-inputs"]),
+            ("Dense", ar_dense, color_palette["Dense"]),
+            ("Compressed", ar_dia, color_palette["Compressed"]),
+            ("Hybrid", ard_dia, color_palette["Hybrid"]),
+            ("Compressed-Inputs", ar_dia_inputs, color_palette["Compressed-Inputs"]),
             (
-                "hybrid-dia-inputs",
+                "Hybrid-CI",
                 ard_dia_inputs,
-                color_palette["hybrid-dia-inputs"],
+                color_palette["Hybrid-CI"],
             ),
         ]
 
@@ -851,7 +897,9 @@ def create_grouped_runtime_plot(
                         width=bar_width,
                         hovertemplate=f"<b>{name}</b><br>Bandwidth: %{{customdata}}<br>Time: %{{y:.4f}} s<br><extra></extra>",
                         customdata=customdata,
-                        legend="legend2",
+                        legend="legend1"
+                        if name in ["Dense", "Compressed"]
+                        else "legend2",
                         showlegend=(idx == 0),
                         marker_pattern_shape=pattern_map[name],
                         marker_pattern_solidity=0.1,
@@ -896,9 +944,8 @@ def create_grouped_runtime_plot(
         )
 
         fig.add_annotation(
-            text=" " + benchmark_name + " ",
+            text=benchmark_name,
             x=0.02,
-            # y=0.70 if benchmark_name in ["Kalman Filter", "Sparse Attention"] else 1.99,
             y=0.70,
             xref=f"x{idx + 1}",
             yref=f"y{idx + 1}",
@@ -909,6 +956,7 @@ def create_grouped_runtime_plot(
             bgcolor="rgba(255, 255, 255, 0.8)",
             bordercolor="black",
             borderwidth=0.5,
+            borderpad=6,
             row=row,
             col=col,
         )
@@ -954,6 +1002,7 @@ def create_grouped_runtime_plot(
             "x": 0.5,
             "font": {"family": "serif", "size": 12},
             "bgcolor": "rgba(255, 255, 255, 0.95)",
+            "itemwidth": 40,
         },
         legend2={
             "orientation": "h",
@@ -965,6 +1014,7 @@ def create_grouped_runtime_plot(
             "entrywidth": 0,
             "font": {"family": "serif", "size": 12},
             "bgcolor": "rgba(255, 255, 255, 0.95)",
+            "itemwidth": 40,
         },
         hovermode="closest",
         hoverlabel=dict(
@@ -1001,25 +1051,25 @@ if __name__ == "__main__":
         "./270526/chain.csv",
         # "./results/chain_dia_input.csv",
     ]
-    
-    # fig = create_grouped_memory_plot(
-    #     csv_paths=benchmark_files,
-    #     output_prefix="memory_comparison",
-    #     figure_title="Memory Footprint Across Benchmarks",
-    #     show_title=False,
-    #     save_png_and_svg=True,
-    # )
-    # fig = create_grouped_runtime_plot(
-    #     csv_paths=benchmark_files,
-    #     output_prefix="runtime_comparison",
-    #     figure_title="Speedup Over Baseline",
-    #     show_title=False,
-    #     save_png_and_svg=True,
-    # )
-    #
-    fig = create_comptime_plot(
-        csv_path="./results/compilation_time.csv",
-        output_prefix="comp_time",
+
+    fig = create_grouped_memory_plot(
+        csv_paths=benchmark_files,
+        output_prefix="memory_comparison",
+        figure_title="Memory Footprint Across Benchmarks",
         show_title=False,
         save_png_and_svg=True,
     )
+    fig = create_grouped_runtime_plot(
+        csv_paths=benchmark_files,
+        output_prefix="runtime_comparison",
+        figure_title="Speedup Over Baseline",
+        show_title=False,
+        save_png_and_svg=True,
+    )
+
+    # fig = create_comptime_plot(
+    #     csv_path="./results/compilation_time.csv",
+    #     output_prefix="comp_time",
+    #     show_title=False,
+    #     save_png_and_svg=True,
+    # )

@@ -115,7 +115,10 @@ def comptime_experiment(runs_count: int = 5):
         ("analysis_rewrite", ["--banded-analysis --banded-rewrite"]),
     ]
     result_path = comptime.run_experiment(
-        benchmark_name, configs, sizes=[128], ops_range=[20, 30, 50, 100, 200], bandwidth=[127, 64, 32, 16, 8, 0]
+        benchmark_name,
+        configs,
+        sizes=[128, 256, 512, 1024],
+        ops_range=[20, 30, 50, 100, 200],
     )
 
     figures.create_comptime_plot(
