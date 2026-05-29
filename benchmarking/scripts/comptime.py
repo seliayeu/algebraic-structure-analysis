@@ -245,7 +245,6 @@ def run_experiment(
     configs: List[Tuple[str, List[str]]],
     sizes: List[int],
     ops_range: List[int],
-    bandwidth: List[int],
     warmup: int = 1,
     runs_count: int = 5,
     program_dir="./benchmarking/programs",
@@ -254,7 +253,7 @@ def run_experiment(
     csv_path.write_text("")
     header = False
 
-    total_configs = len(configs) * len(ops_range) * len(bandwidth)
+    total_configs = len(configs) * len(ops_range) * len(sizes) * 3
     current = 0
 
     for cfg_name, flags in configs:
@@ -263,6 +262,7 @@ def run_experiment(
         logger.info(f"   Flags: {' '.join(flags) if flags else 'none'}")
         logger.info("-" * 60)
         for size in sizes:
+            bandwidth = [0, int(size / 2), size - 1]
             for bw in bandwidth:
                 for ops in ops_range:
                     current += 1
@@ -317,6 +317,7 @@ def run_experiment(
         logger.info(f"   Flags: {' '.join(flags) if flags else 'none'}")
         logger.info("-" * 60)
         for size in sizes:
+            bandwidth = [0, int(size / 2), size - 1]
             for bw in bandwidth:
                 for file_name, original_size in file_pattern:
                     src = Path(program_dir) / file_name
