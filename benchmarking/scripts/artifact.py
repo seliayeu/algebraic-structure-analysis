@@ -36,7 +36,6 @@ def kalman_filter(runs_count: int = 5):
 
 def batch_bertlike(runs_count: int = 5, plot=True):
     benchmark_name = "batch_bertlike"
-    bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
     bandwidths = [1023, 512, 256, 128, 64, 32, 16, 0]
 
     configs = [
@@ -61,7 +60,6 @@ def batch_bertlike(runs_count: int = 5, plot=True):
 
 def sparse_attention(runs_count: int = 5):
     benchmark_name = "sparse_attention"
-    bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
     bandwidths = [1023, 512, 256, 128, 64, 32, 16, 0]
 
     configs = [
@@ -86,7 +84,6 @@ def sparse_attention(runs_count: int = 5):
 
 def chained_matmul(runs_count: int = 5):
     benchmark_name = "chain"
-    bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
     bandwidths = [1023, 512, 256, 128, 64, 32, 16, 0]
 
     configs = [
@@ -117,7 +114,7 @@ def comptime_experiment(runs_count: int = 5):
     result_path = comptime.run_experiment(
         benchmark_name,
         configs,
-        sizes=[128, 256, 512, 1024],
+        sizes=[128, 256, 512, 1024, 2048],
         ops_range=[20, 30, 50, 100, 200],
     )
 
