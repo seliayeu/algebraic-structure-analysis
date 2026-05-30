@@ -31,7 +31,7 @@ LogicalResult BandedStructureAnalysis::run(Block* block) {
         if (failed(visitOperation(&op))) return failure();
 
     // backward
-    return runBackward();
+    return disableBw ? success() : runBackward();
 }
 
 LogicalResult BandedStructureAnalysis::runBackward() {
