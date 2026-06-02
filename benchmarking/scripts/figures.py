@@ -671,7 +671,7 @@ def figure11(
         df["max_rss_gb"] = df["max_rss_mb"] / 1024
 
         benchmark_name = (
-            csv_path.split("/")[-1].replace(".csv", "").replace("_", " ").title()
+            str(csv_path).split("/")[-1].replace(".csv", "").replace("_", " ").title()
         )
 
         baseline = df[df["config"] == "baseline"]
@@ -958,7 +958,7 @@ def figure12(
         df["bw"] = pd.to_numeric(df["bw"])
 
         benchmark_name = (
-            csv_path.split("/")[-1].replace(".csv", "").replace("_", " ").title()
+            str(csv_path).split("/")[-1].replace(".csv", "").replace("_", " ").title()
         )
 
         baseline = df[df["config"] == "baseline"]
