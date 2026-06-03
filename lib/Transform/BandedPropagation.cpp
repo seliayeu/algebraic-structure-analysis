@@ -278,7 +278,7 @@ struct BandedAnalysisPass : public impl::BandedAnalysisBase<BandedAnalysisPass> 
 #endif
         auto funcOp{ getOperation() };
         auto* context{ funcOp->getContext() };
-        BandedStructureAnalysis BSA(detectDIA);
+        BandedStructureAnalysis BSA(detectDIA, disableBw);
 
         for (auto& block : funcOp.getBody()) (void)BSA.run(&block);
 

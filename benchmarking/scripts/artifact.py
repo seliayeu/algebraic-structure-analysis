@@ -8,6 +8,7 @@ from pathlib import Path
 import figures
 import comptime
 import bench
+import attention_prop
 
 
 def kalman_filter(runs_count: int = 5) -> str:
@@ -119,6 +120,20 @@ def chained_matmul(runs_count: int = 5) -> str:
     return result_path
 
 
+def attention_propagation(runs_count: int = 5):
+    from pathlib import Path
+    RESULT_DIR = Path("./results")
+    RESULT_DIR.mkdir(parents=True, exist_ok=True)
+    csv_path = RESULT_DIR / "attention_sparsity.csv"
+    csv_path.write_text("")
+
+    hw = False
+    for lb in [3, 256, 512, 1023]:
+        hw = attention_prop.run(N=1024, lb=lb, ub=0, csv_path=csv_path, header_written=hw)
+
+    return csv_path
+
+
 def comptime_experiment(runs_count: int = 5) -> str:
     benchmark_name = "compilation_time"
     configs = [
@@ -151,7 +166,7 @@ if __name__ == "__main__":
         "--benchmark",
         type=str,
         help="Comma-separated list of benchmarks",
-        default="kalman_filter,sparse_attention,batch_bertlike,chain,comptime",
+        default="kalman_filter,sparse_attention,batch_bertlike,chain,attention_prop,comptime",
     )
 
     parser.add_argument(
@@ -168,6 +183,7 @@ if __name__ == "__main__":
         "batch_bertlike": batch_bertlike,
         "chain": chained_matmul,
         "sparse_attention": sparse_attention,
+        "attention_prop": attention_propagation,
         "comptime": comptime_experiment,
         "bench_chain": stur_chain,
     }
@@ -213,6 +229,7 @@ if __name__ == "__main__":
 
     if "comptime" in benchmark_files:
         comptime_csv = benchmark_files["comptime"]
+        attention_prop_csv = benchmark_files["attention_prop"]
 
         print("Building Figure 14...")
         figures.figure14(
@@ -221,5 +238,5 @@ if __name__ == "__main__":
 
         print("Building Figure 15...")
         figures.figure15(
-            csv_path=comptime_csv,
+            csv_path=attention_prop_csv,
         )
