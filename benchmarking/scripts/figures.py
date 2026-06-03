@@ -15,7 +15,7 @@ pattern_map = {
 }
 
 
-def figure15(
+def figure14(
     csv_path="./results/compilation_time.csv",
     output_prefix="comp_time_vs_size",
     figure_title: str = "Compilation Time by Matrix Size",
@@ -171,19 +171,19 @@ def figure15(
         hovermode="closest",
     )
 
-    dir_path = Path("./results/Figure 15")
+    dir_path = Path("./results/Figure 14")
     dir_path.mkdir(parents=True, exist_ok=True)
 
-    output_path = f"./results/Figure 15/{output_prefix}"
+    output_path = "./results/Figure 14/comptime_vs_size"
     fig.write_html(f"{output_path}.html")
     if save_png_and_svg:
-        fig.write_image(f"{output_path}.svg", width=550, height=410)
-        fig.write_image(f"{output_path}.png", width=550, height=410, scale=2)
+        fig.write_image(f"{output_path}.svg", width=550, height=300)
+        fig.write_image(f"{output_path}.png", width=550, height=300, scale=2)
     fig.show()
     return fig
 
 
-def figure14(
+def figure13(
     csv_path="./results/compilation_time.csv",
     output_prefix="comp_time",
     figure_title: str = "Compilation Time Breakdown by Component",
@@ -417,10 +417,10 @@ def figure14(
             yanchor="top",
         )
 
-    dir_path = Path("./results/Figure 14")
+    dir_path = Path("./results/Figure 13")
     dir_path.mkdir(parents=True, exist_ok=True)
 
-    output_path = "./results/Figure 14/" + str(csv_path).split(".csv")[0]
+    output_path = "./results/Figure 13/compilation_time"
     fig.write_html(
         f"{output_path}.html",
         config={
@@ -430,8 +430,8 @@ def figure14(
         },
     )
     if save_png_and_svg:
-        fig.write_image(f"{output_path}.svg", width=550, height=410)
-        fig.write_image(f"{output_path}.png", width=550, height=410, scale=2)
+        fig.write_image(f"{output_path}.svg", width=550, height=300)
+        fig.write_image(f"{output_path}.png", width=550, height=300, scale=2)
 
     fig.show()
     return fig
@@ -607,7 +607,7 @@ def figure10(
     dir_path = Path("./results/Figure 10")
     dir_path.mkdir(parents=True, exist_ok=True)
 
-    output_path = os.path.join(results_dir + "Figure 10", output_prefix)
+    output_path = os.path.join(results_dir + "Figure10", output_prefix)
 
     fig.write_html(
         f"{output_path}.html",
@@ -1245,13 +1245,13 @@ if __name__ == "__main__":
     #     save_png_and_svg=True,
     # )
 
-    # fig = create_comptime_plot(
-    #     csv_path="./290526/compilation_time.csv",
-    #     output_prefix="comp_time",
-    #     show_title=False,
-    #     save_png_and_svg=True,
-    # )
-    fig = figure15(
+    fig = figure13(
+        csv_path="./290526/compilation_time.csv",
+        output_prefix="comp_time",
+        show_title=False,
+        save_png_and_svg=True,
+    )
+    fig = figure14(
         csv_path="./300526/compilation_time.csv",
         output_prefix="comp_time_vs_size",
         show_title=False,
