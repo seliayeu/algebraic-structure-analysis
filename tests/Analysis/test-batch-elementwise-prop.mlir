@@ -60,11 +60,7 @@ module {
     %empty = tensor.empty() : tensor<2x4x4xf32>
 
     // CHECK: dia.batch_matmul
-<<<<<<< Updated upstream
     // CHECK-SAME: metadata = {dia = true, lowerBw = 0 : i64, propertyDims = [1, 2], upperBw = 1 : i64}
-=======
-    // CHECK-SAME: metadata = {dia = true, lowerBw = 1 : i64, propertyDims = [1, 2], upperBw = 1 : i64}
->>>>>>> Stashed changes
     %O1 = dia.batch_matmul ins(%A, %B : tensor<2x4x4xf32>, tensor<2x4x4xf32>)
                               outs(%empty : tensor<2x4x4xf32>) -> tensor<2x4x4xf32>
     // CHECK: dia.elementwise
