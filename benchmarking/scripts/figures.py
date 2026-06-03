@@ -3,10 +3,187 @@ import os
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from typing import List, Dict, Optional
+from typing import List
+from pathlib import Path
+
+pattern_map = {
+    "Dense": "x",
+    "Compressed": "/",
+    "Hybrid": "\\",
+    "Compressed-Inputs": "+",
+    "Hybrid-CI": "|",
+}
 
 
-def create_comptime_plot(
+def figure14(
+    csv_path="./results/compilation_time.csv",
+    output_prefix="comp_time_vs_size",
+    figure_title: str = "Compilation Time by Matrix Size",
+    show_title: bool = True,
+    save_png_and_svg: bool = True,
+):
+    df = pd.read_csv(csv_path)
+
+    # Filter rows where bw == size/2 and ops == "200"
+    # df_filtered = df[(df["bw"] == df["size"] / 2) & (df["ops"] == "200")].copy()
+    df_filtered = df[(df["bw"] == 0) & (df["ops"] == "chain100")].copy()
+    if df_filtered.empty:
+        print("No data for bw == size/2 and ops == 200")
+        return
+
+    df_filtered["true_lowering"] = (
+        df_filtered["total_lowering_time_avg"] - df_filtered["analysis_time_avg"]
+    )
+    df_filtered["true_lowering"] = df_filtered["true_lowering"].clip(lower=0)
+
+    target_sizes = list(df_filtered["size"].unique())
+    df_filtered = df_filtered[df_filtered["size"].isin(target_sizes)]
+
+    grouped = (
+        df_filtered.groupby("size")
+        .agg(
+            analysis=("analysis_time_avg", "mean"),
+            lowering=("true_lowering", "mean"),
+            runtime=("runtime_avg", "mean"),
+        )
+        .reset_index()
+    )
+
+    grouped = (
+        grouped.set_index("size").reindex(target_sizes, fill_value=0).reset_index()
+    )
+    grouped.columns = ["size", "analysis", "lowering", "runtime"]
+
+    x_labels = [str(s) for s in target_sizes]
+
+    fig = go.Figure()
+
+    pattern_map = {
+        "analysis": "x",
+        "lowering": "/",
+        "runtime": "\\",
+    }
+
+    fig.add_trace(
+        go.Bar(
+            x=x_labels,
+            y=grouped["analysis"],
+            name="Analysis Time",
+            marker_color="#e99575",
+            marker_line_color="black",
+            marker_line_width=0.8,
+            opacity=0.9,
+            width=0.23,
+            marker_pattern_shape=pattern_map["analysis"],
+            marker_pattern_solidity=0.15,
+            hovertemplate="Size: %{x}<br>Analysis: %{y:.4f} s<extra></extra>",
+        )
+    )
+
+    fig.add_trace(
+        go.Bar(
+            x=x_labels,
+            y=grouped["lowering"],
+            name="Compilation Time",
+            marker_color="#88CCEE",
+            marker_line_color="black",
+            marker_line_width=0.8,
+            opacity=0.9,
+            width=0.23,
+            marker_pattern_shape=pattern_map["lowering"],
+            marker_pattern_solidity=0.15,
+            hovertemplate="Size: %{x}<br>Lowering: %{y:.4f} s<extra></extra>",
+        )
+    )
+
+    fig.add_trace(
+        go.Bar(
+            x=x_labels,
+            y=grouped["runtime"],
+            name="Runtime",
+            marker_color="#71b5a0",
+            marker_line_color="black",
+            marker_line_width=0.8,
+            opacity=0.9,
+            width=0.23,
+            marker_pattern_shape=pattern_map["runtime"],
+            marker_pattern_solidity=0.15,
+            hovertemplate="Size: %{x}<br>Runtime: %{y:.4f} s<extra></extra>",
+        )
+    )
+
+    fig.update_layout(
+        title=dict(
+            text=figure_title if show_title else None,
+            font=dict(size=20, family="Inter, Arial, sans-serif", weight="bold"),
+            x=0.5,
+            xanchor="center",
+        ),
+        xaxis=dict(
+            title=dict(
+                text="<b>Matrix Size</b>",
+                font=dict(family="Inter, Arial, sans-serif", size=13),
+            ),
+            tickfont=dict(size=11),
+            tickmode="array",
+            tickvals=x_labels,
+            ticktext=x_labels,
+            type="category",
+            showgrid=False,
+            zeroline=False,
+            showline=True,
+            linewidth=0.5,
+            linecolor="black",
+            mirror=True,
+        ),
+        yaxis=dict(
+            type="log",
+            title=dict(
+                text="<b>Time (seconds) - Log Scale</b>",
+                font=dict(family="Inter, Arial, sans-serif", size=13),
+            ),
+            tickfont=dict(size=11),
+            showgrid=False,
+            zeroline=False,
+            showline=True,
+            linewidth=0.5,
+            linecolor="black",
+            mirror=True,
+        ),
+        barmode="group",
+        bargroupgap=0.02,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=0.98,
+            xanchor="left",
+            x=0.02,
+            bgcolor="rgba(255,255,255,0.9)",
+            bordercolor="black",
+            borderwidth=0.8,
+            font=dict(size=11, family="Inter, Arial, sans-serif"),
+        ),
+        margin=dict(l=50, r=20, t=0, b=50),
+        width=700,
+        height=500,
+        hovermode="closest",
+    )
+
+    dir_path = Path("./results/Figure 14")
+    dir_path.mkdir(parents=True, exist_ok=True)
+
+    output_path = "./results/Figure 14/comptime_vs_size"
+    fig.write_html(f"{output_path}.html")
+    if save_png_and_svg:
+        fig.write_image(f"{output_path}.svg", width=550, height=300)
+        fig.write_image(f"{output_path}.png", width=550, height=300, scale=2)
+    fig.show()
+    return fig
+
+
+def figure13(
     csv_path="./results/compilation_time.csv",
     output_prefix="comp_time",
     figure_title: str = "Compilation Time Breakdown by Component",
@@ -38,6 +215,20 @@ def create_comptime_plot(
         "200",
     ]
 
+    ops_names = [
+        "Kalman<br>Filter",
+        "Sparse<br>Attention",
+        "Bertlike",
+        "Chain<br>Matmul",
+        "20",
+        "30",
+        "50",
+        "100",
+        "200",
+    ]
+
+    bw_values = [0, 64, 127]
+
     components = ["total_lowering_time", "analysis_time_avg", "runtime_avg"]
     component_labels = {
         "total_lowering_time": "Compilation Time",
@@ -51,65 +242,95 @@ def create_comptime_plot(
         "runtime_avg": "#71b5a0",
     }
 
+    pattern_map = {
+        "total_lowering_time": "x",
+        "analysis_time_avg": "/",
+        "runtime_avg": "\\",
+    }
+
     fig = go.Figure()
 
     n_configs = len(configs)
-    bar_width = 0.9 / n_configs
+    bar_width = 0.40
+    bw_group_width = n_configs * bar_width + 0.10
+    ops_group_width = len(bw_values) * bw_group_width + 0.3
 
+    x_centers = []
+    current_x = 0
     for ops_idx, ops in enumerate(ops_values):
-        group_center = ops_idx
+        group_center = current_x + (len(bw_values) * bw_group_width) / 2
+        x_centers.append(group_center)
 
-        for config_idx, config in enumerate(configs):
-            subset = df_processed[
-                (df_processed["config"] == config) & (df_processed["ops"] == ops)
-            ]
+        for bw_idx, bw in enumerate(bw_values):
+            bw_start = current_x + bw_idx * bw_group_width
+            bw_center = bw_start + (n_configs * bar_width) / 2
 
-            if subset.empty:
-                continue
+            for config_idx, config in enumerate(configs):
+                subset = df_processed[
+                    (df_processed["config"] == config)
+                    & (df_processed["ops"] == ops)
+                    & (df_processed["bw"] == bw)
+                ]
+                if subset.empty:
+                    continue
 
-            config_label = config.replace("_", " ").title()
-            time_values = [subset[comp].values[0] for comp in components]
-            x_position = group_center + (config_idx - n_configs / 2 + 0.5) * bar_width
+                config_label = config.replace("_", " ").title()
+                time_values = [subset[comp].values[0] for comp in components]
+                x_position = bw_start + (config_idx - n_configs / 2 + 1) * bar_width
 
-            base_value = 0
-            for comp_idx, (comp, time_val) in enumerate(zip(components, time_values)):
-                fig.add_trace(
-                    go.Bar(
-                        name=component_labels[comp],
-                        x=[x_position],
-                        y=[time_val],
-                        base=[base_value],
-                        marker_color=COLOR_PALETTE[comp],
-                        marker_line_color="black",
-                        marker_line_width=0.8,
-                        opacity=0.9,
-                        width=bar_width * 0.85,
-                        showlegend=(ops_idx == 0 and config_idx == 0),
-                        legendgroup=comp,
-                        hovertemplate=(
-                            f"<b>{config_label}</b><br>"
-                            + f"Benchmark: {ops}<br>"
-                            + f"<b>{component_labels[comp]}</b>: {time_val:.4f} s<br>"
-                            + f"<b>Total Time</b>: {sum(time_values):.4f} s<br>"
-                            + "<extra></extra>"
-                        ),
+                base_value = 0
+                for comp_idx, (comp, time_val) in enumerate(
+                    zip(components, time_values)
+                ):
+                    fig.add_trace(
+                        go.Bar(
+                            name=component_labels[comp],
+                            x=[x_position],
+                            y=[time_val],
+                            base=[base_value],
+                            marker_color=COLOR_PALETTE[comp],
+                            marker_line_color="black",
+                            marker_line_width=0.8,
+                            opacity=0.9,
+                            width=bar_width,
+                            showlegend=(
+                                ops_idx == 0 and bw_idx == 0 and config_idx == 0
+                            ),
+                            marker_pattern_shape=pattern_map[comp],
+                            marker_pattern_solidity=0.1,
+                            hovertemplate=(
+                                f"<b>{config_label}</b><br>"
+                                + f"Benchmark: {ops}<br>"
+                                + f"Bandwidth: {bw}<br>"
+                                + f"<b>{component_labels[comp]}</b>: {time_val:.4f} s<br>"
+                                + f"<b>Total Time</b>: {sum(time_values):.4f} s<br>"
+                                + "<extra></extra>"
+                            ),
+                        )
                     )
-                )
-                base_value += time_val
+                    base_value += time_val
 
-    x_tick_positions = list(range(len(ops_values)))
-    ops_names = [
-        "Kalman<br>Filter",
-        "Sparse<br>Attention",
-        "Bertlike",
-        "Chain<br>Matmul",
-        "20",
-        "30",
-        "50",
-        "100",
-        "200",
-    ]
-    x_tick_labels = ops_names
+            bw_name = str(bw)
+            if bw_idx == 0:
+                bw_name = "(" + bw_name + ","
+            elif bw_idx == 1:
+                bw_name = bw_name + ", "
+            else:
+                bw_name = bw_name + ")"
+
+            fig.add_annotation(
+                x=bw_center,
+                y=-0.01,
+                xref="x",
+                yref="paper",
+                text=bw_name,
+                showarrow=False,
+                font=dict(family="Inter, Arial, sans-serif", size=9),
+                xanchor="center",
+                yanchor="top",
+            )
+
+        current_x += ops_group_width
 
     layout_updates = {
         "title": {
@@ -130,13 +351,11 @@ def create_comptime_plot(
                     "size": 13,
                     "weight": "normal",
                 },
+                "standoff": 50,
             },
-            "tickfont": {"size": 11},
             "tickmode": "array",
-            "tickvals": x_tick_positions,
-            "ticktext": x_tick_labels,
-            "gridcolor": "lightgray",
-            "gridwidth": 0.5,
+            "tickvals": x_centers,
+            "ticktext": [""] * len(x_centers),
             "showgrid": False,
             "zeroline": False,
             "showline": True,
@@ -168,22 +387,40 @@ def create_comptime_plot(
         "plot_bgcolor": "white",
         "paper_bgcolor": "white",
         "legend": {
-            "orientation": "h",
+            "orientation": "v",
             "yanchor": "top",
-            "y": -0.16,
-            "xanchor": "center",
-            "x": 0.5,
-            "bgcolor": "rgba(255, 255, 255, 0.95)",
-            "font": {"size": 11},
+            "y": 0.98,
+            "xanchor": "left",
+            "x": 0.05,
+            "bgcolor": "rgba(255, 255, 255, 0.9)",
+            "bordercolor": "black",
+            "borderwidth": 0.8,
+            "font": {"size": 11, "family": "Inter, Arial, sans-serif"},
         },
-        "margin": {"l": 0, "r": 20, "t": 0, "b": 0},
-        "width": 700,
+        "margin": {"l": 40, "r": 20, "t": 0, "b": 70},
+        "width": 900,
         "height": 500,
     }
 
     fig.update_layout(**layout_updates)
 
-    output_path = str(csv_path).split(".csv")[0]
+    for center, name in zip(x_centers, ops_names):
+        fig.add_annotation(
+            x=center,
+            y=-0.06,
+            xref="x",
+            yref="paper",
+            text=name,
+            showarrow=False,
+            font=dict(family="Inter, Arial, sans-serif", size=11),
+            xanchor="center",
+            yanchor="top",
+        )
+
+    dir_path = Path("./results/Figure 13")
+    dir_path.mkdir(parents=True, exist_ok=True)
+
+    output_path = "./results/Figure 13/compilation_time"
     fig.write_html(
         f"{output_path}.html",
         config={
@@ -193,14 +430,14 @@ def create_comptime_plot(
         },
     )
     if save_png_and_svg:
-        fig.write_image(f"{output_path}.svg", width=550, height=410)
-        fig.write_image(f"{output_path}.png", width=550, height=410, scale=2)
+        fig.write_image(f"{output_path}.svg", width=550, height=300)
+        fig.write_image(f"{output_path}.png", width=550, height=300, scale=2)
 
     fig.show()
     return fig
 
 
-def compare_symbolic_chained(
+def figure10(
     results_dir="./results",
     output_prefix="symbolic_chained_comparison",
     figure_title: str = "Symbolic Analysis Time vs Number of Matmuls",
@@ -208,10 +445,6 @@ def compare_symbolic_chained(
     show_title: bool = True,
     save_png_and_svg: bool = True,
 ):
-    """
-    Create performance analysis plot comparing averaged BPA, STUR, and SparTA
-    symbolic execution times for chained matmuls.
-    """
 
     dia_path = os.path.join(results_dir, "symbolic_chained_dia.csv")
     linalg_path = os.path.join(results_dir, "symbolic_chained_linalg.csv")
@@ -371,7 +604,10 @@ def compare_symbolic_chained(
         type="log" if log else "linear",
     )
 
-    output_path = os.path.join(results_dir, output_prefix)
+    dir_path = Path("./results/Figure 10")
+    dir_path.mkdir(parents=True, exist_ok=True)
+
+    output_path = os.path.join(results_dir + "Figure10", output_prefix)
 
     fig.write_html(
         f"{output_path}.html",
@@ -394,24 +630,25 @@ def compare_symbolic_chained(
     return fig
 
 
-def create_grouped_memory_plot(
+def figure11(
     csv_paths: List[str],
     output_prefix: str = "memory_consumption",
     figure_title: str = "Bandwidth Memory Consumption",
     show_title: bool = True,
     save_png_and_svg: bool = True,
-    color_palette: Optional[Dict[str, str]] = None,
 ):
-    if color_palette is None:
-        color_palette = {
-            "baseline": "#ef4444",
-            "bpa-dense": "#A5B4FC",
-            "bpa-dia": "#C4B5FD",
-            "bpa-hybrid": "#6EE7B7",
-        }
+    color_palette = {
+        "Compressed-Inputs": "rgb(229,196,148)",
+        "Hybrid-CI": "rgb(217,95,2)",
+        # "baseline": "#ef4444",
+        "Baseline": "#7f7f7f",
+        "Dense": "#A5B4FC",
+        "Compressed": "#C4B5FD",
+        "Hybrid": "rgb(77,175,74)",
+    }
 
     n_rows = 2
-    n_cols = 4
+    n_cols = 2
 
     fig = make_subplots(
         rows=n_rows,
@@ -434,39 +671,50 @@ def create_grouped_memory_plot(
         df["max_rss_gb"] = df["max_rss_mb"] / 1024
 
         benchmark_name = (
-            csv_path.split("/")[-1].replace(".csv", "").replace("_", " ").title()
+            str(csv_path).split("/")[-1].replace(".csv", "").replace("_", " ").title()
         )
 
         baseline = df[df["config"] == "baseline"]
+
         ar_dense = df[
             (df["config"] == "AR") & (df["file_name"].str.contains("dense", na=False))
         ]
         ar_dia = df[
-            (df["config"] == "AR") & (df["file_name"].str.contains("dia", na=False))
+            (df["config"] == "AR")
+            & (df["file_name"].str.contains("dia.mlir", na=False))
         ]
         ard_dia = df[
-            (df["config"] == "ADR") & (df["file_name"].str.contains("dia", na=False))
+            (df["config"] == "ADR")
+            & (df["file_name"].str.contains("dia.mlir", na=False))
+        ]
+        ar_dia_inputs = df[
+            (df["config"] == "AR")
+            & (df["file_name"].str.contains("dia_inputs.mlir", na=False))
+        ]
+        ard_dia_inputs = df[
+            (df["config"] == "ADR")
+            & (df["file_name"].str.contains("dia_inputs.mlir", na=False))
         ]
 
+        group_space = 1.5
         bw_values = sorted(df["bw"].unique())
         n_bandwidths = len(bw_values)
-
-        x_positions = list(range(n_bandwidths))
 
         if not baseline.empty:
             baseline_mean = baseline["max_rss_gb"].mean()
 
             x_min = -0.5
-            x_max = n_bandwidths - 0.5
+            x_max = group_space * n_bandwidths - 0.65
 
             fig.add_trace(
                 go.Scatter(
                     x=[x_min, x_max],
                     y=[baseline_mean, baseline_mean],
                     mode="lines",
-                    name="baseline",
-                    legendgroup="baseline",
-                    line=dict(color=color_palette["baseline"], width=2.5, dash="dash"),
+                    name="Baseline",
+                    legend="legend1",
+                    legendgroup="Baseline",
+                    line=dict(color=color_palette["Baseline"], width=2.5, dash="dash"),
                     hovertemplate=f"<b>baseline</b><br>Mean: {baseline_mean:.1f} MB<br><extra></extra>",
                     showlegend=(idx == 0),
                 ),
@@ -475,9 +723,15 @@ def create_grouped_memory_plot(
             )
 
         bar_configs = [
-            ("bpa-dense", ar_dense, color_palette["bpa-dense"]),
-            ("bpa-dia", ar_dia, color_palette["bpa-dia"]),
-            ("bpa-hybrid", ard_dia, color_palette["bpa-hybrid"]),
+            ("Dense", ar_dense, color_palette["Dense"]),
+            ("Compressed", ar_dia, color_palette["Compressed"]),
+            ("Hybrid", ard_dia, color_palette["Hybrid"]),
+            ("Compressed-Inputs", ar_dia_inputs, color_palette["Compressed-Inputs"]),
+            (
+                "Hybrid-CI",
+                ard_dia_inputs,
+                color_palette["Hybrid-CI"],
+            ),
         ]
 
         for config_idx, (name, data, color) in enumerate(bar_configs):
@@ -492,7 +746,7 @@ def create_grouped_memory_plot(
 
             for bw_idx, bw in enumerate(bw_values):
                 if bw in bw_to_memory:
-                    x_pos.append(bw_idx + (config_idx - 1) * bar_width)
+                    x_pos.append(bw_idx * group_space + (config_idx - 1) * bar_width)
                     y_values.append(bw_to_memory[bw])
                     customdata.append(bw)
 
@@ -510,13 +764,22 @@ def create_grouped_memory_plot(
                         width=bar_width,
                         hovertemplate=f"<b>{name}</b><br>Bandwidth: %{{customdata}}<br>Memory: %{{y:.1f}} MB<br><extra></extra>",
                         customdata=customdata,
+                        legend="legend1"
+                        if name
+                        in [
+                            "Dense",
+                            "Compressed",
+                        ]
+                        else "legend2",
                         showlegend=(idx == 0),
+                        marker_pattern_shape=pattern_map[name],
+                        marker_pattern_solidity=0.1,
                     ),
                     row=row,
                     col=col,
                 )
 
-        tick_positions = x_positions
+        tick_positions = [i * group_space for i in range(n_bandwidths)]
         tick_labels = [str(bw) for bw in bw_values]
 
         fig.update_xaxes(
@@ -555,7 +818,7 @@ def create_grouped_memory_plot(
 
         max_y = df["max_rss_gb"].max()
         fig.add_annotation(
-            text=" " + benchmark_name + " ",
+            text=benchmark_name,
             x=2.0,
             y=max_y * 0.9999,
             xref=f"x{idx + 1}",
@@ -569,6 +832,7 @@ def create_grouped_memory_plot(
             borderwidth=0.5,
             row=row,
             col=col,
+            borderpad=6,
         )
 
     fig.add_annotation(
@@ -576,7 +840,7 @@ def create_grouped_memory_plot(
         xref="paper",
         yref="paper",
         x=0.5,
-        y=-0.10,
+        y=-0.11,
         xanchor="center",
         yanchor="middle",
         showarrow=False,
@@ -604,13 +868,21 @@ def create_grouped_memory_plot(
             "xanchor": "center",
         },
         showlegend=True,
-        legend={
+        legend1={
             "orientation": "h",
             "yanchor": "bottom",
-            "y": -0.19,
+            "y": -0.22,
             "xanchor": "center",
-            "x": 0.4,
-            "title": {"font": {"family": "serif", "size": 9}},
+            "x": 0.45,
+            "font": {"family": "serif", "size": 12},
+            "bgcolor": "rgba(255, 255, 255, 0.95)",
+        },
+        legend2={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": -0.30,
+            "xanchor": "center",
+            "x": 0.45,
             "font": {"family": "serif", "size": 12},
             "bgcolor": "rgba(255, 255, 255, 0.95)",
         },
@@ -627,7 +899,10 @@ def create_grouped_memory_plot(
         margin=dict(t=0, b=0, l=40, r=20),
     )
 
-    output_path = "./results/memory_comparison"
+    dir_path = Path("./results/Figure 11")
+    dir_path.mkdir(parents=True, exist_ok=True)
+
+    output_path = "./results/Figure 11/memory_comparison"
     fig.write_html(
         f"{output_path}.html",
         config={
@@ -644,24 +919,25 @@ def create_grouped_memory_plot(
     return fig
 
 
-def create_grouped_runtime_plot(
+def figure12(
     csv_paths: List[str],
     output_prefix: str = "timing_comparison",
     figure_title: str = "Average Runtime Comparison",
     show_title: bool = True,
     save_png_and_svg: bool = True,
-    color_palette: Optional[Dict[str, str]] = None,
 ):
-    if color_palette is None:
-        color_palette = {
-            "baseline": "#ef4444",
-            "bpa-dense": "#F4A460",
-            "bpa-dia": "#87CEEB",
-            "bpa-hybrid": "#98FB98",
-        }
+    color_palette = {
+        "Baseline": "#7f7f7f",
+        "Baseline_opt": "#ef4444",
+        "Dense": "#F4A460",
+        "Compressed": "#87CEEB",
+        "Hybrid": "rgb(77,175,74)",
+        "Compressed-Inputs": "#BDA6CE",
+        "Hybrid-CI": "#6d29ff",
+    }
 
     n_rows = 2
-    n_cols = 4
+    n_cols = 2
 
     fig = make_subplots(
         rows=n_rows,
@@ -682,59 +958,85 @@ def create_grouped_runtime_plot(
         df["bw"] = pd.to_numeric(df["bw"])
 
         benchmark_name = (
-            csv_path.split("/")[-1].replace(".csv", "").replace("_", " ").title()
+            str(csv_path).split("/")[-1].replace(".csv", "").replace("_", " ").title()
         )
 
         baseline = df[df["config"] == "baseline"]
+        baseline_opt = df[(df["config"] == "baseline_opt")]
+
         ar_dense = df[
             (df["config"] == "AR") & (df["file_name"].str.contains("dense", na=False))
         ]
         ar_dia = df[
-            (df["config"] == "AR") & (df["file_name"].str.contains("dia", na=False))
+            (df["config"] == "AR")
+            & (df["file_name"].str.contains("dia.mlir", na=False))
         ]
         ard_dia = df[
-            (df["config"] == "ADR") & (df["file_name"].str.contains("dia", na=False))
+            (df["config"] == "ADR")
+            & (df["file_name"].str.contains("dia.mlir", na=False))
+        ]
+        ar_dia_inputs = df[
+            (df["config"] == "AR")
+            & (df["file_name"].str.contains("dia_inputs.mlir", na=False))
+        ]
+        ard_dia_inputs = df[
+            (df["config"] == "ADR")
+            & (df["file_name"].str.contains("dia_inputs.mlir", na=False))
         ]
 
         bw_values = sorted(df["bw"].unique())
         n_bandwidths = len(bw_values)
 
-        x_positions = list(range(n_bandwidths))
+        group_space = 1.5
+        x_min = -0.5
+        x_max = group_space * n_bandwidths - 0.65
 
-        if not baseline.empty:
-            baseline_times = []
-            baseline_bws = []
-            for bw in bw_values:
-                baseline_subset = baseline[baseline["bw"] == bw]
-                if not baseline_subset.empty:
-                    baseline_bws.append(bw)
-                    baseline_times.append(baseline_subset["avg_time_s"].values[0])
-
-            if baseline_times:
-                x_min = -0.5
-                x_max = n_bandwidths - 0.5
-
-                fig.add_trace(
-                    go.Scatter(
-                        x=[x_min, x_max],
-                        y=[baseline_times[0], baseline_times[0]],
-                        mode="lines",
-                        name="baseline",
-                        legendgroup="baseline",
-                        line=dict(
-                            color=color_palette["baseline"], width=2.0, dash="dash"
-                        ),
-                        hovertemplate=f"<b>baseline</b><br>Time: {baseline_times[0]:.4f} s<br><extra></extra>",
-                        showlegend=(idx == 0),
-                    ),
-                    row=row,
-                    col=col,
-                )
+        # baseline
+        fig.add_trace(
+            go.Scatter(
+                x=[x_min, x_max],
+                y=[baseline["avg_time_s"].values[0], baseline["avg_time_s"].values[0]],
+                mode="lines",
+                name="Baseline",
+                legendgroup="baseline",
+                legend="legend1",
+                line=dict(color=color_palette["Baseline"], width=2.0, dash="dash"),
+                hovertemplate=f"<b>baseline</b><br>Time: {baseline['avg_time_s'].values[0]:.4f} s<br><extra></extra>",
+                showlegend=(idx == 0),
+            ),
+            row=row,
+            col=col,
+        )
+        # baseline opt
+        fig.add_trace(
+            go.Scatter(
+                x=[x_min, x_max],
+                y=[
+                    baseline_opt["avg_time_s"].values[0],
+                    baseline_opt["avg_time_s"].values[0],
+                ],
+                mode="lines",
+                name="Baseline-ikj",
+                legend="legend1",
+                legendgroup="baseline_opt",
+                line=dict(color=color_palette["Baseline_opt"], width=2.0, dash="dot"),
+                hovertemplate=f"<b>baseline_opt</b><br>Time: {baseline_opt['avg_time_s'].values[0]:.4f} s<br><extra></extra>",
+                showlegend=(idx == 0),
+            ),
+            row=row,
+            col=col,
+        )
 
         bar_configs = [
-            ("bpa-dense", ar_dense, color_palette["bpa-dense"]),
-            ("bpa-dia", ar_dia, color_palette["bpa-dia"]),
-            ("bpa-hybrid", ard_dia, color_palette["bpa-hybrid"]),
+            ("Dense", ar_dense, color_palette["Dense"]),
+            ("Compressed", ar_dia, color_palette["Compressed"]),
+            ("Hybrid", ard_dia, color_palette["Hybrid"]),
+            ("Compressed-Inputs", ar_dia_inputs, color_palette["Compressed-Inputs"]),
+            (
+                "Hybrid-CI",
+                ard_dia_inputs,
+                color_palette["Hybrid-CI"],
+            ),
         ]
 
         for config_idx, (name, data, color) in enumerate(bar_configs):
@@ -749,7 +1051,7 @@ def create_grouped_runtime_plot(
 
             for bw_idx, bw in enumerate(bw_values):
                 if bw in bw_to_time:
-                    x_pos.append(bw_idx + (config_idx - 1) * bar_width)
+                    x_pos.append(bw_idx * group_space + (config_idx - 1) * bar_width)
                     y_values.append(bw_to_time[bw])
                     customdata.append(bw)
 
@@ -767,13 +1069,18 @@ def create_grouped_runtime_plot(
                         width=bar_width,
                         hovertemplate=f"<b>{name}</b><br>Bandwidth: %{{customdata}}<br>Time: %{{y:.4f}} s<br><extra></extra>",
                         customdata=customdata,
+                        legend="legend1"
+                        if name in ["Dense", "Compressed"]
+                        else "legend2",
                         showlegend=(idx == 0),
+                        marker_pattern_shape=pattern_map[name],
+                        marker_pattern_solidity=0.1,
                     ),
                     row=row,
                     col=col,
                 )
 
-        tick_positions = x_positions
+        tick_positions = [i * group_space for i in range(n_bandwidths)]
         tick_labels = [str(bw) for bw in bw_values]
 
         fig.update_xaxes(
@@ -795,7 +1102,7 @@ def create_grouped_runtime_plot(
         )
 
         fig.update_yaxes(
-            # type="log",
+            type="log",
             title_font={"family": "serif", "size": 10, "weight": "normal"},
             tickfont={"family": "serif", "size": 12},
             showgrid=False,
@@ -809,9 +1116,9 @@ def create_grouped_runtime_plot(
         )
 
         fig.add_annotation(
-            text=" " + benchmark_name + " ",
+            text=benchmark_name,
             x=0.02,
-            y=0.70 if benchmark_name in ["Kalman Filter", "Sparse Attention"] else 1.99,
+            y=0.70,
             xref=f"x{idx + 1}",
             yref=f"y{idx + 1}",
             xanchor="left",
@@ -821,6 +1128,7 @@ def create_grouped_runtime_plot(
             bgcolor="rgba(255, 255, 255, 0.8)",
             bordercolor="black",
             borderwidth=0.5,
+            borderpad=6,
             row=row,
             col=col,
         )
@@ -830,7 +1138,7 @@ def create_grouped_runtime_plot(
         xref="paper",
         yref="paper",
         x=0.5,
-        y=-0.10,
+        y=-0.11,
         xanchor="center",
         yanchor="middle",
         showarrow=False,
@@ -858,15 +1166,27 @@ def create_grouped_runtime_plot(
             "xanchor": "center",
         },
         showlegend=True,
-        legend={
+        legend1={
             "orientation": "h",
             "yanchor": "bottom",
-            "y": -0.19,
+            "y": -0.22,
             "xanchor": "center",
-            "x": 0.4,
-            "title": {"font": {"family": "serif", "size": 9}},
+            "x": 0.5,
             "font": {"family": "serif", "size": 12},
             "bgcolor": "rgba(255, 255, 255, 0.95)",
+            "itemwidth": 40,
+        },
+        legend2={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": -0.30,
+            "xanchor": "center",
+            "x": 0.5,
+            "entrywidthmode": "pixels",
+            "entrywidth": 0,
+            "font": {"family": "serif", "size": 12},
+            "bgcolor": "rgba(255, 255, 255, 0.95)",
+            "itemwidth": 40,
         },
         hovermode="closest",
         hoverlabel=dict(
@@ -881,7 +1201,10 @@ def create_grouped_runtime_plot(
         margin=dict(t=0, b=0, l=40, r=20),
     )
 
-    output_path = f"./results/{output_prefix}"
+    dir_path = Path("./results/Figure 12")
+    dir_path.mkdir(parents=True, exist_ok=True)
+
+    output_path = f"./results/Figure 12/{output_prefix}"
     fig.write_html(f"{output_path}.html")
 
     if save_png_and_svg:
@@ -891,7 +1214,7 @@ def create_grouped_runtime_plot(
     fig.show()
     return fig
 
-def create_attention_plot(
+def figure15(
     csv_path="./results/attention_sparsity.csv",
     output_prefix="sparsity",
     show_title: bool = False,
@@ -1018,27 +1341,43 @@ def create_attention_plot(
 
 if __name__ == "__main__":
     benchmark_files = [
-        "./results/kalman_filter.csv",
-        # "./results/kalman_filter_dia_inputs.csv",
-        "./results/sparse_attention.csv",
-        # "./results/sparse_attention_dia_inputs.csv",
-        "./results/batch_bertlike.csv",
-        # "./results/batch_bertlike_dia_inputs.csv",
-        "./results/chain.csv",
-        # "./results/chain_dia_inputs.csv",
+        "./290526/kalman_filter.csv",
+        # "./270526/kalman_filter.csv",
+        "./290526/sparse_attention.csv",
+        # "./270526/sparse_attention.csv",
+        # "./results/sparse_attention_dia_input.csv",
+        "./290526/batch_bertlike.csv",
+        # "./270526/batch_bertlike.csv",
+        # "./results/batch_bertlike_dia_input.csv",
+        "./290526/chain.csv",
+        # "./270526/chain.csv",
+        # "./results/chain_dia_input.csv",
     ]
 
-    fig = create_grouped_memory_plot(
-        csv_paths=benchmark_files,
-        output_prefix="memory_comparison",
-        figure_title="Memory Footprint Across Benchmarks",
+    # fig = create_grouped_memory_plot(
+    #     csv_paths=benchmark_files,
+    #     output_prefix="memory_comparison",
+    #     figure_title="Memory Footprint Across Benchmarks",
+    #     show_title=False,
+    #     save_png_and_svg=True,
+    # )
+    # fig = create_grouped_runtime_plot(
+    #     csv_paths=benchmark_files,
+    #     output_prefix="runtime_comparison",
+    #     figure_title="Speedup Over Baseline",
+    #     show_title=False,
+    #     save_png_and_svg=True,
+    # )
+
+    fig = figure13(
+        csv_path="./290526/compilation_time.csv",
+        output_prefix="comp_time",
         show_title=False,
         save_png_and_svg=True,
     )
-    fig = create_grouped_runtime_plot(
-        csv_paths=benchmark_files,
-        output_prefix="runtime_comparison",
-        figure_title="Speedup Over Baseline",
+    fig = figure14(
+        csv_path="./300526/compilation_time.csv",
+        output_prefix="comp_time_vs_size",
         show_title=False,
         save_png_and_svg=True,
     )

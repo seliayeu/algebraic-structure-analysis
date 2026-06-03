@@ -5,25 +5,23 @@ import bench
 import attention_prop
 
 
-def kalman_filter(runs_count: int = 5):
+def kalman_filter(runs_count: int = 5) -> str:
     benchmark_name = "kalman_filter"
-    bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
+    bandwidths = [1023, 512, 256, 128, 64, 32, 16, 0]
 
+    # D = --banded-analysis=detect-dia=true
+    # A = --banded-analysis
+    # R = --banded-rewrite
+    # L = --linalg-ikj-loop
+    # S = --dense-softmax-rewrite
     configs = [
         ("kalman_filter_dense.mlir", None),
-        ("kalman_filter_dense.mlir", "ikj-loop"),
-        ("kalman_filter_dense.mlir", "analysis", "rewrite"),
-        ("kalman_filter_dia.mlir", "analysis", "rewrite"),
-        ("kalman_filter_dia.mlir", "analysis-detect", "rewrite"),
-        ("kalman_filter_dia_input.mlir", "analysis", "rewrite"),
-        ("kalman_filter_dia_input.mlir", "analysis-detect", "rewrite"),
-    ]
-
-    color_palette = [
-        "#94A3B8",  # gray
-        "#F97316",  # orange
-        "#06B6D4",  # cyan
-        "#00b200",  # green
+        ("kalman_filter_dense.mlir", "L"),
+        ("kalman_filter_dense.mlir", "ARL"),
+        ("kalman_filter_dia.mlir", "ARL"),
+        ("kalman_filter_dia.mlir", "DRL"),
+        ("kalman_filter_dia_inputs.mlir", "ARL"),
+        ("kalman_filter_dia_inputs.mlir", "DRL"),
     ]
 
     result_path = bench.run(
@@ -35,36 +33,21 @@ def kalman_filter(runs_count: int = 5):
         runs_count=runs_count,
     )
 
-    result_path = "./results/kalman_filter.csv"
-    # figures.bandwidth_plot(
-    #     result_path,
-    #     benchmark_name,
-    #     "Kalman Filter Benchmark",
-    #     color_palette=color_palette,
-    # )
+    return result_path
 
 
-def batch_bertlike(runs_count: int = 5, plot=True):
+def batch_bertlike(runs_count: int = 5, plot=True) -> str:
     benchmark_name = "batch_bertlike"
-    bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
+    bandwidths = [1023, 512, 256, 128, 64, 32, 16, 0]
 
     configs = [
         ("batch_bertlike_dense.mlir", None),
-        ("batch_bertlike_dense.mlir", "ikj-loop"),
-        ("batch_bertlike_dense.mlir", "analysis", "rewrite"),
-        ("batch_bertlike_dia.mlir", "analysis", "rewrite"),
-        ("batch_bertlike_dia.mlir", "analysis-detect", "rewrite"),
-        ("batch_bertlike_dia_inputs.mlir", "analysis", "rewrite"),
-        ("batch_bertlike_dia_inputs.mlir", "analysis-detect", "rewrite"),
-    ]
-
-    color_palette = [
-        "#94A3B8",  # gray
-        "#8B5CF6",  # Vibrant Purple
-        "#EC4899",  # Hot Pink
-        "#3B82F6",  # Bright Blue
-        "#F97316",  # Orange
-        "#06B6D4",  # Cyan
+        ("batch_bertlike_dense.mlir", "L"),
+        ("batch_bertlike_dense.mlir", "ARL"),
+        ("batch_bertlike_dia.mlir", "ARL"),
+        ("batch_bertlike_dia.mlir", "DRL"),
+        ("batch_bertlike_dia_inputs.mlir", "ARL"),
+        ("batch_bertlike_dia_inputs.mlir", "DRL"),
     ]
 
     result_path = bench.run(
@@ -76,36 +59,23 @@ def batch_bertlike(runs_count: int = 5, plot=True):
         runs_count=runs_count,
     )
 
-    # figures.bandwidth_plot(
-    #     result_path,
-    #     benchmark_name,
-    #     "Batch Bert-Like Benchmark",
-    #     color_palette=color_palette,
-    # )
+    return result_path
 
 
-def sparse_attention(runs_count: int = 5):
+def sparse_attention(runs_count: int = 5) -> str:
     benchmark_name = "sparse_attention"
-    bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
+    bandwidths = [1023, 512, 256, 128, 64, 32, 16, 0]
 
     configs = [
-        ("sparse_attention_baseline.mlir", "dense-softmax"),
-        ("sparse_attention_baseline.mlir", "dense-softmax", "ikj-loop"),
-        ("sparse_attention_dense.mlir", "analysis", "rewrite"),
-        ("sparse_attention_dia.mlir", "analysis", "rewrite"),
-        ("sparse_attention_dia.mlir", "analysis-detect", "rewrite"),
-        ("sparse_attention_dia_input.mlir", "analysis", "rewrite"),
-        ("sparse_attention_dia_input.mlir", "analysis-detect", "rewrite"),
+        ("sparse_attention_baseline.mlir", "S"),
+        ("sparse_attention_baseline.mlir", "SL"),
+        ("sparse_attention_dense.mlir", "ARL"),
+        ("sparse_attention_dia.mlir", "ARL"),
+        ("sparse_attention_dia.mlir", "DRL"),
+        ("sparse_attention_dia_inputs.mlir", "ARL"),
+        ("sparse_attention_dia_inputs.mlir", "DRL"),
     ]
 
-    color_palette = [
-        "#94A3B8",  # gray
-        "#E67C73",  # Salmon
-        "#F6BF26",  # Golden Yellow
-        "#57BB8A",  # Mint Green
-        "#5B9BD5",  # Light Blue
-        "#F59E0B",  # Amber/Gold
-    ]
     result_path = bench.run(
         benchmark_name=benchmark_name,
         program_dir="./benchmarking/programs",
@@ -115,36 +85,21 @@ def sparse_attention(runs_count: int = 5):
         runs_count=runs_count,
     )
 
-    # figures.bandwidth_plot(
-    #     result_path,
-    #     benchmark_name,
-    #     "Sparse Attention Benchmark",
-    #     color_palette=color_palette,
-    # )
-    #
+    return result_path
 
 
-def chained_matmul(runs_count: int = 5):
+def chained_matmul(runs_count: int = 5) -> str:
     benchmark_name = "chain"
-    bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
+    bandwidths = [1023, 512, 256, 128, 64, 32, 16, 0]
 
     configs = [
-        ("chain100_dense.mlir", None),
-        ("chain100_dense.mlir", "ikj-loop"),
-        ("chain100_dense.mlir", "analysis", "rewrite"),
-        ("chain100_dia.mlir", "analysis", "rewrite"),
-        ("chain100_dia.mlir", "analysis-detect", "rewrite"),
-        ("chain100_dia_inputs.mlir", "analysis", "rewrite"),
-        ("chain100_dia_inputs.mlir", "analysis-detect", "rewrite"),
-    ]
-
-    color_palette = [
-        "#94A3B8",  # gray
-        "#8B5CF6",  # Vibrant Purple
-        "#EC4899",  # Hot Pink
-        "#3B82F6",  # Bright Blue
-        "#F97316",  # Orange
-        "#06B6D4",  # Cyan
+        ("chain10_dense.mlir", None),
+        ("chain10_dense.mlir", "L"),
+        ("chain10_dense.mlir", "ARL"),
+        ("chain10_dia.mlir", "ARL"),
+        ("chain10_dia.mlir", "DRL"),
+        ("chain10_dia_inputs.mlir", "ARL"),
+        ("chain10_dia_inputs.mlir", "DRL"),
     ]
 
     result_path = bench.run(
@@ -156,14 +111,7 @@ def chained_matmul(runs_count: int = 5):
         runs_count=runs_count,
     )
 
-    # figures.bandwidth_plot(
-    #     result_path,
-    #     benchmark_name,
-    #     "Batch Bert-Like Benchmark",
-    #     color_palette=color_palette,
-    # )
-    #
-    #
+    return result_path
 
 
 def attention_propagation(runs_count: int = 5):
@@ -177,61 +125,93 @@ def attention_propagation(runs_count: int = 5):
     for lb in [3, 256, 512, 1023]:
         hw = attention_prop.run(N=1024, lb=lb, ub=0, csv_path=csv_path, header_written=hw)
 
-    figures.create_attention_plot(
-        csv_path=str(csv_path),
-    )
+    return csv_path
 
 
-def comptime_experiment(runs_count: int = 5):
+def comptime_experiment(runs_count: int = 5) -> str:
     benchmark_name = "compilation_time"
     configs = [
         ("analysis_rewrite", ["--banded-analysis --banded-rewrite"]),
     ]
     result_path = comptime.run_experiment(
-        benchmark_name, configs, sizes=[128], ops_range=[20, 30, 50, 100, 200]
+        benchmark_name,
+        configs,
+        sizes=[128, 256, 512, 1024, 2048],
+        ops_range=[20, 30, 50, 100, 200],
     )
 
-    figures.create_comptime_plot(
-        csv_path=result_path,
-        output_prefix="bpa_comptime",
-        figure_title="Compilation Time Breakdown by Component",
-        show_title=True,
-        save_png_and_svg=True,
-    )
+    return result_path
 
 
 if __name__ == "__main__":
-    dispatch = {
-        "kalman_filter": kalman_filter,
-        "batch_bertlike": batch_bertlike,
-        "chain100": chained_matmul,
-        "sparse_attention": sparse_attention,
-        "attention_prop": attention_propagation,
-        "comptime": comptime_experiment,
-    }
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--benchmark",
         type=str,
-        help="Comma-separated list of figures",
-        # default="7,8,9,10,11,12",
-        default="kalman_filter,batch_bertlike,chain100,sparse_attention,attention_prop,comptime",
+        help="Comma-separated list of benchmarks",
+        default="kalman_filter,sparse_attention,batch_bertlike,chain,attention_prop,comptime",
     )
 
     parser.add_argument(
         "--repeat",
         type=int,
         help="Number of executions for each benchmark",
-        default=5,
+        default=10,
     )
 
     args = parser.parse_args()
 
+    dispatch = {
+        "kalman_filter": kalman_filter,
+        "batch_bertlike": batch_bertlike,
+        "chain": chained_matmul,
+        "sparse_attention": sparse_attention,
+        "attention_prop": attention_propagation,
+        "comptime": comptime_experiment,
+    }
+
     benchmarks = [x.strip() for x in args.benchmark.split(",")]
+
+    benchmark_files = {}
     for benchmark in benchmarks:
+        benchmark_func = dispatch[benchmark]
         try:
-            func = dispatch[benchmark]
-            func(args.repeat)
+            result_path = benchmark_func(args.repeat)
+            benchmark_files[benchmark] = result_path
         except KeyError as e:
             print(f"error: invalid benchmark option {str(e)}")
+
+    runtime_benchmarks = {
+        "kalman_filter",
+        "sparse_attention",
+        "batch_bertlike",
+        "chain",
+    }
+
+    if runtime_benchmarks.issubset(benchmark_files.keys()):
+        runtime_csvs = [
+            benchmark_files["kalman_filter"],
+            benchmark_files["sparse_attention"],
+            benchmark_files["batch_bertlike"],
+            benchmark_files["chain"],
+        ]
+
+        print("Building Figure 11...")
+        figures.figure11(runtime_csvs)
+
+        print("Building Figure 12...")
+        figures.figure12(runtime_csvs)
+
+    if "comptime" in benchmark_files:
+        comptime_csv = benchmark_files["comptime"]
+        attention_prop_csv = benchmark_files["attention_prop"]
+
+        print("Building Figure 14...")
+        figures.figure14(
+            csv_path=comptime_csv,
+        )
+
+        print("Building Figure 15...")
+        figures.figure15(
+            csv_path=attention_prop_csv,
+        )
