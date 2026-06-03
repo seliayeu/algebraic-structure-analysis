@@ -2,6 +2,7 @@ import argparse
 import figures
 import comptime
 import bench
+import attention_prop
 
 
 def kalman_filter(runs_count: int = 5):
@@ -165,6 +166,22 @@ def chained_matmul(runs_count: int = 5):
     #
 
 
+def attention_propagation(runs_count: int = 5):
+    from pathlib import Path
+    RESULT_DIR = Path("./results")
+    RESULT_DIR.mkdir(parents=True, exist_ok=True)
+    csv_path = RESULT_DIR / "attention_sparsity.csv"
+    csv_path.write_text("")
+
+    hw = False
+    for lb in [3, 256, 512, 1023]:
+        hw = attention_prop.run(N=1024, lb=lb, ub=0, csv_path=csv_path, header_written=hw)
+
+    figures.create_attention_plot(
+        csv_path=str(csv_path),
+    )
+
+
 def comptime_experiment(runs_count: int = 5):
     benchmark_name = "compilation_time"
     configs = [
@@ -189,6 +206,7 @@ if __name__ == "__main__":
         "batch_bertlike": batch_bertlike,
         "chain100": chained_matmul,
         "sparse_attention": sparse_attention,
+        "attention_prop": attention_propagation,
         "comptime": comptime_experiment,
     }
 
@@ -198,7 +216,7 @@ if __name__ == "__main__":
         type=str,
         help="Comma-separated list of figures",
         # default="7,8,9,10,11,12",
-        default="kalman_filter,batch_bertlike,chain100,sparse_attention,comptime",
+        default="kalman_filter,batch_bertlike,chain100,sparse_attention,attention_prop,comptime",
     )
 
     parser.add_argument(
