@@ -4,9 +4,8 @@ import comptime
 import bench
 
 
-def kalman_filter(runs_count: int = 5):
+def kalman_filter(runs_count: int = 5) -> str:
     benchmark_name = "kalman_filter"
-    bandwidths = [1023, 512, 409, 307, 256, 204, 153, 102, 51, 0]
     bandwidths = [1023, 512, 256, 128, 64, 32, 16, 0]
 
     # D = --banded-analysis=detect-dia=true
@@ -33,8 +32,10 @@ def kalman_filter(runs_count: int = 5):
         runs_count=runs_count,
     )
 
+    return result_path
 
-def batch_bertlike(runs_count: int = 5, plot=True):
+
+def batch_bertlike(runs_count: int = 5, plot=True) -> str:
     benchmark_name = "batch_bertlike"
     bandwidths = [1023, 512, 256, 128, 64, 32, 16, 0]
 
@@ -57,8 +58,10 @@ def batch_bertlike(runs_count: int = 5, plot=True):
         runs_count=runs_count,
     )
 
+    return result_path
 
-def sparse_attention(runs_count: int = 5):
+
+def sparse_attention(runs_count: int = 5) -> str:
     benchmark_name = "sparse_attention"
     bandwidths = [1023, 512, 256, 128, 64, 32, 16, 0]
 
@@ -81,8 +84,10 @@ def sparse_attention(runs_count: int = 5):
         runs_count=runs_count,
     )
 
+    return result_path
 
-def chained_matmul(runs_count: int = 5):
+
+def chained_matmul(runs_count: int = 5) -> str:
     benchmark_name = "chain"
     bandwidths = [1023, 512, 256, 128, 64, 32, 16, 0]
 
@@ -105,8 +110,10 @@ def chained_matmul(runs_count: int = 5):
         runs_count=runs_count,
     )
 
+    return result_path
 
-def comptime_experiment(runs_count: int = 5):
+
+def comptime_experiment(runs_count: int = 5) -> str:
     benchmark_name = "compilation_time"
     configs = [
         ("analysis_rewrite", ["--banded-analysis --banded-rewrite"]),
@@ -118,31 +125,16 @@ def comptime_experiment(runs_count: int = 5):
         ops_range=[20, 30, 50, 100, 200],
     )
 
-    figures.create_comptime_plot(
-        csv_path=result_path,
-        output_prefix="bpa_comptime",
-        figure_title="Compilation Time Breakdown by Component",
-        show_title=True,
-        save_png_and_svg=True,
-    )
+    return result_path
 
 
 if __name__ == "__main__":
-    dispatch = {
-        "kalman_filter": kalman_filter,
-        "batch_bertlike": batch_bertlike,
-        "chain100": chained_matmul,
-        "sparse_attention": sparse_attention,
-        "comptime": comptime_experiment,
-    }
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--benchmark",
         type=str,
-        help="Comma-separated list of figures",
-        # default="7,8,9,10,11,12",
-        default="kalman_filter,sparse_attention,batch_bertlike,chain100,comptime",
+        help="Comma-separated list of benchmarks",
+        default="kalman_filter,sparse_attention,batch_bertlike,chain,comptime",
     )
 
     parser.add_argument(
@@ -154,10 +146,55 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    dispatch = {
+        "kalman_filter": kalman_filter,
+        "batch_bertlike": batch_bertlike,
+        "chain": chained_matmul,
+        "sparse_attention": sparse_attention,
+        "comptime": comptime_experiment,
+    }
+
     benchmarks = [x.strip() for x in args.benchmark.split(",")]
+
+    benchmark_files = {}
     for benchmark in benchmarks:
+        benchmark_func = dispatch[benchmark]
         try:
-            func = dispatch[benchmark]
-            func(args.repeat)
+            result_path = benchmark_func(args.repeat)
+            benchmark_files[benchmark] = result_path
         except KeyError as e:
             print(f"error: invalid benchmark option {str(e)}")
+
+    runtime_benchmarks = {
+        "kalman_filter",
+        "sparse_attention",
+        "batch_bertlike",
+        "chain",
+    }
+
+    if runtime_benchmarks.issubset(benchmark_files.keys()):
+        runtime_csvs = [
+            benchmark_files["kalman_filter"],
+            benchmark_files["sparse_attention"],
+            benchmark_files["batch_bertlike"],
+            benchmark_files["chain"],
+        ]
+
+        print("Building Figure 11...")
+        figures.figure11(runtime_csvs)
+
+        print("Building Figure 12...")
+        figures.figure12(runtime_csvs)
+
+    if "comptime" in benchmark_files:
+        comptime_csv = benchmark_files["comptime"]
+
+        print("Building Figure 14...")
+        figures.figure14(
+            csv_path=comptime_csv,
+        )
+
+        print("Building Figure 15...")
+        figures.figure15(
+            csv_path=comptime_csv,
+        )

@@ -3,7 +3,8 @@ import os
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from typing import List, Dict, Optional
+from typing import List
+from pathlib import Path
 
 pattern_map = {
     "Dense": "x",
@@ -14,7 +15,175 @@ pattern_map = {
 }
 
 
-def create_comptime_plot(
+def figure15(
+    csv_path="./results/compilation_time.csv",
+    output_prefix="comp_time_vs_size",
+    figure_title: str = "Compilation Time by Matrix Size",
+    show_title: bool = True,
+    save_png_and_svg: bool = True,
+):
+    df = pd.read_csv(csv_path)
+
+    # Filter rows where bw == size/2 and ops == "200"
+    # df_filtered = df[(df["bw"] == df["size"] / 2) & (df["ops"] == "200")].copy()
+    df_filtered = df[(df["bw"] == 0) & (df["ops"] == "chain100")].copy()
+    if df_filtered.empty:
+        print("No data for bw == size/2 and ops == 200")
+        return
+
+    df_filtered["true_lowering"] = (
+        df_filtered["total_lowering_time_avg"] - df_filtered["analysis_time_avg"]
+    )
+    df_filtered["true_lowering"] = df_filtered["true_lowering"].clip(lower=0)
+
+    target_sizes = list(df_filtered["size"].unique())
+    df_filtered = df_filtered[df_filtered["size"].isin(target_sizes)]
+
+    grouped = (
+        df_filtered.groupby("size")
+        .agg(
+            analysis=("analysis_time_avg", "mean"),
+            lowering=("true_lowering", "mean"),
+            runtime=("runtime_avg", "mean"),
+        )
+        .reset_index()
+    )
+
+    grouped = (
+        grouped.set_index("size").reindex(target_sizes, fill_value=0).reset_index()
+    )
+    grouped.columns = ["size", "analysis", "lowering", "runtime"]
+
+    x_labels = [str(s) for s in target_sizes]
+
+    fig = go.Figure()
+
+    pattern_map = {
+        "analysis": "x",
+        "lowering": "/",
+        "runtime": "\\",
+    }
+
+    fig.add_trace(
+        go.Bar(
+            x=x_labels,
+            y=grouped["analysis"],
+            name="Analysis Time",
+            marker_color="#e99575",
+            marker_line_color="black",
+            marker_line_width=0.8,
+            opacity=0.9,
+            width=0.23,
+            marker_pattern_shape=pattern_map["analysis"],
+            marker_pattern_solidity=0.15,
+            hovertemplate="Size: %{x}<br>Analysis: %{y:.4f} s<extra></extra>",
+        )
+    )
+
+    fig.add_trace(
+        go.Bar(
+            x=x_labels,
+            y=grouped["lowering"],
+            name="Compilation Time",
+            marker_color="#88CCEE",
+            marker_line_color="black",
+            marker_line_width=0.8,
+            opacity=0.9,
+            width=0.23,
+            marker_pattern_shape=pattern_map["lowering"],
+            marker_pattern_solidity=0.15,
+            hovertemplate="Size: %{x}<br>Lowering: %{y:.4f} s<extra></extra>",
+        )
+    )
+
+    fig.add_trace(
+        go.Bar(
+            x=x_labels,
+            y=grouped["runtime"],
+            name="Runtime",
+            marker_color="#71b5a0",
+            marker_line_color="black",
+            marker_line_width=0.8,
+            opacity=0.9,
+            width=0.23,
+            marker_pattern_shape=pattern_map["runtime"],
+            marker_pattern_solidity=0.15,
+            hovertemplate="Size: %{x}<br>Runtime: %{y:.4f} s<extra></extra>",
+        )
+    )
+
+    fig.update_layout(
+        title=dict(
+            text=figure_title if show_title else None,
+            font=dict(size=20, family="Inter, Arial, sans-serif", weight="bold"),
+            x=0.5,
+            xanchor="center",
+        ),
+        xaxis=dict(
+            title=dict(
+                text="<b>Matrix Size</b>",
+                font=dict(family="Inter, Arial, sans-serif", size=13),
+            ),
+            tickfont=dict(size=11),
+            tickmode="array",
+            tickvals=x_labels,
+            ticktext=x_labels,
+            type="category",
+            showgrid=False,
+            zeroline=False,
+            showline=True,
+            linewidth=0.5,
+            linecolor="black",
+            mirror=True,
+        ),
+        yaxis=dict(
+            type="log",
+            title=dict(
+                text="<b>Time (seconds) - Log Scale</b>",
+                font=dict(family="Inter, Arial, sans-serif", size=13),
+            ),
+            tickfont=dict(size=11),
+            showgrid=False,
+            zeroline=False,
+            showline=True,
+            linewidth=0.5,
+            linecolor="black",
+            mirror=True,
+        ),
+        barmode="group",
+        bargroupgap=0.02,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=0.98,
+            xanchor="left",
+            x=0.02,
+            bgcolor="rgba(255,255,255,0.9)",
+            bordercolor="black",
+            borderwidth=0.8,
+            font=dict(size=11, family="Inter, Arial, sans-serif"),
+        ),
+        margin=dict(l=50, r=20, t=0, b=50),
+        width=700,
+        height=500,
+        hovermode="closest",
+    )
+
+    dir_path = Path("./results/Figure 15")
+    dir_path.mkdir(parents=True, exist_ok=True)
+
+    output_path = f"./results/Figure 15/{output_prefix}"
+    fig.write_html(f"{output_path}.html")
+    if save_png_and_svg:
+        fig.write_image(f"{output_path}.svg", width=550, height=410)
+        fig.write_image(f"{output_path}.png", width=550, height=410, scale=2)
+    fig.show()
+    return fig
+
+
+def figure14(
     csv_path="./results/compilation_time.csv",
     output_prefix="comp_time",
     figure_title: str = "Compilation Time Breakdown by Component",
@@ -248,7 +417,10 @@ def create_comptime_plot(
             yanchor="top",
         )
 
-    output_path = str(csv_path).split(".csv")[0]
+    dir_path = Path("./results/Figure 14")
+    dir_path.mkdir(parents=True, exist_ok=True)
+
+    output_path = "./results/Figure 14/" + str(csv_path).split(".csv")[0]
     fig.write_html(
         f"{output_path}.html",
         config={
@@ -265,7 +437,7 @@ def create_comptime_plot(
     return fig
 
 
-def compare_symbolic_chained(
+def figure10(
     results_dir="./results",
     output_prefix="symbolic_chained_comparison",
     figure_title: str = "Symbolic Analysis Time vs Number of Matmuls",
@@ -273,10 +445,6 @@ def compare_symbolic_chained(
     show_title: bool = True,
     save_png_and_svg: bool = True,
 ):
-    """
-    Create performance analysis plot comparing averaged BPA, STUR, and SparTA
-    symbolic execution times for chained matmuls.
-    """
 
     dia_path = os.path.join(results_dir, "symbolic_chained_dia.csv")
     linalg_path = os.path.join(results_dir, "symbolic_chained_linalg.csv")
@@ -436,7 +604,10 @@ def compare_symbolic_chained(
         type="log" if log else "linear",
     )
 
-    output_path = os.path.join(results_dir, output_prefix)
+    dir_path = Path("./results/Figure 10")
+    dir_path.mkdir(parents=True, exist_ok=True)
+
+    output_path = os.path.join(results_dir + "Figure 10", output_prefix)
 
     fig.write_html(
         f"{output_path}.html",
@@ -459,13 +630,12 @@ def compare_symbolic_chained(
     return fig
 
 
-def create_grouped_memory_plot(
+def figure11(
     csv_paths: List[str],
     output_prefix: str = "memory_consumption",
     figure_title: str = "Bandwidth Memory Consumption",
     show_title: bool = True,
     save_png_and_svg: bool = True,
-    color_palette: Optional[Dict[str, str]] = None,
 ):
     color_palette = {
         "Compressed-Inputs": "rgb(229,196,148)",
@@ -501,7 +671,7 @@ def create_grouped_memory_plot(
         df["max_rss_gb"] = df["max_rss_mb"] / 1024
 
         benchmark_name = (
-            csv_path.split("/")[-1].replace(".csv", "").replace("_", " ").title()
+            str(csv_path).split("/")[-1].replace(".csv", "").replace("_", " ").title()
         )
 
         baseline = df[df["config"] == "baseline"]
@@ -729,7 +899,10 @@ def create_grouped_memory_plot(
         margin=dict(t=0, b=0, l=40, r=20),
     )
 
-    output_path = "./results/memory_comparison"
+    dir_path = Path("./results/Figure 11")
+    dir_path.mkdir(parents=True, exist_ok=True)
+
+    output_path = "./results/Figure 11/memory_comparison"
     fig.write_html(
         f"{output_path}.html",
         config={
@@ -746,13 +919,12 @@ def create_grouped_memory_plot(
     return fig
 
 
-def create_grouped_runtime_plot(
+def figure12(
     csv_paths: List[str],
     output_prefix: str = "timing_comparison",
     figure_title: str = "Average Runtime Comparison",
     show_title: bool = True,
     save_png_and_svg: bool = True,
-    color_palette: Optional[Dict[str, str]] = None,
 ):
     color_palette = {
         "Baseline": "#7f7f7f",
@@ -786,7 +958,7 @@ def create_grouped_runtime_plot(
         df["bw"] = pd.to_numeric(df["bw"])
 
         benchmark_name = (
-            csv_path.split("/")[-1].replace(".csv", "").replace("_", " ").title()
+            str(csv_path).split("/")[-1].replace(".csv", "").replace("_", " ").title()
         )
 
         baseline = df[df["config"] == "baseline"]
@@ -1029,7 +1201,10 @@ def create_grouped_runtime_plot(
         margin=dict(t=0, b=0, l=40, r=20),
     )
 
-    output_path = f"./results/{output_prefix}"
+    dir_path = Path("./results/Figure 12")
+    dir_path.mkdir(parents=True, exist_ok=True)
+
+    output_path = f"./results/Figure 12/{output_prefix}"
     fig.write_html(f"{output_path}.html")
 
     if save_png_and_svg:
@@ -1042,34 +1217,43 @@ def create_grouped_runtime_plot(
 
 if __name__ == "__main__":
     benchmark_files = [
-        "./270526/kalman_filter.csv",
-        # "./results/kalman_filter_dia_input.csv",
-        "./270526/sparse_attention.csv",
+        "./290526/kalman_filter.csv",
+        # "./270526/kalman_filter.csv",
+        "./290526/sparse_attention.csv",
+        # "./270526/sparse_attention.csv",
         # "./results/sparse_attention_dia_input.csv",
-        "./270526/batch_bertlike.csv",
+        "./290526/batch_bertlike.csv",
+        # "./270526/batch_bertlike.csv",
         # "./results/batch_bertlike_dia_input.csv",
-        "./270526/chain.csv",
+        "./290526/chain.csv",
+        # "./270526/chain.csv",
         # "./results/chain_dia_input.csv",
     ]
 
-    fig = create_grouped_memory_plot(
-        csv_paths=benchmark_files,
-        output_prefix="memory_comparison",
-        figure_title="Memory Footprint Across Benchmarks",
-        show_title=False,
-        save_png_and_svg=True,
-    )
-    fig = create_grouped_runtime_plot(
-        csv_paths=benchmark_files,
-        output_prefix="runtime_comparison",
-        figure_title="Speedup Over Baseline",
-        show_title=False,
-        save_png_and_svg=True,
-    )
+    # fig = create_grouped_memory_plot(
+    #     csv_paths=benchmark_files,
+    #     output_prefix="memory_comparison",
+    #     figure_title="Memory Footprint Across Benchmarks",
+    #     show_title=False,
+    #     save_png_and_svg=True,
+    # )
+    # fig = create_grouped_runtime_plot(
+    #     csv_paths=benchmark_files,
+    #     output_prefix="runtime_comparison",
+    #     figure_title="Speedup Over Baseline",
+    #     show_title=False,
+    #     save_png_and_svg=True,
+    # )
 
     # fig = create_comptime_plot(
-    #     csv_path="./results/compilation_time.csv",
+    #     csv_path="./290526/compilation_time.csv",
     #     output_prefix="comp_time",
     #     show_title=False,
     #     save_png_and_svg=True,
     # )
+    fig = figure15(
+        csv_path="./300526/compilation_time.csv",
+        output_prefix="comp_time_vs_size",
+        show_title=False,
+        save_png_and_svg=True,
+    )
