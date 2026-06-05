@@ -122,6 +122,7 @@ def chained_matmul(runs_count: int = 5) -> str:
 
 def attention_propagation(runs_count: int = 5):
     from pathlib import Path
+
     RESULT_DIR = Path("./results")
     RESULT_DIR.mkdir(parents=True, exist_ok=True)
     csv_path = RESULT_DIR / "attention_sparsity.csv"
@@ -129,7 +130,9 @@ def attention_propagation(runs_count: int = 5):
 
     hw = False
     for lb in [3, 256, 512, 1023]:
-        hw = attention_prop.run(N=1024, lb=lb, ub=0, csv_path=csv_path, header_written=hw)
+        hw = attention_prop.run(
+            N=1024, lb=lb, ub=0, csv_path=csv_path, header_written=hw
+        )
 
     return csv_path
 
@@ -230,6 +233,11 @@ if __name__ == "__main__":
     if "comptime" in benchmark_files:
         comptime_csv = benchmark_files["comptime"]
         attention_prop_csv = benchmark_files["attention_prop"]
+
+        print("Building Figure 13...")
+        figures.figure13(
+            csv_path=comptime_csv,
+        )
 
         print("Building Figure 14...")
         figures.figure14(
