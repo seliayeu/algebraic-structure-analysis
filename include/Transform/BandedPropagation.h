@@ -14,6 +14,7 @@ struct BandedAnalysisResult {
 
    public:
     bool detectDIA = false;
+    bool disableBw = false;
 };
 
 #endif

@@ -34,6 +34,13 @@ servicesdocker ps -docker ps -aa:
     volumes:
       - ./results:/app/bpa/results
 
+  bpa_stur_chain:
+    image: bpa-artifact
+    container_name: bpa-stur-chain
+    command: ["--benchmark", "bench_chain"]
+    volumes:
+      - ./results:/app/bpa/results
+
   # bpa-figures:
   #   image: bpa-artifact
   #   container_name: bpa-figure-generator

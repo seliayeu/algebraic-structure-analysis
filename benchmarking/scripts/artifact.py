@@ -1,7 +1,14 @@
 import argparse
+import inspect
+import os
+import shutil
+import subprocess
+from pathlib import Path
+
 import figures
 import comptime
 import bench
+import attention_prop
 
 
 def kalman_filter(runs_count: int = 5) -> str:
@@ -113,6 +120,20 @@ def chained_matmul(runs_count: int = 5) -> str:
     return result_path
 
 
+def attention_propagation(runs_count: int = 5):
+    from pathlib import Path
+    RESULT_DIR = Path("./results")
+    RESULT_DIR.mkdir(parents=True, exist_ok=True)
+    csv_path = RESULT_DIR / "attention_sparsity.csv"
+    csv_path.write_text("")
+
+    hw = False
+    for lb in [3, 256, 512, 1023]:
+        hw = attention_prop.run(N=1024, lb=lb, ub=0, csv_path=csv_path, header_written=hw)
+
+    return csv_path
+
+
 def comptime_experiment(runs_count: int = 5) -> str:
     benchmark_name = "compilation_time"
     configs = [
@@ -128,13 +149,24 @@ def comptime_experiment(runs_count: int = 5) -> str:
     return result_path
 
 
+def stur_chain() -> str:
+    stur_dir = os.environ.get("STUR_DIR", "/app/stur")
+    subprocess.run(["python3", "benchmark_chained.py"], cwd=stur_dir, check=True)
+
+    results_dir = Path("./results")
+    results_dir.mkdir(exist_ok=True)
+    dest = results_dir / "symbolic_chained_stur.csv"
+    shutil.copy(Path(stur_dir) / "benchmark_chained_results.csv", dest)
+    return str(dest)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--benchmark",
         type=str,
         help="Comma-separated list of benchmarks",
-        default="kalman_filter,sparse_attention,batch_bertlike,chain,comptime",
+        default="kalman_filter,sparse_attention,batch_bertlike,chain,attention_prop,comptime",
     )
 
     parser.add_argument(
@@ -151,7 +183,9 @@ if __name__ == "__main__":
         "batch_bertlike": batch_bertlike,
         "chain": chained_matmul,
         "sparse_attention": sparse_attention,
+        "attention_prop": attention_propagation,
         "comptime": comptime_experiment,
+        "bench_chain": stur_chain,
     }
 
     benchmarks = [x.strip() for x in args.benchmark.split(",")]
@@ -160,7 +194,10 @@ if __name__ == "__main__":
     for benchmark in benchmarks:
         benchmark_func = dispatch[benchmark]
         try:
-            result_path = benchmark_func(args.repeat)
+            if "runs_count" in inspect.signature(benchmark_func).parameters:
+                result_path = benchmark_func(args.repeat)
+            else:
+                result_path = benchmark_func()
             benchmark_files[benchmark] = result_path
         except KeyError as e:
             print(f"error: invalid benchmark option {str(e)}")
@@ -186,8 +223,13 @@ if __name__ == "__main__":
         print("Building Figure 12...")
         figures.figure12(runtime_csvs)
 
+    if "bench_chain" in benchmark_files:
+        print("Building Figure 10...")
+        figures.figure10()
+
     if "comptime" in benchmark_files:
         comptime_csv = benchmark_files["comptime"]
+        attention_prop_csv = benchmark_files["attention_prop"]
 
         print("Building Figure 14...")
         figures.figure14(
@@ -196,5 +238,5 @@ if __name__ == "__main__":
 
         print("Building Figure 15...")
         figures.figure15(
-            csv_path=comptime_csv,
+            csv_path=attention_prop_csv,
         )

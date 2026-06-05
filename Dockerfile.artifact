@@ -67,12 +67,34 @@ RUN cmake -G Ninja \
     && ninja -C /app/bpa/build
 
 # ---------------------------------------------------------------------------
+# Build stur-benchmark (Scala / sbt)
+# ---------------------------------------------------------------------------
+FROM base AS stur-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        openjdk-21-jdk-headless \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fL "https://github.com/sbt/sbt/releases/download/v1.10.11/sbt-1.10.11.tgz" \
+        | tar -xz -C /opt
+
+RUN git clone --depth 1 https://github.com/seliayeu/stur-benchmark /app/stur
+
+# Pre-fetch all Scala/sbt dependencies into local dirs so they survive COPY
+ENV COURSIER_CACHE=/app/stur/.coursier-cache
+ENV SBT_OPTS="-Dsbt.global.base=/app/stur/.sbt-cache -Dsbt.ivy.home=/app/stur/.ivy2-cache"
+WORKDIR /app/stur
+RUN /opt/sbt/bin/sbt compile
+
+# ---------------------------------------------------------------------------
 # Runtime image
 # ---------------------------------------------------------------------------
 FROM base AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
         clang \
         libstdc++-14-dev \
+        openjdk-21-jdk-headless \
         time \
         libnss3 \
         libatk1.0-0 \
@@ -92,9 +114,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=mlir-builder /opt/mlir /opt/mlir
 COPY --from=bpa-builder  /app/bpa  /app/bpa
+COPY --from=stur-builder /opt/sbt  /opt/sbt
+COPY --from=stur-builder /app/stur /app/stur
 
-ENV PATH="/opt/mlir/bin:$PATH"
 ENV MLIR_LIB_DIR=/opt/mlir/lib
+ENV COURSIER_CACHE=/app/stur/.coursier-cache
+ENV SBT_OPTS="-Dsbt.global.base=/app/stur/.sbt-cache -Dsbt.ivy.home=/app/stur/.ivy2-cache"
+ENV STUR_DIR=/app/stur
 
 # ---------------------------------------------------------------------------
 # Python environment
@@ -105,7 +131,7 @@ RUN python3 -m venv /venv \
     && /venv/bin/pip install -r /app/bpa/benchmarking/scripts/requirements.txt \
     && /venv/bin/kaleido_get_chrome
 
-ENV PATH="/venv/bin:/opt/mlir/bin:$PATH"
+ENV PATH="/venv/bin:/opt/sbt/bin:/opt/mlir/bin:$PATH"
 # ---------------------------------------------------------------------------
 # Runtime env
 # ---------------------------------------------------------------------------
