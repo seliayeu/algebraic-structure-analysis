@@ -169,7 +169,7 @@ if __name__ == "__main__":
         "--benchmark",
         type=str,
         help="Comma-separated list of benchmarks",
-        default="kalman_filter,sparse_attention,batch_bertlike,chain,attention_prop,comptime",
+        default="kalman_filter,sparse_attention,batch_bertlike,chain,attention_prop,comptime,bench_chain",
     )
 
     parser.add_argument(
