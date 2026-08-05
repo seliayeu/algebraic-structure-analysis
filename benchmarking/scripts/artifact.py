@@ -279,8 +279,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--figures",
         type=str,
-        help="Comma-separated list of figures to generate",
-        default="figure10,figure11,figure12,figure13,figure14,figure15",
+        help="Comma-separated list of figure numbers to generate (e.g., 10,11)",
+        default="10,11,12,13,14,15",
     )
     parser.add_argument(
         "--runs",
@@ -290,7 +290,14 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    requested_figures = [f.strip() for f in args.figures.split(",")]
+    raw = [f.strip() for f in args.figures.split(",")]
+    requested_figures = []
+    for item in raw:
+        if item.startswith("figure"):
+            num = item[6:]
+        else:
+            num = item
+        requested_figures.append(f"figure{num}")
 
     results = run_required_benchmarks(requested_figures, args.runs)
     generate_requested_figures(requested_figures, results)
