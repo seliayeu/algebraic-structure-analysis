@@ -163,88 +163,134 @@ def stur_chain() -> str:
     return str(dest)
 
 
+FIGURE_REQUIREMENTS = {
+    "figure10": ["bench_chain"],
+    "figure11": ["kalman_filter", "sparse_attention", "batch_bertlike", "chain"],
+    "figure12": ["kalman_filter", "sparse_attention", "batch_bertlike", "chain"],
+    "figure13": ["comptime"],
+    "figure14": ["comptime"],
+    "figure15": ["attention_prop"],
+}
+
+BENCHMARK_DISPATCH = {
+    "kalman_filter": kalman_filter,
+    "batch_bertlike": batch_bertlike,
+    "chain": chained_matmul,
+    "sparse_attention": sparse_attention,
+    "attention_prop": attention_propagation,
+    "comptime": comptime_experiment,
+    "bench_chain": stur_chain,
+}
+
+
+def run_required_benchmarks(figures, runs):
+    required_benchmarks = set()
+    for fig in figures:
+        if fig in FIGURE_REQUIREMENTS:
+            required_benchmarks.update(FIGURE_REQUIREMENTS[fig])
+        else:
+            print(f"Warning: unknown figure '{fig}' – skipping.")
+
+    benchmark_results = {}
+    for bench_name in required_benchmarks:
+        func = BENCHMARK_DISPATCH.get(bench_name)
+        if func is None:
+            print(f"Error: no benchmark function for '{bench_name}'")
+            continue
+        try:
+            if "runs_count" in inspect.signature(func).parameters:
+                result_path = func(runs)
+            else:
+                result_path = func()
+            benchmark_results[bench_name] = result_path
+            print(f"Finished benchmark '{bench_name}' -> {result_path}")
+        except Exception as e:
+            print(f"Error running benchmark '{bench_name}': {e}")
+
+    return benchmark_results
+
+
+def generate_requested_figures(figures_list, benchmark_results):
+    def get_runtime_csvs():
+        return [
+            benchmark_results["kalman_filter"],
+            benchmark_results["sparse_attention"],
+            benchmark_results["batch_bertlike"],
+            benchmark_results["chain"],
+        ]
+
+    for fig in figures_list:
+        if fig == "figure10":
+            if "bench_chain" in benchmark_results:
+                print("Building Figure 10...")
+                figures.figure10()
+            else:
+                print(
+                    "Skipping Figure 10: required benchmark 'bench_chain' not available."
+                )
+
+        elif fig == "figure11":
+            if all(b in benchmark_results for b in FIGURE_REQUIREMENTS["figure11"]):
+                print("Building Figure 11...")
+                figures.figure11(get_runtime_csvs())
+            else:
+                print("Skipping Figure 11: missing runtime benchmarks.")
+
+        elif fig == "figure12":
+            if all(b in benchmark_results for b in FIGURE_REQUIREMENTS["figure12"]):
+                print("Building Figure 12...")
+                figures.figure12(get_runtime_csvs())
+            else:
+                print("Skipping Figure 12: missing runtime benchmarks.")
+
+        elif fig == "figure13":
+            if "comptime" in benchmark_results:
+                print("Building Figure 13...")
+                figures.figure13(csv_path=benchmark_results["comptime"])
+            else:
+                print(
+                    "Skipping Figure 13: required benchmark 'comptime' not available."
+                )
+
+        elif fig == "figure14":
+            if "comptime" in benchmark_results:
+                print("Building Figure 14...")
+                figures.figure14(csv_path=benchmark_results["comptime"])
+            else:
+                print(
+                    "Skipping Figure 14: required benchmark 'comptime' not available."
+                )
+
+        elif fig == "figure15":
+            if "attention_prop" in benchmark_results:
+                print("Building Figure 15...")
+                figures.figure15(csv_path=benchmark_results["attention_prop"])
+            else:
+                print(
+                    "Skipping Figure 15: required benchmark 'attention_prop' not available."
+                )
+
+        else:
+            print(f"Figure '{fig}' is not recognised – nothing generated.")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--benchmark",
+        "--figures",
         type=str,
-        help="Comma-separated list of benchmarks",
-        default="kalman_filter,sparse_attention,batch_bertlike,chain,attention_prop,comptime,bench_chain",
+        help="Comma-separated list of figures to generate",
+        default="figure10,figure11,figure12,figure13,figure14,figure15",
     )
-
     parser.add_argument(
-        "--repeat",
+        "--runs",
         type=int,
         help="Number of executions for each benchmark",
         default=10,
     )
-
     args = parser.parse_args()
 
-    dispatch = {
-        "kalman_filter": kalman_filter,
-        "batch_bertlike": batch_bertlike,
-        "chain": chained_matmul,
-        "sparse_attention": sparse_attention,
-        "attention_prop": attention_propagation,
-        "comptime": comptime_experiment,
-        "bench_chain": stur_chain,
-    }
+    requested_figures = [f.strip() for f in args.figures.split(",")]
 
-    benchmarks = [x.strip() for x in args.benchmark.split(",")]
-
-    benchmark_files = {}
-    for benchmark in benchmarks:
-        benchmark_func = dispatch[benchmark]
-        try:
-            if "runs_count" in inspect.signature(benchmark_func).parameters:
-                result_path = benchmark_func(args.repeat)
-            else:
-                result_path = benchmark_func()
-            benchmark_files[benchmark] = result_path
-        except KeyError as e:
-            print(f"error: invalid benchmark option {str(e)}")
-
-    runtime_benchmarks = {
-        "kalman_filter",
-        "sparse_attention",
-        "batch_bertlike",
-        "chain",
-    }
-
-    if runtime_benchmarks.issubset(benchmark_files.keys()):
-        runtime_csvs = [
-            benchmark_files["kalman_filter"],
-            benchmark_files["sparse_attention"],
-            benchmark_files["batch_bertlike"],
-            benchmark_files["chain"],
-        ]
-
-        print("Building Figure 11...")
-        figures.figure11(runtime_csvs)
-
-        print("Building Figure 12...")
-        figures.figure12(runtime_csvs)
-
-    if "bench_chain" in benchmark_files:
-        print("Building Figure 10...")
-        figures.figure10()
-
-    if "comptime" in benchmark_files:
-        comptime_csv = benchmark_files["comptime"]
-        attention_prop_csv = benchmark_files["attention_prop"]
-
-        print("Building Figure 13...")
-        figures.figure13(
-            csv_path=comptime_csv,
-        )
-
-        print("Building Figure 14...")
-        figures.figure14(
-            csv_path=comptime_csv,
-        )
-
-        print("Building Figure 15...")
-        figures.figure15(
-            csv_path=attention_prop_csv,
-        )
+    results = run_required_benchmarks(requested_figures, args.runs)
+    generate_requested_figures(requested_figures, results)
