@@ -120,6 +120,27 @@ def chained_matmul(runs_count: int = 5) -> str:
     return result_path
 
 
+def attention_backward_prop(runs_count: int = 5) -> str:
+    benchmark_name = "attention_backward_prop"
+    # lowerBw sweep matches Figure 15; upperBw is fixed at 0 in the template
+    bandwidths = [3, 256, 512, 1023]
+
+    configs = [
+        ("sparse_attention_baseline.mlir", "S"),          # naive baseline (no analysis)
+        ("sparse_attention_dense_asym.mlir", "FRL"),       # forward-only analysis + rewrite
+        ("sparse_attention_dense_asym.mlir", "ARL"),       # full forward+backward + rewrite
+    ]
+
+    return bench.run(
+        benchmark_name=benchmark_name,
+        program_dir="./benchmarking/programs",
+        configs=configs,
+        bandwidths=bandwidths,
+        warmup=1,
+        runs_count=runs_count,
+    )
+
+
 def attention_propagation(runs_count: int = 5):
     from pathlib import Path
 
@@ -170,6 +191,7 @@ FIGURE_REQUIREMENTS = {
     "figure13": ["comptime"],
     "figure14": ["comptime"],
     "figure15": ["attention_prop"],
+    "figure16": ["attention_backward_prop"],
 }
 
 BENCHMARK_DISPATCH = {
@@ -178,6 +200,7 @@ BENCHMARK_DISPATCH = {
     "chain": chained_matmul,
     "sparse_attention": sparse_attention,
     "attention_prop": attention_propagation,
+    "attention_backward_prop": attention_backward_prop,
     "comptime": comptime_experiment,
     "bench_chain": stur_chain,
 }
@@ -270,6 +293,15 @@ def generate_requested_figures(figures_list, benchmark_results):
                     "Skipping Figure 15: required benchmark 'attention_prop' not available."
                 )
 
+        elif fig == "figure16":
+            if "attention_backward_prop" in benchmark_results:
+                print("Building Figure 16...")
+                figures.figure16(csv_path=benchmark_results["attention_backward_prop"])
+            else:
+                print(
+                    "Skipping Figure 16: required benchmark 'attention_backward_prop' not available."
+                )
+
         else:
             print(f"Figure '{fig}' is not recognised – nothing generated.")
 
@@ -279,8 +311,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--figures",
         type=str,
-        help="Comma-separated list of figures to generate",
-        default="figure10,figure11,figure12,figure13,figure14,figure15",
+        help="Comma-separated list of figure numbers to generate (e.g., 10,11)",
+        default="10,11,12,13,14,15",
     )
     parser.add_argument(
         "--runs",
@@ -290,7 +322,14 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    requested_figures = [f.strip() for f in args.figures.split(",")]
+    raw = [f.strip() for f in args.figures.split(",")]
+    requested_figures = []
+    for item in raw:
+        if item.startswith("figure"):
+            num = item[6:]
+        else:
+            num = item
+        requested_figures.append(f"figure{num}")
 
     results = run_required_benchmarks(requested_figures, args.runs)
     generate_requested_figures(requested_figures, results)
