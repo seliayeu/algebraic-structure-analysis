@@ -1326,9 +1326,7 @@ def figure15(
             "range": [0, 0.6],
             "tickformat": ".2f",
             "tickfont": {"size": 11},
-            "showgrid": True,
-            "gridcolor": "lightgray",
-            "gridwidth": 0.5,
+            "showgrid": False,
             "zeroline": False,
             "showline": True,
             "linewidth": 0.5,
@@ -1368,20 +1366,147 @@ def figure15(
     return fig
 
 
+def figure16(
+    csv_path="./results/attention_backward_prop.csv",
+    show_title: bool = False,
+    save_png_and_svg: bool = True,
+):
+    N = 1024
+    UBW = 0
+
+    CONFIG_COLORS = {
+        "FR": "#88CCEE",
+        "AR": "#CC6677",
+    }
+    CONFIG_LABELS = {
+        "FR": "Forward Only",
+        "AR": "Full (Fwd + Bwd)",
+    }
+
+    def mask_label(lb):
+        return (
+            f"Causal<br>(LBW={lb}, UBW={UBW})"
+            if lb == N - 1
+            else f"Window<br>(LBW={lb}, UBW={UBW})"
+        )
+
+    df = pd.read_csv(csv_path)
+    configs_present = [c for c in ["FR", "AR"] if c in df["config"].unique()]
+    bw_order = sorted(df[df["config"].isin(configs_present)]["bw"].unique())
+    tick_labels = [mask_label(bw) for bw in bw_order]
+
+    n_configs = len(configs_present)
+    bar_width = 0.8 / n_configs
+
+    fig = go.Figure()
+
+    for cfg_idx, cfg in enumerate(configs_present):
+        subset = df[df["config"] == cfg]
+
+        y_vals = []
+        for bw in bw_order:
+            row = subset[subset["bw"] == bw]
+            y_vals.append(row["avg_time_s"].values[0] if not row.empty else None)
+
+        x_offsets = [
+            i + (cfg_idx - n_configs / 2 + 0.5) * bar_width
+            for i in range(len(bw_order))
+        ]
+
+        fig.add_trace(
+            go.Bar(
+                name=CONFIG_LABELS[cfg],
+                legendgroup=cfg,
+                x=x_offsets,
+                y=y_vals,
+                marker_color=CONFIG_COLORS[cfg],
+                marker_line_color="black",
+                marker_line_width=0.8,
+                opacity=0.9,
+                width=bar_width * 0.9,
+                hovertemplate=(
+                    f"<b>{CONFIG_LABELS[cfg]}</b><br>"
+                    "Mask: %{customdata}<br>"
+                    "Average Runtime: %{y:.4f} s<extra></extra>"
+                ),
+                customdata=tick_labels,
+            )
+        )
+
+    fig.update_layout(
+        title=dict(
+            text="Attention Runtime: Forward vs Full (Fwd+Bwd) Analysis"
+            if show_title
+            else None,
+            font=dict(size=18, family="Inter, Arial, sans-serif", weight="bold"),
+            x=0.5,
+            xanchor="center",
+        ),
+        xaxis=dict(
+            title=None,
+            tickmode="array",
+            tickvals=list(range(len(bw_order))),
+            ticktext=tick_labels,
+            tickfont=dict(size=11),
+            showgrid=False,
+            zeroline=False,
+            showline=True,
+            linewidth=0.5,
+            linecolor="black",
+            mirror=True,
+        ),
+        yaxis=dict(
+            title=dict(
+                text="<b>Average Runtime (s)</b>",
+                font=dict(family="Inter, Arial, sans-serif", size=13),
+            ),
+            tickfont=dict(size=11),
+            showgrid=False,
+            zeroline=False,
+            showline=True,
+            linewidth=0.5,
+            linecolor="black",
+            mirror=True,
+        ),
+        barmode="group",
+        bargroupgap=0.05,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=0.98,
+            xanchor="right",
+            x=0.98,
+            bgcolor="rgba(255,255,255,0.85)",
+            bordercolor="black",
+            borderwidth=1,
+            font=dict(size=11, family="Inter, Arial, sans-serif"),
+        ),
+        margin=dict(l=50, r=20, t=50 if show_title else 20, b=50),
+        width=700,
+        height=350,
+    )
+
+    dir_path = Path("./results/Figure 16")
+    dir_path.mkdir(parents=True, exist_ok=True)
+    output_path = str(dir_path / "attention_backward_prop")
+
+    fig.write_html(
+        f"{output_path}.html",
+        config={"displayModeBar": True, "displaylogo": False},
+    )
+    if save_png_and_svg:
+        try:
+            fig.write_image(f"{output_path}.svg", width=550, height=300)
+            fig.write_image(f"{output_path}.png", width=550, height=300, scale=2)
+        except Exception as e:
+            print(f"Image export skipped ({e}). Install kaleido: pip install kaleido")
+    return fig
+
+
 if __name__ == "__main__":
-    benchmark_files = [
-        "./290526/kalman_filter.csv",
-        # "./270526/kalman_filter.csv",
-        "./290526/sparse_attention.csv",
-        # "./270526/sparse_attention.csv",
-        # "./results/sparse_attention_dia_input.csv",
-        "./290526/batch_bertlike.csv",
-        # "./270526/batch_bertlike.csv",
-        # "./results/batch_bertlike_dia_input.csv",
-        "./290526/chain.csv",
-        # "./270526/chain.csv",
-        # "./results/chain_dia_input.csv",
-    ]
+    benchmark_files = ["results/attention_backward_prop.csv"]
 
     # fig = create_grouped_memory_plot(
     #     csv_paths=benchmark_files,
@@ -1398,15 +1523,16 @@ if __name__ == "__main__":
     #     save_png_and_svg=True,
     # )
 
-    fig = figure13(
-        csv_path="./290526/compilation_time.csv",
-        output_prefix="comp_time",
-        show_title=False,
-        save_png_and_svg=True,
-    )
-    fig = figure14(
-        csv_path="./300526/compilation_time.csv",
-        output_prefix="comp_time_vs_size",
-        show_title=False,
-        save_png_and_svg=True,
-    )
+    # fig = figure13(
+    #     csv_path="./290526/compilation_time.csv",
+    #     output_prefix="comp_time",
+    #     show_title=False,
+    #     save_png_and_svg=True,
+    # )
+    # fig = figure14(
+    #     csv_path="./300526/compilation_time.csv",
+    #     output_prefix="comp_time_vs_size",
+    #     show_title=False,
+    #     save_png_and_svg=True,
+    # )
+    fig = figure16(csv_path="./results/attention_backward_prop.csv")
