@@ -1326,9 +1326,7 @@ def figure15(
             "range": [0, 0.6],
             "tickformat": ".2f",
             "tickfont": {"size": 11},
-            "showgrid": True,
-            "gridcolor": "lightgray",
-            "gridwidth": 0.5,
+            "showgrid": False,
             "zeroline": False,
             "showline": True,
             "linewidth": 0.5,
@@ -1373,23 +1371,29 @@ def figure16(
     show_title: bool = False,
     save_png_and_svg: bool = True,
 ):
+    N = 1024
+    UBW = 0
+
     CONFIG_COLORS = {
-        "baseline": "#aaaaaa",
-        "F": "#e99575",
-        "FR": "#e99575",
-        "AR": "#71b5a0",
+        "FR": "#88CCEE",
+        "AR": "#CC6677",
     }
     CONFIG_LABELS = {
-        "baseline": "Baseline",
-        "F": "Forward Only",
         "FR": "Forward Only",
         "AR": "Full (Fwd + Bwd)",
     }
 
+    def mask_label(lb):
+        return (
+            f"Causal<br>(LBW={lb}, UBW={UBW})"
+            if lb == N - 1
+            else f"Window<br>(LBW={lb}, UBW={UBW})"
+        )
+
     df = pd.read_csv(csv_path)
-    configs_present = [c for c in ["baseline", "FR", "AR"] if c in df["config"].unique()]
-    bw_order = sorted(df[df["config"] != "baseline"]["bw"].unique())
-    bw_labels = [str(b) for b in bw_order]
+    configs_present = [c for c in ["FR", "AR"] if c in df["config"].unique()]
+    bw_order = sorted(df[df["config"].isin(configs_present)]["bw"].unique())
+    tick_labels = [mask_label(bw) for bw in bw_order]
 
     n_configs = len(configs_present)
     bar_width = 0.8 / n_configs
@@ -1398,19 +1402,6 @@ def figure16(
 
     for cfg_idx, cfg in enumerate(configs_present):
         subset = df[df["config"] == cfg]
-        if cfg == "baseline":
-            # single value — draw as a horizontal dashed line
-            val = subset["avg_time_s"].mean()
-            fig.add_hline(
-                y=val,
-                line_dash="dash",
-                line_color=CONFIG_COLORS[cfg],
-                line_width=1.5,
-                annotation_text=CONFIG_LABELS[cfg],
-                annotation_position="top right",
-                annotation_font_size=11,
-            )
-            continue
 
         y_vals = []
         for bw in bw_order:
@@ -1425,6 +1416,7 @@ def figure16(
         fig.add_trace(
             go.Bar(
                 name=CONFIG_LABELS[cfg],
+                legendgroup=cfg,
                 x=x_offsets,
                 y=y_vals,
                 marker_color=CONFIG_COLORS[cfg],
@@ -1434,28 +1426,27 @@ def figure16(
                 width=bar_width * 0.9,
                 hovertemplate=(
                     f"<b>{CONFIG_LABELS[cfg]}</b><br>"
-                    "BW: %{customdata}<br>"
-                    "Avg time: %{y:.4f} s<extra></extra>"
+                    "Mask: %{customdata}<br>"
+                    "Average Runtime: %{y:.4f} s<extra></extra>"
                 ),
-                customdata=bw_labels,
+                customdata=tick_labels,
             )
         )
 
     fig.update_layout(
         title=dict(
-            text="Attention Runtime: Forward vs Full (Fwd+Bwd) Analysis" if show_title else None,
+            text="Attention Runtime: Forward vs Full (Fwd+Bwd) Analysis"
+            if show_title
+            else None,
             font=dict(size=18, family="Inter, Arial, sans-serif", weight="bold"),
             x=0.5,
             xanchor="center",
         ),
         xaxis=dict(
-            title=dict(
-                text="<b>Lower Bandwidth (Upper fixed at 0)</b>",
-                font=dict(family="Inter, Arial, sans-serif", size=13),
-            ),
+            title=None,
             tickmode="array",
             tickvals=list(range(len(bw_order))),
-            ticktext=bw_labels,
+            ticktext=tick_labels,
             tickfont=dict(size=11),
             showgrid=False,
             zeroline=False,
@@ -1465,15 +1456,12 @@ def figure16(
             mirror=True,
         ),
         yaxis=dict(
-            type="log",
             title=dict(
-                text="<b>Avg Time (s) — Log Scale</b>",
+                text="<b>Average Runtime (s)</b>",
                 font=dict(family="Inter, Arial, sans-serif", size=13),
             ),
             tickfont=dict(size=11),
-            showgrid=True,
-            gridcolor="lightgray",
-            gridwidth=0.5,
+            showgrid=False,
             zeroline=False,
             showline=True,
             linewidth=0.5,
@@ -1518,19 +1506,7 @@ def figure16(
 
 
 if __name__ == "__main__":
-    benchmark_files = [
-        "./290526/kalman_filter.csv",
-        # "./270526/kalman_filter.csv",
-        "./290526/sparse_attention.csv",
-        # "./270526/sparse_attention.csv",
-        # "./results/sparse_attention_dia_input.csv",
-        "./290526/batch_bertlike.csv",
-        # "./270526/batch_bertlike.csv",
-        # "./results/batch_bertlike_dia_input.csv",
-        "./290526/chain.csv",
-        # "./270526/chain.csv",
-        # "./results/chain_dia_input.csv",
-    ]
+    benchmark_files = ["results/attention_backward_prop.csv"]
 
     # fig = create_grouped_memory_plot(
     #     csv_paths=benchmark_files,
@@ -1547,15 +1523,16 @@ if __name__ == "__main__":
     #     save_png_and_svg=True,
     # )
 
-    fig = figure13(
-        csv_path="./290526/compilation_time.csv",
-        output_prefix="comp_time",
-        show_title=False,
-        save_png_and_svg=True,
-    )
-    fig = figure14(
-        csv_path="./300526/compilation_time.csv",
-        output_prefix="comp_time_vs_size",
-        show_title=False,
-        save_png_and_svg=True,
-    )
+    # fig = figure13(
+    #     csv_path="./290526/compilation_time.csv",
+    #     output_prefix="comp_time",
+    #     show_title=False,
+    #     save_png_and_svg=True,
+    # )
+    # fig = figure14(
+    #     csv_path="./300526/compilation_time.csv",
+    #     output_prefix="comp_time_vs_size",
+    #     show_title=False,
+    #     save_png_and_svg=True,
+    # )
+    fig = figure16(csv_path="./results/attention_backward_prop.csv")
