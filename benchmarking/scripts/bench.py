@@ -121,6 +121,9 @@ def build_pipeline_flags(cfg):
             elif flag == "R":
                 flags.append("--banded-rewrite")
                 tag += "R"
+            elif flag == "F":
+                flags.append("--banded-analysis=disable-bw=true")
+                tag += "F"
             elif flag == "D":
                 flags.append("--banded-analysis=detect-dia=true")
                 tag += "AD"

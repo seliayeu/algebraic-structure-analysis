@@ -1368,6 +1368,155 @@ def figure15(
     return fig
 
 
+def figure16(
+    csv_path="./results/attention_backward_prop.csv",
+    show_title: bool = False,
+    save_png_and_svg: bool = True,
+):
+    CONFIG_COLORS = {
+        "baseline": "#aaaaaa",
+        "F": "#e99575",
+        "FR": "#e99575",
+        "AR": "#71b5a0",
+    }
+    CONFIG_LABELS = {
+        "baseline": "Baseline",
+        "F": "Forward Only",
+        "FR": "Forward Only",
+        "AR": "Full (Fwd + Bwd)",
+    }
+
+    df = pd.read_csv(csv_path)
+    configs_present = [c for c in ["baseline", "FR", "AR"] if c in df["config"].unique()]
+    bw_order = sorted(df[df["config"] != "baseline"]["bw"].unique())
+    bw_labels = [str(b) for b in bw_order]
+
+    n_configs = len(configs_present)
+    bar_width = 0.8 / n_configs
+
+    fig = go.Figure()
+
+    for cfg_idx, cfg in enumerate(configs_present):
+        subset = df[df["config"] == cfg]
+        if cfg == "baseline":
+            # single value — draw as a horizontal dashed line
+            val = subset["avg_time_s"].mean()
+            fig.add_hline(
+                y=val,
+                line_dash="dash",
+                line_color=CONFIG_COLORS[cfg],
+                line_width=1.5,
+                annotation_text=CONFIG_LABELS[cfg],
+                annotation_position="top right",
+                annotation_font_size=11,
+            )
+            continue
+
+        y_vals = []
+        for bw in bw_order:
+            row = subset[subset["bw"] == bw]
+            y_vals.append(row["avg_time_s"].values[0] if not row.empty else None)
+
+        x_offsets = [
+            i + (cfg_idx - n_configs / 2 + 0.5) * bar_width
+            for i in range(len(bw_order))
+        ]
+
+        fig.add_trace(
+            go.Bar(
+                name=CONFIG_LABELS[cfg],
+                x=x_offsets,
+                y=y_vals,
+                marker_color=CONFIG_COLORS[cfg],
+                marker_line_color="black",
+                marker_line_width=0.8,
+                opacity=0.9,
+                width=bar_width * 0.9,
+                hovertemplate=(
+                    f"<b>{CONFIG_LABELS[cfg]}</b><br>"
+                    "BW: %{customdata}<br>"
+                    "Avg time: %{y:.4f} s<extra></extra>"
+                ),
+                customdata=bw_labels,
+            )
+        )
+
+    fig.update_layout(
+        title=dict(
+            text="Attention Runtime: Forward vs Full (Fwd+Bwd) Analysis" if show_title else None,
+            font=dict(size=18, family="Inter, Arial, sans-serif", weight="bold"),
+            x=0.5,
+            xanchor="center",
+        ),
+        xaxis=dict(
+            title=dict(
+                text="<b>Lower Bandwidth (Upper fixed at 0)</b>",
+                font=dict(family="Inter, Arial, sans-serif", size=13),
+            ),
+            tickmode="array",
+            tickvals=list(range(len(bw_order))),
+            ticktext=bw_labels,
+            tickfont=dict(size=11),
+            showgrid=False,
+            zeroline=False,
+            showline=True,
+            linewidth=0.5,
+            linecolor="black",
+            mirror=True,
+        ),
+        yaxis=dict(
+            type="log",
+            title=dict(
+                text="<b>Avg Time (s) — Log Scale</b>",
+                font=dict(family="Inter, Arial, sans-serif", size=13),
+            ),
+            tickfont=dict(size=11),
+            showgrid=True,
+            gridcolor="lightgray",
+            gridwidth=0.5,
+            zeroline=False,
+            showline=True,
+            linewidth=0.5,
+            linecolor="black",
+            mirror=True,
+        ),
+        barmode="group",
+        bargroupgap=0.05,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=0.98,
+            xanchor="right",
+            x=0.98,
+            bgcolor="rgba(255,255,255,0.85)",
+            bordercolor="black",
+            borderwidth=1,
+            font=dict(size=11, family="Inter, Arial, sans-serif"),
+        ),
+        margin=dict(l=50, r=20, t=50 if show_title else 20, b=50),
+        width=700,
+        height=350,
+    )
+
+    dir_path = Path("./results/Figure 16")
+    dir_path.mkdir(parents=True, exist_ok=True)
+    output_path = str(dir_path / "attention_backward_prop")
+
+    fig.write_html(
+        f"{output_path}.html",
+        config={"displayModeBar": True, "displaylogo": False},
+    )
+    if save_png_and_svg:
+        try:
+            fig.write_image(f"{output_path}.svg", width=550, height=300)
+            fig.write_image(f"{output_path}.png", width=550, height=300, scale=2)
+        except Exception as e:
+            print(f"Image export skipped ({e}). Install kaleido: pip install kaleido")
+    return fig
+
+
 if __name__ == "__main__":
     benchmark_files = [
         "./290526/kalman_filter.csv",
