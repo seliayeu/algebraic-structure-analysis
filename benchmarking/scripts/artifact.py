@@ -126,9 +126,9 @@ def attention_backward_prop(runs_count: int = 5) -> str:
     bandwidths = [3, 256, 512, 1023]
 
     configs = [
-        ("sparse_attention_baseline.mlir", "S"),          # naive baseline (no analysis)
-        ("sparse_attention_dense_asym.mlir", "FRL"),       # forward-only analysis + rewrite
-        ("sparse_attention_dense_asym.mlir", "ARL"),       # full forward+backward + rewrite
+        ("sparse_attention_baseline.mlir", "S"),  # naive baseline (no analysis)
+        ("sparse_attention_dense_asym.mlir", "FRL"),  # forward-only analysis + rewrite
+        ("sparse_attention_dense_asym.mlir", "ARL"),  # full forward+backward + rewrite
     ]
 
     return bench.run(
@@ -312,7 +312,7 @@ if __name__ == "__main__":
         "--figures",
         type=str,
         help="Comma-separated list of figure numbers to generate (e.g., 10,11)",
-        default="10,11,12,13,14,15",
+        default="10,11,12,13,14,15,16",
     )
     parser.add_argument(
         "--runs",
