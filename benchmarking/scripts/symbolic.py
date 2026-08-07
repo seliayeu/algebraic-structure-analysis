@@ -4,6 +4,7 @@ import re
 import csv
 import statistics
 import argparse
+from pathlib import Path
 
 def generate_mlir(k, filename, mode="dia"):
     """Generates an MLIR file with a chain of k matmul operations (linalg or dia)."""
@@ -45,29 +46,33 @@ def generate_mlir(k, filename, mode="dia"):
         f.write("  }\n")
         f.write("}\n")
 
-def run_benchmark():
+def run_benchmark(repetitions: int = 10):
     ks = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
-    REPETITIONS = 10
+    repetitions = max(1, int(repetitions))
     modes = ["linalg", "dia"]
+    build_dir = Path(os.environ.get("BUILD_PATH", "build"))
+    alg_opt = build_dir / "tools" / "alg-opt"
+    result_paths = []
     
     os.makedirs("results", exist_ok=True)
     os.makedirs("benchmarking/programs", exist_ok=True)
     
     for mode in modes:
         csv_filename = f"results/symbolic_chained_{mode}.csv"
+        result_paths.append(csv_filename)
         print(f"\nRunning benchmark for mode: {mode.upper()}")
         print(f"{'K':<6} | {'Avg Time (ms)':<15} | {'Trials (ms)':<30}")
         print("-" * 60)
         
         with open(csv_filename, 'w', newline='') as csvfile:
             csv_writer = csv.writer(csvfile)
-            csv_writer.writerow(['k', 'avg_time_ms'] + [f'trial_{i+1}' for i in range(REPETITIONS)])
+            csv_writer.writerow(['k', 'avg_time_ms'] + [f'trial_{i+1}' for i in range(repetitions)])
             
             for k in ks:
                 filename = f"benchmarking/programs/chained_{k}_{mode}.mlir"
                 generate_mlir(k, filename, mode)
                 
-                cmd = ["build/tools/alg-opt", filename, "--banded-analysis"]
+                cmd = [str(alg_opt), filename, "--banded-analysis"]
                 
                 try:
                     subprocess.check_output(cmd, stderr=subprocess.STDOUT)
@@ -76,7 +81,7 @@ def run_benchmark():
                 
                 trials = []
 
-                for i in range(REPETITIONS):
+                for i in range(repetitions):
                     try:
                         output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode()
                         match = re.search(r"BandedAnalysis time: ([\d.eE+-]+) ms", output)
@@ -101,5 +106,10 @@ def run_benchmark():
                 
         print(f"Results saved to {csv_filename}")
 
+    return result_paths
+
 if __name__ == "__main__":
-    run_benchmark()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--runs", type=int, default=10, help="Number of trials per k")
+    args = parser.parse_args()
+    run_benchmark(repetitions=args.runs)

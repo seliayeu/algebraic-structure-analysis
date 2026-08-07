@@ -455,15 +455,24 @@ def figure10(
         df_dia = pd.read_csv(dia_path)
         df_linalg = pd.read_csv(linalg_path)
         df_stur = pd.read_csv(stur_path)
-        df_tesa = pd.read_csv(tesa_path)
     except FileNotFoundError as e:
         print(f"Error loading CSVs: {e}")
         return
 
+    df_tesa = None
+    if os.path.exists(tesa_path):
+        df_tesa = pd.read_csv(tesa_path)
+    else:
+        print(
+            f"Warning: optional SPARTA/TESA CSV not found: {tesa_path}; "
+            "omitting that series."
+        )
+
     df_dia["k"] = pd.to_numeric(df_dia["k"])
     df_linalg["k"] = pd.to_numeric(df_linalg["k"])
     df_stur["k"] = pd.to_numeric(df_stur["k"])
-    df_tesa["k"] = pd.to_numeric(df_tesa["k"])
+    if df_tesa is not None:
+        df_tesa["k"] = pd.to_numeric(df_tesa["k"])
 
     df_bpa = pd.merge(
         df_dia[["k", "avg_time_ms"]],
@@ -519,29 +528,30 @@ def figure10(
         )
     )
 
-    speedup_tesa = (
-        df_bpa.set_index("k").reindex(df_tesa["k"])["avg_time_ms"].values
-        / df_tesa["avg_time_ms"].values
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=df_tesa["k"],
-            y=df_tesa["avg_time_ms"],
-            mode="lines+markers",
-            name="sparta",
-            legendgroup="sparta",
-            line=dict(color="#8B5CF6", width=2, shape="spline"),
-            marker=dict(
-                size=6,
-                symbol="square",
-                color="#8B5CF6",
-                line=dict(color="white", width=1.5),
-            ),
-            customdata=speedup_tesa,
-            hovertemplate="<b>sparta</b><br># Matmuls: %{x}<br>Time: %{y:.2f} ms<br>Speedup (vs bpa): %{customdata:.1f}x<br><extra></extra>",
+    if df_tesa is not None:
+        speedup_tesa = (
+            df_bpa.set_index("k").reindex(df_tesa["k"])["avg_time_ms"].values
+            / df_tesa["avg_time_ms"].values
         )
-    )
+
+        fig.add_trace(
+            go.Scatter(
+                x=df_tesa["k"],
+                y=df_tesa["avg_time_ms"],
+                mode="lines+markers",
+                name="sparta",
+                legendgroup="sparta",
+                line=dict(color="#8B5CF6", width=2, shape="spline"),
+                marker=dict(
+                    size=6,
+                    symbol="square",
+                    color="#8B5CF6",
+                    line=dict(color="white", width=1.5),
+                ),
+                customdata=speedup_tesa,
+                hovertemplate="<b>sparta</b><br># Matmuls: %{x}<br>Time: %{y:.2f} ms<br>Speedup (vs bpa): %{customdata:.1f}x<br><extra></extra>",
+            )
+        )
 
     fig.update_layout(
         title={
@@ -607,7 +617,7 @@ def figure10(
     dir_path = Path("./results/Figure 10")
     dir_path.mkdir(parents=True, exist_ok=True)
 
-    output_path = dir_path + output_prefix
+    output_path = str(dir_path / output_prefix)
 
     fig.write_html(
         f"{output_path}.html",
@@ -1352,7 +1362,9 @@ def figure15(
         height=252,
     )
 
-    output_path = str(csv_path).split(".csv")[0]
+    dir_path = Path("./results/Figure 15")
+    dir_path.mkdir(parents=True, exist_ok=True)
+    output_path = str(dir_path / output_prefix)
     fig.write_html(
         f"{output_path}.html",
         config={"displayModeBar": True, "displaylogo": False},
