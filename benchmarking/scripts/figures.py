@@ -1474,10 +1474,10 @@ def figure16(
         paper_bgcolor="white",
         legend=dict(
             orientation="v",
+            xanchor="left",
             yanchor="top",
             y=0.98,
-            xanchor="right",
-            x=0.98,
+            x=0.02,
             bgcolor="rgba(255,255,255,0.85)",
             bordercolor="black",
             borderwidth=1,
