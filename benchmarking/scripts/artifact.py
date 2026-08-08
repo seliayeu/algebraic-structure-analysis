@@ -10,6 +10,7 @@ import comptime
 import bench
 import attention_prop
 import symbolic
+import sparta
 
 
 def kalman_filter(runs_count: int = 5) -> str:
@@ -189,8 +190,12 @@ def stur_chain() -> str:
     return str(dest)
 
 
+def sparta_chain(runs_count: int = 10) -> str:
+    return sparta.run_benchmark(repetitions=runs_count)
+
+
 FIGURE_REQUIREMENTS = {
-    "figure10": ["symbolic_chain", "bench_chain"],
+    "figure10": ["symbolic_chain", "bench_chain", "sparta_chain"],
     "figure11": ["kalman_filter", "sparse_attention", "batch_bertlike", "chain"],
     "figure12": ["kalman_filter", "sparse_attention", "batch_bertlike", "chain"],
     "figure13": ["comptime"],
@@ -209,6 +214,7 @@ BENCHMARK_DISPATCH = {
     "comptime": comptime_experiment,
     "symbolic_chain": symbolic_chain,
     "bench_chain": stur_chain,
+    "sparta_chain": sparta_chain,
 }
 
 
