@@ -441,7 +441,7 @@ def figure10(
     results_dir="./results",
     output_prefix="symbolic_chained_comparison",
     figure_title: str = "Symbolic Analysis Time vs Number of Matmuls",
-    log=False,
+    log=True,
     show_title: bool = True,
     save_png_and_svg: bool = True,
 ):
