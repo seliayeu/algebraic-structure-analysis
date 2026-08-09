@@ -7,6 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         clang \
+        clang-tools \
         lld \
         cmake \
         ninja-build \
@@ -53,8 +54,8 @@ FROM base AS bpa-builder
 
 COPY --from=mlir-builder /opt/mlir /opt/mlir
 
-RUN git clone https://github.com/seliayeu/algebraic-structure-analysis /app/bpa \
-    && cd /app/bpa 
+WORKDIR /app/bpa
+COPY . /app/bpa
 
 RUN cmake -G Ninja \
         -S /app/bpa \
@@ -88,6 +89,34 @@ WORKDIR /app/stur
 RUN /opt/sbt/bin/sbt compile
 
 # ---------------------------------------------------------------------------
+# Build SPARTA/TESA symbolic benchmark binaries
+# ---------------------------------------------------------------------------
+FROM base AS sparta-builder
+
+ARG SPARTA_REPO=https://github.com/seliayeu/tesa-prop.git
+ARG SPARTA_COMMIT=0323bcd62e33fc8663e7b6161c5292e2637f778e
+
+RUN git init /app/sparta \
+    && cd /app/sparta \
+    && git remote add origin ${SPARTA_REPO} \
+    && git fetch --depth 1 origin ${SPARTA_COMMIT} \
+    && git checkout FETCH_HEAD
+
+WORKDIR /app/sparta
+RUN mkdir -p /opt/sparta/bin \
+    && for k in 100 200 300 400 500 600 700 800 900 1000; do \
+        cmake -G Ninja \
+            -S /app/sparta \
+            -B /app/sparta/build-$k \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSIZE_MACRO=2048 \
+            -DNUM_MATMULS=$k; \
+        ninja -C /app/sparta/build-$k tesa-prop; \
+        cp /app/sparta/build-$k/tesa-prop /opt/sparta/bin/tesa-prop-$k; \
+    done \
+    && cp -a /app/sparta/CMakeLists.txt /app/sparta/src /opt/sparta/
+
+# ---------------------------------------------------------------------------
 # Runtime image
 # ---------------------------------------------------------------------------
 FROM base AS runtime
@@ -116,11 +145,13 @@ COPY --from=mlir-builder /opt/mlir /opt/mlir
 COPY --from=bpa-builder  /app/bpa  /app/bpa
 COPY --from=stur-builder /opt/sbt  /opt/sbt
 COPY --from=stur-builder /app/stur /app/stur
+COPY --from=sparta-builder /opt/sparta /opt/sparta
 
 ENV MLIR_LIB_DIR=/opt/mlir/lib
 ENV COURSIER_CACHE=/app/stur/.coursier-cache
 ENV SBT_OPTS="-Dsbt.global.base=/app/stur/.sbt-cache -Dsbt.ivy.home=/app/stur/.ivy2-cache"
 ENV STUR_DIR=/app/stur
+ENV SPARTA_DIR=/opt/sparta
 
 # ---------------------------------------------------------------------------
 # Python environment

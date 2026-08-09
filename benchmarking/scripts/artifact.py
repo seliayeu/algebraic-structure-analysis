@@ -9,6 +9,8 @@ import figures
 import comptime
 import bench
 import attention_prop
+import symbolic
+import sparta
 
 
 def kalman_filter(runs_count: int = 5) -> str:
@@ -173,6 +175,10 @@ def comptime_experiment(runs_count: int = 5) -> str:
     return result_path
 
 
+def symbolic_chain(runs_count: int = 10) -> list[str]:
+    return symbolic.run_benchmark(repetitions=runs_count)
+
+
 def stur_chain() -> str:
     stur_dir = os.environ.get("STUR_DIR", "/app/stur")
     subprocess.run(["python3", "benchmark_chained.py"], cwd=stur_dir, check=True)
@@ -184,8 +190,12 @@ def stur_chain() -> str:
     return str(dest)
 
 
+def sparta_chain(runs_count: int = 10) -> str:
+    return sparta.run_benchmark(repetitions=runs_count)
+
+
 FIGURE_REQUIREMENTS = {
-    "figure10": ["bench_chain"],
+    "figure10": ["symbolic_chain", "bench_chain", "sparta_chain"],
     "figure11": ["kalman_filter", "sparse_attention", "batch_bertlike", "chain"],
     "figure12": ["kalman_filter", "sparse_attention", "batch_bertlike", "chain"],
     "figure13": ["comptime"],
@@ -202,7 +212,9 @@ BENCHMARK_DISPATCH = {
     "attention_prop": attention_propagation,
     "attention_backward_prop": attention_backward_prop,
     "comptime": comptime_experiment,
+    "symbolic_chain": symbolic_chain,
     "bench_chain": stur_chain,
+    "sparta_chain": sparta_chain,
 }
 
 
@@ -244,13 +256,11 @@ def generate_requested_figures(figures_list, benchmark_results):
 
     for fig in figures_list:
         if fig == "figure10":
-            if "bench_chain" in benchmark_results:
+            if all(b in benchmark_results for b in FIGURE_REQUIREMENTS["figure10"]):
                 print("Building Figure 10...")
                 figures.figure10()
             else:
-                print(
-                    "Skipping Figure 10: required benchmark 'bench_chain' not available."
-                )
+                print("Skipping Figure 10: missing symbolic chain benchmarks.")
 
         elif fig == "figure11":
             if all(b in benchmark_results for b in FIGURE_REQUIREMENTS["figure11"]):
