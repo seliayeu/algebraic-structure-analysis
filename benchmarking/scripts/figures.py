@@ -584,7 +584,7 @@ def figure10(
         width=700,
         height=500,
         template="plotly_white",
-        margin=dict(t=0, b=0, l=0, r=0),
+        margin=dict(t=70, b=0, l=0, r=0),
         plot_bgcolor="white",
     )
 
@@ -612,6 +612,11 @@ def figure10(
         zeroline=False,
         showline=True,
         type="log" if log else "linear",
+        tickmode="linear" if log else "auto",
+        tick0=0 if log else None,
+        dtick=1 if log else None,
+        exponentformat="power",
+        showexponent="all",
     )
 
     dir_path = Path("./results/Figure 10")
