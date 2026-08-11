@@ -59,3 +59,7 @@ $ ninja check-bpa
 - `dia.transposition`
 - `dia.elementwise`
 
+
+
+### How to Cite?
+
